@@ -48,7 +48,7 @@ Without Firebase configured, the app runs in **demo mode**: data is stored only 
 ## Quick start
 
 1. **Fork** this repo (or use it directly if you're the owner).
-2. **Settings → Pages →** Source: **GitHub Actions**. The included workflow publishes the site on every push to `main`.
+2. **Settings → Pages →** Source: **Deploy from a branch**, branch `main`, folder `/ (root)`. Every push to `main` republishes the site.
 3. Open `https://<your-user>.github.io/AuctionXI/` to use it in demo mode immediately.
 4. To let captains bid from their own phones: follow **[docs/SETUP.md](docs/SETUP.md)** (about 10 minutes: create a Firebase project, paste the config into `js/config.js`, publish `database.rules.json`).
 
