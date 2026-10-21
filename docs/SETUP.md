@@ -4,10 +4,17 @@ Demo mode works without any setup, but only inside one browser. To let captains 
 
 ## 1. Host the site on GitHub Pages
 
-1. Fork this repo (or use your own copy).
-2. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Push any commit to `main` (or run the *Deploy to GitHub Pages* workflow manually).
-4. Your site: `https://<github-user>.github.io/<repo-name>/`
+The site is plain files, so GitHub Pages serves it directly. No build is needed.
+
+**Quickest (works from any branch):**
+
+1. Repo **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
+2. Branch: the branch holding the code (e.g. `main`), folder **`/ (root)`** → **Save**.
+3. After a minute the site is live at `https://<github-user>.github.io/<repo-name>/` (shown at the top of the Pages settings).
+
+**Alternative: deploy with the included workflow** (`.github/workflows/pages.yml`, runs on every push to `main`): choose **Source: GitHub Actions** instead. Use this once the code is on `main`.
+
+The repo must be **public** for free GitHub Pages (private repos need a paid plan).
 
 ## 2. Create the Firebase project
 

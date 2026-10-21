@@ -133,7 +133,7 @@ body.stage-mode main { max-width: none; padding: 0; }
 .stage {
   position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center;
   transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
-  display: grid; grid-template-rows: auto 1fr auto auto; gap: var(--space-6);
+  display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); gap: var(--space-6);
   padding: var(--space-8) var(--space-10) 0; background: var(--ground); color: var(--ink); overflow: hidden;
 }
 .stage-top { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-8); }
