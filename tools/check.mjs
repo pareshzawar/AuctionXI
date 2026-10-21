@@ -120,3 +120,23 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   const again = []; const c2 = C.createCommentator({ onLine: (l) => again.push(l.text) }); c2.update(a);
   ok(again.length === 0 && c2.lines.length > 0, 'a late joiner gets the history without it being read out');
 }
+
+// commentary languages: same events, Hinglish and Marathi
+{
+  const C = await import(root + '/js/commentary.js');
+  for (const lang of ['hi', 'mr']) {
+    const a = E.normalize({ meta: { name: 'SPL 2026', round: 1 }, rules: s.rules, teams, players, sales: {}, log: {} });
+    for (const [pid, p] of Object.entries(players)) if (p.allottedTeam) a.sales[pid] = { team: p.allottedTeam, price: E.allottedPrice(p, s.rules), allotted: true };
+    const said = [];
+    const c = C.createCommentator({ lang, onLine: (l) => said.push(l.text) });
+    c.update(a);
+    const [p1] = Object.keys(players).filter((id) => !players[id].allottedTeam);
+    a.log.a1 = { type: 'start', at: 1 }; a.log.a2 = { type: 'up', playerId: p1, amount: 50, drawn: 'chit', at: 2 };
+    a.live = { playerId: p1, status: 'bidding', bid: { amount: 50, team: null } }; c.update(a);
+    for (const [team, amount] of [['T1', 50], ['T2', 60], ['T1', 70], ['T2', 80], ['T3', 200]]) { a.live.bid = { amount, team, at: amount }; c.update(a); }
+    a.sales[p1] = { team: 'T3', price: 200 }; a.live.status = 'sold'; a.log.a3 = { type: 'sold', playerId: p1, team: 'T3', amount: 200, at: 300 }; c.update(a);
+    a.log.a4 = { type: 'end', at: 400 }; c.update(a);
+    console.log(`     [${lang}]\n     ` + said.join('\n     '));
+    ok(said.length === 9 && (lang === 'mr' ? said.every((t) => /[ऀ-ॿ]/.test(t)) : /shuru|baari|nikla/.test(said[1])), `commentary in ${lang === 'hi' ? 'Hinglish' : 'Marathi'}`);
+  }
+}

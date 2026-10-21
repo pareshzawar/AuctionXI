@@ -12,10 +12,10 @@ import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
   HOUSE_RULE_QUESTIONS, TEAM_COLORS, num,
 } from './csv.js';
-import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction } from './ui.js';
+import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
-import { createCommentator, createVoice } from './commentary.js';
+import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -31,7 +31,9 @@ let drawPool = '';
 let drawRole = '';
 let miniKeep = null;
 const voice = createVoice();
-const commentator = createCommentator({ onLine: (line) => { voice.say(line); if (tab === 'control') renderCommentary(); } });
+const commLang = () => deviceCommLang() || A?.rules.commentaryLang || 'en';
+const makeCommentator = () => createCommentator({ lang: commLang, onLine: (line) => { voice.say(line); if (tab === 'control') renderCommentary(); } });
+let commentator = makeCommentator();
 // Arriving from "Create → Mini" on the home page: open the mini-auction builder pre-filled.
 const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
 if (miniPreset) tab = 'results'; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
@@ -185,6 +187,7 @@ function setup(el) {
         </div>
         ${field('Order players come up', `<select id="r-order">${Object.entries(PICK_ORDERS).map(([k, v]) => `<option value="${k}" ${k === rules.pickOrder ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Allotted captains and vice-captains are never auctioned.')}
         <label class="check" style="margin-top:var(--space-3)"><input type="checkbox" id="r-comm" ${rules.commentary === false ? '' : 'checked'}> Live commentary on the stage, phones and here</label>
+        ${field('Commentary language', `<select id="r-commlang">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === rules.commentaryLang ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'The default for this tournament. Every phone can switch for itself.')}
       </div>
       <div class="card">
         <h2>House rules</h2>
@@ -248,6 +251,7 @@ async function saveSetup() {
     unsoldRounds: n('#r-rounds'),
     pickOrder: $('#r-order').value,
     commentary: $('#r-comm').checked,
+    commentaryLang: $('#r-commlang').value,
     bidMode: $('#r-mode').value,
     roleMin: Object.fromEntries(Object.keys(ROLES).map((k) => [k, n(`#role-${k}`)])),
     categories,
@@ -619,7 +623,9 @@ function control(el) {
       <div class="card"><h2>Purses</h2><div class="stack">${purses(A, { viewer: { role: 'admin' } })}</div></div>
       <div class="stack">
         ${A.rules.commentary === false ? '' : `<div class="card"><div class="section-title"><h2 style="margin:0">Commentary</h2><span class="spacer"></span>
+          <select id="c-lang" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
           ${voice.supported ? `<button class="btn-sm" id="c-voice">${voice.on ? 'Stop reading aloud' : 'Read aloud on this laptop'}</button>` : ''}</div>
+          ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This laptop has no Marathi or Hindi voice, so lines are shown but not read. Install one in the system language settings.</p>' : ''}
           <div id="c-comm" class="feed"></div></div>`}
         <div class="card"><h2>Activity</h2>${feed(A)}</div>
       </div>
@@ -627,7 +633,8 @@ function control(el) {
 
   wireNextPlayerPanel(el);
   renderCommentary();
-  if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(); render(true); };
+  if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(commLang()); render(true); };
+  if ($('#c-lang')) $('#c-lang').onchange = (e) => { setDeviceCommLang(e.target.value === A.rules.commentaryLang ? '' : e.target.value); commentator = makeCommentator(); commentator.update(A); e.target.blur(); render(true); };
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
   $('#c-undobid').onclick = run(() => undoLastBid(aid, A));
