@@ -43,6 +43,7 @@ export const DEFAULT_RULES = {
   // 'room': paddles in the room only; the auctioneer records every bid or just the final amount.
   bidMode: 'both',
   commentary: true, // live commentary lines on the stage, phones and console
+  commentaryLang: 'en', // 'en' | 'hi' (Hinglish) | 'mr' (Marathi); each device can switch
   houseRules: [],
 };
 

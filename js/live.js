@@ -4,8 +4,8 @@
 import { db } from './db.js';
 import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat } from './actions.js';
-import { createCommentator, createVoice } from './commentary.js';
-import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl } from './ui.js';
+import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
+import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
 
@@ -21,7 +21,15 @@ let tab = null; // default: Rules before the auction starts, Squads after
 let sending = false;
 let lastResult = null;
 const voice = createVoice();
-const commentator = createCommentator({ onLine: (line) => voice.say(line) });
+// Language: ?lang= on the link (handy for the stage), else this device's choice, else the tournament's.
+const commLang = () => (LANGUAGES[param('lang')] ? param('lang') : '') || deviceCommLang() || A?.rules.commentaryLang || 'en';
+const makeCommentator = () => createCommentator({ lang: commLang, onLine: (line) => voice.say(line) });
+let commentator = makeCommentator();
+function switchLang(l) {
+  setDeviceCommLang(l === A.rules.commentaryLang ? '' : l);
+  commentator = makeCommentator();
+  commentator.update(A);
+}
 
 if (stage) {
   document.documentElement.setAttribute('data-theme', 'night');
@@ -60,7 +68,12 @@ async function boot() {
     addEventListener('resize', fit);
     fit();
     // The stage takes no clicks; V switches the voice on or off (the browser needs a key press first).
-    addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'v' && voice.supported) { voice.toggle(); renderStage(); } });
+    // L cycles the commentary language.
+    addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'v' && voice.supported) { voice.toggle(commLang()); renderStage(); }
+      if (k === 'l' && A) { const ls = Object.keys(LANGUAGES); switchLang(ls[(ls.indexOf(commLang()) + 1) % ls.length]); renderStage(); }
+    });
   }
 }
 
@@ -136,7 +149,9 @@ function renderPhone() {
       <div>${hasLot ? livePanel(A) : ''}</div>
     </div>
     ${A.rules.commentary === false ? '' : `<div class="card" style="margin-top:var(--space-4)"><div class="section-title"><h3 style="margin:0">Commentary</h3><span class="spacer"></span>
+      <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
+      ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
       <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div><span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
     ${isBidder() && team ? `<div class="dock">${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
@@ -148,7 +163,8 @@ function renderPhone() {
     <section id="below">${below(current)}</section>`;
   if (keep) $('#below').scrollTop = keep;
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPhone(); }));
-  if ($('#voice-btn')) $('#voice-btn').onclick = () => { voice.toggle(); renderPhone(); };
+  if ($('#voice-btn')) $('#voice-btn').onclick = () => { voice.toggle(commLang()); renderPhone(); };
+  if ($('#lang-sel')) $('#lang-sel').onchange = (e) => { switchLang(e.target.value); renderPhone(); };
   const btn = $('[data-bid-button]');
   if (btn) btn.onclick = bid;
 }

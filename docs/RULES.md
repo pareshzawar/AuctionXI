@@ -39,6 +39,9 @@ The stage shows how each player came up ("Random draw from Pool B", "Chit"). Cap
 
 ## Live commentary
 
+**Languages:** English, **Hinglish** and **Marathi** (मराठी). Set the tournament's default under Setup → Bidding (or `commentary_language` in the questionnaire). Every phone can switch for itself in its Commentary card, the control room has its own picker, and on the stage press `L` to cycle (or add `&lang=mr` / `&lang=hi` to the stage link). The voice uses an Indian English voice for English and Hinglish, and a Marathi voice for Marathi (falling back to Hindi); if a device has neither, the lines are shown but not read.
+
+
 With **Live commentary** on (Setup → Bidding, or `live_commentary` in the questionnaire), the app writes a running commentary from what happens: each player's introduction (pool, role, stats), the opening bid, teams joining, bidding wars, record prices, sales with squad progress, unsold players and the closing summary. It appears on the stage (above the teams), on phones (under the bid panel and in a Commentary tab) and in the control room.
 
 **Read aloud:** the control room's *Read aloud on this laptop* button (plug the laptop into the hall speakers), *Read aloud* on any phone, or press `V` on the stage screen. It uses the device's own voice, free and offline-capable, preferring an Indian English voice. It never mentions a team's remaining purse unless purses are shown to everyone.

@@ -80,3 +80,11 @@ export function mountHeader(extra = '') {
     <div class="top-extra">${extra}</div>`;
   header.append(modeBadge());
 }
+
+// Commentary language chosen on this device ('' = the tournament's default).
+export function deviceCommLang() {
+  try { return localStorage.getItem('auctionxi:commlang') || ''; } catch { return ''; }
+}
+export function setDeviceCommLang(l) {
+  try { if (l) localStorage.setItem('auctionxi:commlang', l); else localStorage.removeItem('auctionxi:commlang'); } catch { /* private mode */ }
+}

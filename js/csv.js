@@ -267,6 +267,9 @@ function setupFields() {
     (m, r) => r.pickOrder, (m, r, v, warn) => { if (PICK_ORDERS[v]) r.pickOrder = v; else if (v) warn(`pick_order: "${v}" not recognised, kept ${r.pickOrder}`); }]);
   f.push(['Bidding', 'live_commentary', 'Show live commentary on the stage and phones? (yes / no)', 'Generated from the auction itself; it can also be read aloud on any device',
     (m, r) => (r.commentary === false ? 'no' : 'yes'), (m, r, v) => { r.commentary = !/^(n|no|off|false|0)$/i.test(v); }]);
+  f.push(['Bidding', 'commentary_language', 'Commentary language (english / hinglish / marathi)', 'Each phone can still switch for itself',
+    (m, r) => ({ hi: 'hinglish', mr: 'marathi' }[r.commentaryLang] || 'english'),
+    (m, r, v, warn) => { const l = /hing|hindi/i.test(v) ? 'hi' : /mar|मराठी/i.test(v) ? 'mr' : /eng/i.test(v) || !v ? 'en' : null; if (l) r.commentaryLang = l; else warn(`commentary_language: "${v}" should be english, hinglish or marathi`); }]);
   number('Bidding', 'unsold_rounds', 'How many times unsold players come back for another round', 'e.g. 1', 'unsoldRounds');
 
   for (const [key, q, help] of HOUSE_RULE_QUESTIONS) {
