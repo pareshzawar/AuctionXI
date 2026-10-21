@@ -46,6 +46,22 @@ With **Live commentary** on (Setup → Bidding, or `live_commentary` in the ques
 
 **Read aloud:** the control room's *Read aloud on this laptop* button (plug the laptop into the hall speakers), *Read aloud* on any phone, or press `V` on the stage screen. It uses the device's own voice, free and offline-capable, preferring an Indian English voice. It never mentions a team's remaining purse unless purses are shown to everyone.
 
+## Captain's workbook
+
+Every captain and vice-captain who has signed in with their code gets a **My workbook** tab on their phone. Nobody else sees it: not team members, not the audience, and **not the admin**.
+
+| Section | What it holds |
+|---|---|
+| **Players** | Every player in the auction with pool, role, stats and status (available, up now, sold to whom and for how much, unsold). Search, filter by pool or role, show only those still available or only *My list*. Add players to your list and write **your max bid** and a note against each |
+| **Other teams** | Your own record of what the other teams buy: add each player and price as you hear it. The workbook estimates each team's purse left, players still to buy and max bid (same formula as above). Adjust a team's starting purse (e.g. a mini auction) and keep notes on each team |
+| **Scratch pad** | Free notes and a quick calculator that understands `₹`, `L` and `Cr` (e.g. `650 - 7*50`, `1.5L + 50,000`) |
+
+While a player is up, the phone shows *Your limit for this player* above the BID button, and warns when the next bid is over it. The limit is a reminder only; the max-bid rule above is what the app enforces.
+
+**Privacy.** The first time, each person chooses a PIN. The workbook is encrypted on the phone with it (AES-GCM) before it is saved, and the database rules let only that captain's or vice-captain's signed-in phone fetch it. Without the PIN the saved text is unreadable, even to the person who owns the Firebase project. The phone remembers the PIN until the tab is closed; *Lock* forgets it at once. A forgotten PIN can't be recovered: *Forgot PIN* starts a new, empty workbook. *Download* saves a copy as a file.
+
+The captain and vice-captain of a team each have their own workbook. Share notes by talking, or by sending the downloaded file.
+
 ## Max bid
 
 A team must always be able to fill its squad, so:

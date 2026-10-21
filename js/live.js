@@ -5,6 +5,7 @@ import { db } from './db.js';
 import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat } from './actions.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
+import { openWorkbook, renderWorkbook } from './workbook.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
@@ -20,6 +21,8 @@ let A = null;
 let tab = null; // default: Rules before the auction starts, Squads after
 let sending = false;
 let lastResult = null;
+let wb = null; // this captain's / vice-captain's private workbook
+let belowDirty = false;
 const voice = createVoice();
 // Language: ?lang= on the link (handy for the stage), else this device's choice, else the tournament's.
 const commLang = () => (LANGUAGES[param('lang')] ? param('lang') : '') || deviceCommLang() || A?.rules.commentaryLang || 'en';
@@ -50,6 +53,8 @@ async function boot() {
     } else {
       myTeam = seat.team;
       role = seat.as === 'VC' ? 'vc' : 'captain';
+      wb = openWorkbook(aid, `${seat.team}_${seat.as}`);
+      await wb.resume();
     }
   }
   db.on(`auctions/${aid}`, (v) => {
@@ -133,8 +138,14 @@ function renderPhone() {
   const team = myTeam && A.teams[myTeam];
   const roleLabel = { audience: 'Audience', member: 'Team member', captain: 'Captain', vc: 'Vice-captain' }[role] || role;
   const current = tab || (meta.status === 'setup' ? 'rules' : 'squads');
-  const keep = $('#below')?.scrollTop;
-  $('#app').innerHTML = `
+  if (!$('#p-top')) {
+    // #below stays in place between updates so typing in the workbook is never lost.
+    $('#app').innerHTML = '<div id="p-top"></div><section id="below"></section>';
+    $('#below').addEventListener('focusout', () => setTimeout(() => {
+      if (belowDirty && !$('#below').contains(document.activeElement)) renderBelow();
+    }, 0));
+  }
+  $('#p-top').innerHTML = `
     <div class="page-head">
       <div>
         <h1 style="margin:0">${esc(meta.name)}</h1>
@@ -153,16 +164,15 @@ function renderPhone() {
       ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
       ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
       <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div><span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
-    ${isBidder() && team ? `<div class="dock">${captainButton()}</div>` : ''}
+    ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
     <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
-      ${[['squads', 'Squads'], ['pool', 'Players left'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules']].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
-    </nav>
-    <section id="below">${below(current)}</section>`;
-  if (keep) $('#below').scrollTop = keep;
-  $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPhone(); }));
+      ${[['squads', 'Squads'], ['pool', 'Players left'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
+    </nav>`;
+  renderBelow();
+  $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; belowDirty = true; $('#below').innerHTML = ''; renderPhone(); }));
   if ($('#voice-btn')) $('#voice-btn').onclick = () => { voice.toggle(commLang()); renderPhone(); };
   if ($('#lang-sel')) $('#lang-sel').onchange = (e) => { switchLang(e.target.value); renderPhone(); };
   const btn = $('[data-bid-button]');
@@ -197,6 +207,34 @@ async function bid() {
     sending = false;
     renderPhone();
   }
+}
+
+const currentTab = () => tab || (A.meta.status === 'setup' ? 'rules' : 'squads');
+
+function renderBelow() {
+  const el = $('#below');
+  const t = currentTab() === 'wb' && !wb ? 'squads' : currentTab();
+  if (t === 'wb') {
+    // Never redraw under the captain's fingers; catch up when they leave the field.
+    const f = document.activeElement;
+    if (el.contains(f) && f.matches('input, textarea, select')) { belowDirty = true; return; }
+    belowDirty = false;
+    renderWorkbook(el, { get a() { return A; }, wb, team: myTeam, seatLabel: `${A.teams[myTeam]?.name || myTeam} ${role === 'vc' ? 'vice-captain' : 'captain'}`, rerender: renderPhone });
+    return;
+  }
+  belowDirty = false;
+  el.innerHTML = below(t);
+}
+
+// The captain's own limit for the player on the block, from the workbook.
+function myLimit() {
+  const live = A.live;
+  const mine = wb?.book && live?.status === 'bidding' && wb.book.players[live.playerId];
+  if (!mine || mine.max == null) return '';
+  const over = live.bid?.team !== myTeam && nextBid(live, A.rules) > mine.max;
+  return `<p class="${over ? 'notice notice-warn' : 'hint'}" style="margin:0 0 var(--space-2)">${over
+    ? `Next bid ${esc(money(nextBid(live, A.rules), A.rules))} is over your limit of ${esc(money(mine.max, A.rules))} (from your workbook).`
+    : `Your limit for this player: ${esc(money(mine.max, A.rules))} (from your workbook).`}${mine.note ? ` ${esc(mine.note)}` : ''}</p>`;
 }
 
 function below(tab) {

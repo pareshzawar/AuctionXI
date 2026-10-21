@@ -529,6 +529,23 @@ function access(el) {
         <ul>${Object.entries(coadmins).map(([uid, c]) => `<li>${esc(c.name)} <button class="btn-sm btn-ghost" data-kick-admin="${esc(uid)}">Remove</button></li>`).join('') || '<li class="muted">None</li>'}</ul>
       </div>
       <div class="card" style="grid-column:1/-1">
+        <h2>Present on Zoom or Google Meet</h2>
+        <p>For captains, players and family who can't be in the hall. Share the stage screen, with its commentary and voice, in your video call. Captains still bid from their phones with the join link, and the call only shows what the stage shows, so purses stay private.</p>
+        <div class="grid grid-2">
+          <div>
+            ${field('Stage link', `<input readonly value="${esc(screenUrl)}" onclick="this.select()">`)}
+            <p class="row">${Object.entries(LANGUAGES).map(([k, v]) => `<a class="btn btn-sm" target="_blank" href="${esc(pageUrl('live.html', { a: aid, screen: 1, lang: k }))}">Open stage · ${esc(v)}</a>`).join('')}</p>
+          </div>
+          <ol class="stack" style="gap:var(--space-2);margin:0;padding-left:1.2em">
+            <li>On the laptop in the call, open the stage in its own Chrome or Edge tab (buttons on the left; each sets the commentary language). Press <kbd>F11</kbd> for full screen.</li>
+            <li>Click on the stage once, then press <kbd>V</kbd> to read the commentary aloud (<kbd>L</kbd> changes language).</li>
+            <li><b>Google Meet:</b> Present now → <i>A tab</i> → the stage tab, with <i>Also share tab audio</i> on.<br>
+                <b>Zoom:</b> Share screen → the browser window, and tick <i>Share sound</i> (bottom left) so the call hears the voice.</li>
+            <li>Mute your own microphone while the voice speaks, or the hall echoes. Send remote captains the join link and their code as usual.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
         <h2>${vcCanBid(A.rules) ? 'Captain and vice-captain codes' : 'Captain codes'}</h2>
         <p>Send each person only their own code. They open the join link, choose ${vcCanBid(A.rules) ? 'Captain or Vice-captain' : 'Captain'} and their team, and enter the code.
           With a code they bid and see ${A.rules.purseVisibility === 'own' ? 'their own team\'s' : 'the'} remaining purse and max bid.</p>
