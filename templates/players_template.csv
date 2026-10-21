@@ -1,0 +1,4 @@
+id,name,role,category,base_price,batting_style,bowling_style,age,locality,photo_url,matches,runs,wickets,notes,retained_by,retained_price
+P001,Rohan Patil,All-rounder,A,,Right-hand bat,Right-arm medium,28,Wing A - 302,,12,340,9,Opening bat,,
+P002,Amit Shah,Wicket-keeper,B,600,Left-hand bat,,34,Wing C - 105,,8,150,0,,,
+P003,Vikram Rao,Bowler,C,,Right-hand bat,Left-arm spin,22,Wing B - 410,,,,,Captain of Tigers,T1,0

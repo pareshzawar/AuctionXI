@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live auction - AuctionXI</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%23b91c1c'/></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top"></header>
+  <main>
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <h1 id="title" style="margin:0;font-size:1.5rem"></h1>
+        <small class="muted" id="subtitle"></small>
+      </div>
+      <span class="spacer"></span>
+      <span id="role" class="pill pill-blue"></span>
+      <span id="status" class="pill"></span>
+    </div>
+    <div id="captain-info" class="hidden"></div>
+    <div class="stage">
+      <div class="card" id="player"></div>
+      <div class="card" id="bid"></div>
+    </div>
+    <div class="card" style="margin-top:16px" id="teams"></div>
+    <nav class="tabs" style="margin-top:16px" id="tabs">
+      <button data-tab="squads" class="active">Squads</button>
+      <button data-tab="feed">Activity</button>
+      <button data-tab="pool">Players remaining</button>
+    </nav>
+    <section id="below"></section>
+    <div class="captain-bid hidden" id="captain-bid"><button class="btn-gold" id="bid-btn">Bid</button><div class="muted" id="bid-why" style="text-align:center;margin-top:6px"></div></div>
+  </main>
+  <div id="banner"></div>
+  <script type="module" src="js/live.js"></script>
+</body>
+</html>

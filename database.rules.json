@@ -1,0 +1,46 @@
+{
+  "rules": {
+    "auctions": {
+      "$aid": {
+        ".read": true,
+        ".write": "auth != null && ((!data.exists() && newData.child('meta/ownerUid').val() === auth.uid) || data.child('meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        "meta": {
+          "ownerUid": {
+            ".validate": "!data.exists() || newData.val() === data.val()"
+          }
+        },
+        "live": {
+          "bid": {
+            ".write": "auth != null && root.child('auctions/' + $aid + '/rules/captainBidding').val() === true && data.parent().child('status').val() === 'bidding' && root.child('captains/' + $aid + '/' + auth.uid + '/team').val() === newData.child('team').val() && newData.child('team').val() !== data.child('team').val() && newData.child('amount').isNumber() && (newData.child('amount').val() > data.child('amount').val() || (!data.child('team').exists() && newData.child('amount').val() === data.child('amount').val())) && newData.child('amount').val() <= root.child('auctions/' + $aid + '/teams/' + newData.child('team').val() + '/maxBid').val()"
+          }
+        }
+      }
+    },
+    "secrets": {
+      "$aid": {
+        ".read": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        ".write": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())"
+      }
+    },
+    "captains": {
+      "$aid": {
+        ".read": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        ".write": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid && newData.exists() && newData.child('code').val() === root.child('secrets/' + $aid + '/teamCodes/' + newData.child('team').val()).val()"
+        }
+      }
+    },
+    "coadmins": {
+      "$aid": {
+        ".read": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        ".write": "auth != null && root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid && newData.exists() && newData.child('code').val() === root.child('secrets/' + $aid + '/adminCode').val()"
+        }
+      }
+    }
+  }
+}
