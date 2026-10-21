@@ -72,7 +72,7 @@ function renderStage() {
     <div class="stage-frame"><div class="stage">
       <header class="stage-top">
         <div class="stage-brand">
-          <span class="stage-label">AuctionXI${total ? ` · Lot ${lot} of ${total}` : ''}</span>
+          <span class="stage-label">AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}</span>
           <h1 class="stage-title">${esc(meta.name)}</h1>
         </div>
         <div class="stage-tally">
@@ -99,7 +99,7 @@ function stageRules() {
   const res = Math.max(0, r.squadSize - r.playersPerSide);
   const lines = [
     `${r.playersPerSide}-a-side · every team buys exactly ${r.squadSize} players${res ? ` (${res} reserve${res === 1 ? '' : 's'})` : ''}`,
-    `Purse ${money(r.purse, r)} · captain ${money(r.captainPrice, r)}${r.leaders === 'captain_vc' ? ` · vice-captain ${money(r.vcPrice, r)}` : ''} · base price ${money(r.categories[0]?.base, r)}`,
+    `Purse ${money(r.purse, r)} · base price ${money(r.categories[0]?.base, r)} · captain value ${money(r.captainPrice, r)}${r.leaders === 'captain_vc' ? ` · vice-captain value ${money(r.vcPrice, r)}` : ''} (not from the purse)`,
     mb.rule,
   ];
   return `<div style="margin-top:var(--space-8);text-align:left;max-width:1400px">${lines.map((l) => `<p style="font-size:30px;line-height:40px;color:var(--ink)">${esc(l)}</p>`).join('')}</div>`;
