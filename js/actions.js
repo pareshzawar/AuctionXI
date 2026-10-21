@@ -14,17 +14,31 @@ async function newAuctionId(name, tournament) {
   return aid;
 }
 
-export async function createAuction({ name, tournament, venue, date, organiser }) {
+// A major auction: a fresh player pool. `copyFrom` (an earlier auction, normalized) copies its
+// rules, house rules and teams - typically last season's auction of the same tournament.
+export async function createAuction({ name, tournament, season, venue, date, organiser, copyFrom = null }) {
   const aid = await newAuctionId(name, tournament);
   const adminCode = randomCode(8);
+  const teams = {};
+  const codes = { teamCodes: {}, vcCodes: {} };
+  for (const [id, t] of Object.entries(copyFrom?.teams || {})) {
+    const { purse, spent, maxBid, carriedOver, releasedValue, ...rest } = t;
+    teams[id] = rest;
+    codes.teamCodes[id] = randomCode(6);
+    codes.vcCodes[id] = randomCode(6);
+  }
   await db.set(`auctions/${aid}`, {
     meta: {
-      name, tournament: tournament || null, venue: venue || null, date: date || null, organiser: organiser || null,
+      name, tournament: tournament || null, season: season || null, kind: 'major',
+      venue: venue || null, date: date || null, organiser: organiser || null,
+      copiedFrom: copyFrom ? copyFrom.id : null, copiedFromName: copyFrom ? copyFrom.meta.name : null,
       ownerUid: db.uid(), createdAt: db.now(), status: 'setup', locked: false, round: 1,
     },
-    rules: DEFAULT_RULES,
+    rules: copyFrom ? copyFrom.rules : DEFAULT_RULES,
+    teams,
   });
-  await db.set(`secrets/${aid}`, { adminCode, teamCodes: {}, vcCodes: {} });
+  await db.set(`secrets/${aid}`, { adminCode, ...codes });
+  if (copyFrom) await db.update(`auctions/${aid}`, capsUpdate(normalize({ meta: {}, rules: copyFrom.rules, teams })));
   return { aid, adminCode };
 }
 
@@ -33,7 +47,7 @@ export async function createAuction({ name, tournament, venue, date, organiser }
 // the auction (captain / vice-captain stay so; others as retained) and are never auctioned.
 // Each team's budget = remaining purse + value of its released players.
 // addToPool: put released and never-sold players back into the player pool.
-export async function createMiniAuction(prevAid, a, { name, keep, addToPool }) {
+export async function createMiniAuction(prevAid, a, { name, season, keep, addToPool }) {
   const aid = await newAuctionId(name, a.meta.tournament);
   const teams = {};
   const players = {};
@@ -57,7 +71,7 @@ export async function createMiniAuction(prevAid, a, { name, keep, addToPool }) {
   const adminCode = randomCode(8);
   const next = normalize({
     meta: {
-      name, tournament: a.meta.tournament || null, organiser: a.meta.organiser || null, venue: null, date: null,
+      name, tournament: a.meta.tournament || null, season: season || a.meta.season || null, organiser: a.meta.organiser || null, venue: null, date: null,
       ownerUid: db.uid(), createdAt: db.now(), status: 'setup', locked: false, round: 1,
       kind: 'mini', parent: prevAid, parentName: a.meta.name,
     },

@@ -59,7 +59,7 @@ Each captain's phone shows **Purse left** and **Max bid** for their team, update
 
 The captain / vice-captain values and each team's remaining purse carry over to next season.
 
-1. After the auction, open **Admin → Results → Next season: mini auction**.
+1. On the home page choose **Create → Mini**, type the tournament and season, and pick the auction it is **based on** (or, from that auction, open **Admin → Results → Next season: mini auction**).
 2. For each team, tick the players it **keeps**. Everyone unticked is released. The team's budget updates as you tick:
 
    ```

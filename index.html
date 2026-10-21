@@ -62,10 +62,32 @@
       <section class="card">
         <h2>Create a new auction</h2>
         <form id="create-form">
-          <label for="c-name">Auction name</label>
-          <input id="c-name" required placeholder="Society Premier League 2026 player auction">
           <label for="c-tournament">Tournament</label>
-          <input id="c-tournament" placeholder="Society Premier League">
+          <input id="c-tournament" list="c-tournaments" placeholder="Society Premier League" autocomplete="off">
+          <datalist id="c-tournaments"></datalist>
+          <span class="hint">Use exactly the same name every season, so its auctions stay together.</span>
+          <div class="grid grid-2" style="gap:var(--space-3)">
+            <div><label for="c-season">Season</label><input id="c-season" placeholder="2026"></div>
+            <div><label>Auction type</label>
+              <div class="ax-seg ax-seg-block" role="group" aria-label="Auction type">
+                <button type="button" data-kind="major" aria-pressed="true">Major</button>
+                <button type="button" data-kind="mini" aria-pressed="false">Mini</button>
+              </div></div>
+          </div>
+          <div id="major-opts">
+            <label for="c-copy">Copy rules, house rules and teams from</label>
+            <select id="c-copy"><option value="">Nothing: start from the setup questionnaire</option></select>
+            <span class="hint">Major = a fresh player list. Copying keeps last season's rules and teams; players are uploaded new.</span>
+          </div>
+          <div id="mini-opts" class="hidden">
+            <label for="c-parent">Based on auction</label>
+            <select id="c-parent"><option value="">Choose the auction it follows…</option></select>
+            <label for="c-parent-code">…or type that auction's code</label>
+            <input id="c-parent-code" class="code-input" placeholder="SPL-7K2Q" autocomplete="off" style="letter-spacing:.15em">
+            <span class="hint">Mini = teams keep some players from that auction; their budget is the remaining purse plus the value of the players they release. Next you tick who each team keeps.</span>
+          </div>
+          <label for="c-name">Auction name</label>
+          <input id="c-name" placeholder="Filled in from tournament and season">
           <div class="grid grid-2" style="gap:var(--space-3)">
             <div><label for="c-venue">Venue</label><input id="c-venue" placeholder="Clubhouse"></div>
             <div><label for="c-date">Date</label><input id="c-date" type="date"></div>
@@ -77,7 +99,7 @@
               You also get an admin code as a backup.</p>
             <button type="button" id="google-btn">Sign in with Google</button> <small id="who"></small>
           </div>
-          <p style="margin-top:var(--space-4)"><button class="btn-primary btn-lg">Create auction</button></p>
+          <p style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="c-submit">Create major auction</button></p>
         </form>
       </section>
     </div>
@@ -95,7 +117,7 @@
 
     <div class="grid grid-2" style="margin-top:var(--space-4)">
       <section class="card">
-        <h2>My auctions on this device</h2>
+        <h2>My tournaments and auctions</h2>
         <div id="mine"><p class="muted">None yet.</p></div>
       </section>
       <section class="card">
