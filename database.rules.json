@@ -11,7 +11,7 @@
         },
         "live": {
           "bid": {
-            ".write": "auth != null && root.child('auctions/' + $aid + '/rules/captainBidding').val() === true && data.parent().child('status').val() === 'bidding' && root.child('captains/' + $aid + '/' + auth.uid + '/team').val() === newData.child('team').val() && newData.child('team').val() !== data.child('team').val() && newData.child('amount').isNumber() && (newData.child('amount').val() > data.child('amount').val() || (!data.child('team').exists() && newData.child('amount').val() === data.child('amount').val())) && newData.child('amount').val() <= root.child('auctions/' + $aid + '/teams/' + newData.child('team').val() + '/maxBid').val()"
+            ".write": "auth != null && root.child('auctions/' + $aid + '/rules/bidMode').val() !== 'room' && data.parent().child('status').val() === 'bidding' && root.child('captains/' + $aid + '/' + auth.uid + '/team').val() === newData.child('team').val() && newData.child('team').val() !== data.child('team').val() && newData.child('amount').isNumber() && (newData.child('amount').val() > data.child('amount').val() || (!data.child('team').exists() && newData.child('amount').val() === data.child('amount').val())) && newData.child('amount').val() <= root.child('auctions/' + $aid + '/teams/' + newData.child('team').val() + '/maxBid').val() && (!root.child('auctions/' + $aid + '/rules/maxPlayerPrice').exists() || root.child('auctions/' + $aid + '/rules/maxPlayerPrice').val() === 0 || newData.child('amount').val() <= root.child('auctions/' + $aid + '/rules/maxPlayerPrice').val())"
           }
         }
       }

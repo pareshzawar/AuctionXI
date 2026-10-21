@@ -1,0 +1,75 @@
+﻿section,key,question,answer,help
+Tournament,auction_name,Auction name,,Shown on every screen
+Tournament,tournament_name,Tournament name,,e.g. Society Premier League
+Tournament,venue,Venue,,e.g. Clubhouse hall
+Tournament,date,Auction date (YYYY-MM-DD),,e.g. 2026-11-15
+Tournament,organiser,Organiser,,e.g. Sports committee
+Tournament,players_per_side,Players per side in a match,11,"e.g. 11, 8 or 6 (box cricket)"
+Tournament,overs,Overs per innings,,Information only
+Money,currency,Currency,₹,"₹ for virtual rupees (shown as ₹5 L, ₹1.2 Cr), or pts for points"
+Money,purse_per_team,Purse per team,10000000,"Amounts can be written 10000000, 1Cr, 100L or 1,00,00,000"
+Money,max_price_per_player,Highest price allowed for one player (blank = no cap),0,e.g. 30L
+Squad,min_squad,Minimum players each team must buy (not counting reserves),11,"Usually players per side, e.g. 11. Retained players count"
+Squad,max_squad,Maximum players per team (not counting reserves),15,e.g. 13-15
+Squad,reserves_per_team,Reserve players each team may buy (0 = none),0,Reserve players are marked pool=reserve in the players CSV and are auctioned after everyone else
+Squad,reserve_base_price,Base price for reserve players (blank = their category base),0,e.g. 50000
+Squad,retained_price_default,Price charged for a retained player when the CSV leaves retained_price blank,0,"e.g. 0, or 10L"
+Categories,category_1_id,Category 1: short ID used in the players CSV,A,e.g. A. Leave the whole category blank if not needed. Categories come up in this order
+Categories,category_1_name,Category 1: name,Icon,e.g. Icon
+Categories,category_1_base_price,Category 1: base (starting) price,1000000,e.g. 10L
+Categories,category_1_min_per_team,Category 1: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_1_max_per_team,Category 1: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Categories,category_2_id,Category 2: short ID used in the players CSV,B,e.g. B
+Categories,category_2_name,Category 2: name,Gold,e.g. Gold
+Categories,category_2_base_price,Category 2: base (starting) price,500000,e.g. 5L
+Categories,category_2_min_per_team,Category 2: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_2_max_per_team,Category 2: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Categories,category_3_id,Category 3: short ID used in the players CSV,C,e.g. C
+Categories,category_3_name,Category 3: name,Silver,e.g. Silver
+Categories,category_3_base_price,Category 3: base (starting) price,200000,e.g. 2L
+Categories,category_3_min_per_team,Category 3: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_3_max_per_team,Category 3: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Categories,category_4_id,Category 4: short ID used in the players CSV,D,e.g. D
+Categories,category_4_name,Category 4: name,Bronze,e.g. Bronze
+Categories,category_4_base_price,Category 4: base (starting) price,100000,e.g. 1L
+Categories,category_4_min_per_team,Category 4: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_4_max_per_team,Category 4: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Categories,category_5_id,Category 5: short ID used in the players CSV,,
+Categories,category_5_name,Category 5: name,,e.g. Juniors
+Categories,category_5_base_price,Category 5: base (starting) price,,e.g. 50000
+Categories,category_5_min_per_team,Category 5: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_5_max_per_team,Category 5: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Categories,category_6_id,Category 6: short ID used in the players CSV,,
+Categories,category_6_name,Category 6: name,,e.g. Juniors
+Categories,category_6_base_price,Category 6: base (starting) price,,e.g. 50000
+Categories,category_6_min_per_team,Category 6: each team must buy at least (blank = no rule),,e.g. 1 junior per team
+Categories,category_6_max_per_team,Category 6: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Roles,min_batters,Each team must have at least this many batters (blank = no rule),,
+Roles,min_bowlers,Each team must have at least this many bowlers (blank = no rule),,
+Roles,min_allrounders,Each team must have at least this many all-rounders (blank = no rule),,
+Roles,min_wicketkeepers,Each team must have at least this many wicket-keepers (blank = no rule),,e.g. 1
+Bid increments,increment_1_below,Slab 1: while the bid is below,2000000,"e.g. 20L. Leave blank on the last slab to mean ""and above"""
+Bid increments,increment_1_raise_by,Slab 1: raise each bid by,50000,e.g. 50000
+Bid increments,increment_2_below,Slab 2: while the bid is below,5000000,
+Bid increments,increment_2_raise_by,Slab 2: raise each bid by,100000,
+Bid increments,increment_3_below,Slab 3: while the bid is below,,
+Bid increments,increment_3_raise_by,Slab 3: raise each bid by,200000,
+Bid increments,increment_4_below,Slab 4: while the bid is below,,
+Bid increments,increment_4_raise_by,Slab 4: raise each bid by,,
+Bidding,bid_mode,How do captains bid? (phones / room),phones,"phones = captains tap BID on their phones, auctioneer can still enter room bids. room = paddles only, auctioneer enters the final amount"
+Bidding,bid_timer_seconds,"Countdown after each bid, in seconds (0 = off)",30,e.g. 30
+Bidding,pick_order,Order players come up (category-random / category-sequence / random / manual),category-random,category-random is most common
+Bidding,unsold_rounds,How many times unsold players come back for another round,1,e.g. 1
+House rules,hr_eligibility,Who can register to play?,,"e.g. Residents of the society only, age 16+, max 2 guest players per team"
+House rules,hr_captains,"How are captains / owners chosen, and do they cost purse?",,"e.g. Captains chosen by committee, retained at ₹0. Set retained_by in the players CSV"
+House rules,hr_special_players,Any players every team must have?,,e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a category min_per_team
+House rules,hr_locality,Any limit on players from the same wing / tower / family?,,e.g. Max 4 players from the same wing per team (checked by the auctioneer)
+House rules,hr_reserves,When and how are reserve players used?,,e.g. Reserves play only if a squad player is absent; must be informed 1 day before
+House rules,hr_unsold_end,What happens to players still unsold at the end?,,"e.g. Lottery to teams short of players, at base price"
+House rules,hr_absent,What if a bought player drops out before the tournament?,,e.g. Team picks a replacement from the unsold/reserve list at base price
+House rules,hr_trades,Are trades between teams allowed after the auction?,,e.g. No trades
+House rules,hr_conduct,Bidding conduct,,e.g. Bids only via the app or paddle; no bids after the hammer; no proxy bidding
+House rules,hr_disputes,Who settles disputes during the auction?,,e.g. The auctioneer's decision is final
+House rules,hr_other_1,Other rule,,
+House rules,hr_other_2,Other rule,,
+House rules,hr_other_3,Other rule,,

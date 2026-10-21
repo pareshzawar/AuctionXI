@@ -5,7 +5,7 @@
 //   coadmins/{aid}/{uid}      {code, name}        - a device that proved the admin code
 
 import { db, isLocal } from './db.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, normalize, randomCode, slug, basePrice } from './engine.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary } from './engine.js';
 
 export async function createAuction({ name, tournament, venue, date, organiser }) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
@@ -63,7 +63,7 @@ export function log(aid, entry) {
 }
 
 // Captain (or admin on behalf of a team) raises the bid by one increment.
-export async function placeBid(aid, a, team) {
+export async function placeBid(aid, a, team, source = 'phone') {
   const amount = nextBid(a.live, a.rules);
   const why = bidBlocker(a, team, amount);
   if (why) throw new Error(why);
@@ -73,10 +73,42 @@ export async function placeBid(aid, a, team) {
     // Abort if someone else bid since this screen last updated, so nobody
     // accidentally bids a higher amount than the one shown on their button.
     if (!cur || Number(cur.amount) !== Number(seen.amount) || (cur.team || null) !== (seen.team || null)) return undefined;
-    return { amount, team, at: db.now(), until: timer ? db.now() + timer * 1000 : null };
+    return {
+      amount, team, source, at: db.now(), until: timer ? db.now() + timer * 1000 : null,
+      prev: { amount: Number(cur.amount), team: cur.team || null },
+    };
   });
-  if (!res.committed) throw new Error('Bid was beaten - try again');
+  if (!res.committed) {
+    const now = (await db.get(`auctions/${aid}/live/bid`)) || {};
+    throw new Error(`Outbid. ${money(now.amount, a.rules)} is now leading.`);
+  }
   return amount;
+}
+
+// Take the current bid back one step (one level of undo).
+export async function undoLastBid(aid, a) {
+  const b = a.live?.bid;
+  if (a.live?.status !== 'bidding' || !b?.team) throw new Error('No bid to undo');
+  const prev = b.prev || { amount: basePrice(a.players[a.live.playerId], a.rules), team: null };
+  await db.set(`auctions/${aid}/live/bid`, { amount: prev.amount, team: prev.team || null, at: db.now(), until: null });
+}
+
+// Room / paddle auction: the auctioneer enters the winning team and final amount.
+// Returns a warning string (and does nothing) when a soft rule would be broken, unless `force`.
+export async function recordRoomSale(aid, a, team, amount, force = false) {
+  const live = a.live;
+  if (!live || live.status !== 'bidding') throw new Error('Bring up a player first');
+  if (!a.teams[team]) throw new Error('Choose the winning team');
+  const p = a.players[live.playerId];
+  const base = basePrice(p, a.rules);
+  if (!(amount >= base)) throw new Error(`Enter at least the base price, ${money(base, a.rules)}`);
+  const s = teamSummary(a, team);
+  if (amount > s.remaining) throw new Error(`${a.teams[team].name} has only ${money(s.remaining, a.rules)} left`);
+  const { max, why } = bidLimit(a, team, p);
+  if (amount > max && !force) return `Over ${a.teams[team].name}'s max bid of ${money(max, a.rules)}. ${why}`;
+  await db.set(`auctions/${aid}/live/bid`, { amount, team, source: 'room', at: db.now(), until: null });
+  await sell(aid, { ...a, live: { ...live, bid: { amount, team } } });
+  return null;
 }
 
 export async function startPlayer(aid, a, playerId) {
@@ -93,8 +125,8 @@ export async function startPlayer(aid, a, playerId) {
 export async function sell(aid, a) {
   const live = a.live;
   if (!live || live.status !== 'bidding') throw new Error('Nothing to sell');
-  if (!live.bid?.team) throw new Error('No bids yet - mark as unsold instead');
-  const sale = { team: live.bid.team, price: Number(live.bid.amount), at: db.now(), round: live.round || 1 };
+  if (!live.bid?.team) throw new Error('No bids yet. Mark unsold instead.');
+  const sale = { team: live.bid.team, price: Number(live.bid.amount), at: db.now(), round: live.round || 1, source: live.bid.source || 'phone' };
   const after = { ...a, sales: { ...a.sales, [live.playerId]: sale } };
   await db.update(`auctions/${aid}`, {
     [`sales/${live.playerId}`]: sale,
@@ -135,7 +167,8 @@ export async function startAuction(aid, a) {
   const upd = {};
   for (const [pid, p] of Object.entries(a.players)) {
     if (p.retainedBy && a.teams[p.retainedBy] && !sales[pid]) {
-      sales[pid] = { team: p.retainedBy, price: Number(p.retainedPrice) || 0, at: db.now(), round: 0, retained: true };
+      const price = p.retainedPrice ?? a.rules.retainedPriceDefault ?? 0;
+      sales[pid] = { team: p.retainedBy, price: Number(price) || 0, at: db.now(), round: 0, retained: true };
       upd[`sales/${pid}`] = sales[pid];
     }
   }

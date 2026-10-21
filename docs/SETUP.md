@@ -25,10 +25,15 @@ Demo mode works without any setup, but only inside one browser. To let captains 
 2. **Sign-in method:** enable **Anonymous** (captains, audience) and **Google** (admins, optional but recommended).
 3. **Settings → Authorized domains → Add domain:** `<github-user>.github.io`.
 
-## 5. Connect the app
+## 5. Connect the app (the "Firebase config")
 
-1. **Project settings (⚙) → General → Your apps → Web (`</>`)**, register an app (no Hosting needed).
-2. Copy the `firebaseConfig` object into [`js/config.js`](../js/config.js):
+**What it is.** When you register a web app, Firebase gives you a small block of settings called the *Firebase config*. It's the address of your project, like a postal address that tells the AuctionXI website which database to talk to. It is **not a password**. Google designs it to be visible in every visitor's browser, which is why it's safe to commit to a public repo. What keeps your data safe is the **database rules** you published in step 3: they decide who may write what (only admins change the auction, only a captain with the right code bids for their team, and so on).
+
+**Without it** the app runs in demo mode: everything stays inside one browser, so captains' phones can't join.
+**With it** every phone, laptop and the projector share the same live auction.
+
+1. **Project settings (⚙) → General → Your apps → Web (`</>`)**, give it a nickname such as `auctionxi` and register it (leave "Firebase Hosting" unticked; GitHub Pages hosts the site).
+2. Firebase shows a `firebaseConfig = { … }` block. Copy it into [`js/config.js`](../js/config.js). The easiest way is on github.com: open `js/config.js` → pencil icon (Edit) → replace `export const firebaseConfig = null;` with the block → **Commit changes**:
 
 ```js
 export const firebaseConfig = {
@@ -42,7 +47,9 @@ export const firebaseConfig = {
 
 Make sure `databaseURL` is included. If it is missing, copy it from the Realtime Database page.
 
-3. Commit and push. The header badge should now say **Live · Firebase**.
+3. Wait a minute for the *Deploy to GitHub Pages* action to finish, then reload the site. The badge in the header changes from **Demo mode** to **Connected**.
+
+Each person who forks AuctionXI puts their **own** Firebase config in their fork, so every organiser's data lives in their own free Firebase project.
 
 > The web config is not a password. It is designed to be public. Your data is protected by the database rules from step 3.
 
@@ -60,7 +67,7 @@ Make sure `databaseURL` is included. If it is missing, copy it from the Realtime
 |---|---|---|
 | Owner | Device/Google account that created the auction | Everything |
 | Co-admin | Admin code | Everything except removing other co-admins |
-| Captain | Team code (6 characters) | Place bids for their own team only, within purse, only while bidding is open and "captains can bid" is on |
+| Captain | Team code (6 characters) | Place bids for their own team only, within purse, only while bidding is open and the bid mode is not "Room only"; never above their max bid or the per-player cap |
 | Team member / audience / big screen | Nothing | Read only |
 
 Secret codes are stored in a separate `secrets/` area that only admins can read.
