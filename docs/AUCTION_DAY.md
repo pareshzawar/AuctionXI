@@ -18,6 +18,7 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 - [ ] Send each captain and vice-captain their own code ("Copy message" buttons in Access and sharing)
 - [ ] Ask captains to join on their phones and check they appear as "Signed in"
 - [ ] Give the co-admin the admin code
+- [ ] Upload the league **logo and banner** (Setup tab) and the **player photos** (Players tab → Upload many photos, files named by player ID or name). Ask players for a clear head-and-shoulders photo, portrait way up
 - [ ] Remind captains and vice-captains to fill in their **My workbook** tab (their list, max bid per player, notes) before the day. It is private and locked with their own PIN
 - [ ] If people will watch on Zoom or Google Meet, schedule the call and test sharing the stage tab with sound (see below)
 

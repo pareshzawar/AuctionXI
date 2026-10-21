@@ -52,7 +52,7 @@ export function statGrid(stats, { size = '', columns } = {}) {
 }
 
 function photo(p, cls) {
-  const url = photoUrl(p.photoUrl);
+  const url = p.photoData || photoUrl(p.photoUrl);
   return `<div class="${cls}">${url ? `<img src="${esc(url)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc(initials(p.name))}'))">` : esc(initials(p.name))}</div>`;
 }
 

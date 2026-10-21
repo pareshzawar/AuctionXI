@@ -6,6 +6,7 @@ import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidd
 import { placeBid, myBidderSeat } from './actions.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
+import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
@@ -23,6 +24,7 @@ let sending = false;
 let lastResult = null;
 let wb = null; // this captain's / vice-captain's private workbook
 let belowDirty = false;
+let media = {};
 const voice = createVoice();
 // Language: ?lang= on the link (handy for the stage), else this device's choice, else the tournament's.
 const commLang = () => (LANGUAGES[param('lang')] ? param('lang') : '') || deviceCommLang() || A?.rules.commentaryLang || 'en';
@@ -57,12 +59,14 @@ async function boot() {
       await wb.resume();
     }
   }
+  const draw = () => { if (stage) renderStage(); else renderPhone(); };
+  watchMedia(aid, (m) => { media = m; if (A) { applyMedia(A, media); draw(); } });
   db.on(`auctions/${aid}`, (v) => {
-    A = normalize(v);
+    A = applyMedia(normalize(v), media);
     if (!A) { $('#app').innerHTML = '<div class="card"><h2>Auction not found</h2><p><a href="index.html">Back to home</a></p></div>'; return; }
     commentator.update(A);
     document.title = `${A.meta.name} - AuctionXI`;
-    if (stage) renderStage(); else renderPhone();
+    draw();
     showResult();
   });
   startCountdowns(db.now);
@@ -95,6 +99,7 @@ function renderStage() {
   $('#app').innerHTML = `
     <div class="stage-frame"><div class="stage">
       <header class="stage-top">
+        ${logoImg(A, { size: 112, cls: 'stage-logo' })}
         <div class="stage-brand">
           <span class="stage-label">AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}${hasLot && live.status === 'bidding' && live.drawn ? ` · ${live.drawn === 'chit' ? 'Chit' : `Random draw${live.drawnPool ? ` from ${esc(category(rules, live.drawnPool)?.label || live.drawnPool)}` : ''}`}` : ''}</span>
           <h1 class="stage-title">${esc(meta.name)}</h1>
@@ -107,7 +112,7 @@ function renderStage() {
       </header>
       <div class="stage-main">
         ${hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
-          : `<div class="stage-wait" style="grid-column:1/-1"><div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
+          : `<div class="stage-wait" style="grid-column:1/-1"><div>${bannerImg(A, { cls: 'stage-banner' })}<h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
              <p>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
@@ -146,10 +151,12 @@ function renderPhone() {
     }, 0));
   }
   $('#p-top').innerHTML = `
+    ${bannerImg(A, { cls: 'phone-banner' })}
     <div class="page-head">
-      <div>
-        <h1 style="margin:0">${esc(meta.name)}</h1>
-        <small>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date].filter(Boolean).join(' · '))}</small>
+      <div class="brand-row">
+        ${logoImg(A, { size: 56 })}
+        <div style="min-width:0"><h1 style="margin:0">${esc(meta.name)}</h1>
+        <small>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date].filter(Boolean).join(' · '))}</small></div>
       </div>
       ${badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? `Live · Round ${meta.round || 1}` : meta.status === 'completed' ? 'Completed' : 'Not started' })}
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>

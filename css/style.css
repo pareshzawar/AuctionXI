@@ -164,3 +164,18 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 @media (prefers-reduced-motion: reduce) {
   .overlay .ax-stamp, .ax-badge-live .ax-dot, .ax-ticker-scroll .ax-ticker-list { animation: none !important; }
 }
+
+/* League logo, banner and player photos */
+.league-logo { display: block; width: auto; max-width: 160px; object-fit: contain; flex: none; }
+.league-banner { display: block; width: 100%; aspect-ratio: 4 / 1; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line); }
+.phone-banner { margin-bottom: var(--space-4); }
+.brand-row { display: flex; align-items: center; gap: var(--space-3); }
+.stage-top .stage-brand { margin-right: auto; }
+.stage-logo { max-width: 240px; margin-right: calc(var(--space-5) - var(--space-8)); }
+.stage-banner { width: 880px; max-width: 100%; margin: 0 auto var(--space-5); border-radius: var(--radius-lg); }
+.brand-preview { display: grid; place-items: center; overflow: hidden; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); }
+.brand-preview img { width: 100%; height: 100%; object-fit: contain; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+.photo-tile { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.photo-pick { margin: 0; cursor: pointer; }
+.photo-pick:hover .ax-avatar { border-color: var(--gold); }
