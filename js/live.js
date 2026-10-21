@@ -63,7 +63,7 @@ async function boot() {
 function renderStage() {
   const { meta, live, rules } = A;
   const { lot, total } = lotInfo(A);
-  const sold = Object.values(A.sales).filter((s) => !s.retained);
+  const sold = Object.values(A.sales).filter((s) => !s.allotted && !s.retained);
   const unsold = Object.keys(A.unsold).filter((pid) => !A.sales[pid]).length;
   const spent = sold.reduce((t, s) => t + Number(s.price), 0);
   const hasLot = live && A.players[live.playerId];
