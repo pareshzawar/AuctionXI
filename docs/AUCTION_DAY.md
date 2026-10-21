@@ -18,6 +18,8 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 - [ ] Send each captain and vice-captain their own code ("Copy message" buttons in Access and sharing)
 - [ ] Ask captains to join on their phones and check they appear as "Signed in"
 - [ ] Give the co-admin the admin code
+- [ ] Remind captains and vice-captains to fill in their **My workbook** tab (their list, max bid per player, notes) before the day. It is private and locked with their own PIN
+- [ ] If people will watch on Zoom or Google Meet, schedule the call and test sharing the stage tab with sound (see below)
 
 ## At the venue
 
@@ -26,6 +28,7 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 - [ ] QR code from Access and sharing printed or shown at the start so the audience can join
 - [ ] Mic for the auctioneer
 - [ ] Optional: connect the admin laptop to the hall speakers and press *Read aloud on this laptop* for spoken commentary
+- [ ] Video call (optional): open the stage on the laptop in the call, press `V` for voice, and share it: **Meet** → Present now → *A tab* with *Also share tab audio*; **Zoom** → Share screen with *Share sound* ticked. Steps and per-language links are under *Access and sharing → Present on Zoom or Google Meet*. Mute the laptop's mic while the voice speaks
 - [ ] Show the stage screen before the start (it lists the key rules) and announce them once
 
 ## During

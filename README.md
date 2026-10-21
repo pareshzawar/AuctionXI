@@ -22,6 +22,8 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
 | 🎲 **Pools, random draw or chits** | Players are grouped by role (BAT / BOWL / AR / WK) and pool (Pool A = strongest, B, C…). Next player by a built-in random draw (pool by pool, or from one pool or role), or draw a chit in the hall and search the name |
 | 🎙️ **Live commentary** | In English, Hinglish or Marathi, written from the auction itself: player intros with pool, role and stats, opening bids, bidding wars, record prices, sales and squad progress. On the stage, phones and console; any device can read it aloud with the browser's own voice (free, no AI service). Keeps purses private |
+| 📓 **Captain's workbook** | Each captain and vice-captain gets a private **My workbook** tab: every player still available, a favourites list, *their own* max bid and note per player, a manual record of what other teams buy (with estimated purse left and max bid), and a scratch pad with a calculator. The BID button warns when the price passes their limit. Encrypted on the phone with their own PIN, so not even the admin can read it |
+| 🎥 **Zoom / Google Meet** | Share the stage screen, with commentary and voice, in a video call for people who can't come. Step-by-step under *Access and sharing* |
 | 🔁 **Mini auction next season** | Tick who each team keeps; budget = remaining purse + value of released players (C/VC value or price paid). Kept players start in their team; released and new players go into the pool |
 | 🙈 **Private purses** | Remaining purse and max bid are shown only to each team's captain/VC and the admins (or all bidders, or everyone, as you choose) |
 | 🛡️ **House rules** | Shown to everyone on a Rules tab. Number rules are enforced: role minimums (e.g. 1 WK), category min/max, per-player price cap. The database rules check them too |
@@ -125,6 +127,8 @@ js/engine.js      auction rules (increments, max bid, house-rule limits, reserve
 js/ds.js          design-system components as HTML (same markup as the Claude Design bundle)
 js/views.js       screen sections built from those components
 js/actions.js     database writes (bid, sell, undo, rounds…)
+js/commentary.js  live commentary (English, Hinglish, Marathi) and voice
+js/workbook.js    the captain's private workbook; js/vault.js encrypts it
 database.rules.json  Firebase security rules (who can write what)
 css/tokens.css    design tokens (generated from design/tokens.json)
 css/ds-components.css  design-system component styles

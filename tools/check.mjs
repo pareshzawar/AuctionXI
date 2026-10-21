@@ -140,3 +140,14 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
     ok(said.length === 9 && (lang === 'mr' ? said.every((t) => /[ऀ-ॿ]/.test(t)) : /shuru|baari|nikla/.test(said[1])), `commentary in ${lang === 'hi' ? 'Hinglish' : 'Marathi'}`);
   }
 }
+
+// workbook encryption and scratch-pad sums
+{
+  const V = await import(root + '/js/vault.js');
+  const k = await V.keyFor('4321', 'auctionxi:TEST:T1_C');
+  const box = await V.encryptJSON({ players: { P1: { fav: true, max: 300 } }, pad: 'plan' }, k);
+  ok(!box.data.includes('plan') && (await V.decryptJSON(box, k)).players.P1.max === 300, 'workbook: encrypted at rest, decrypts with the PIN');
+  const wrong = await V.keyFor('0000', 'auctionxi:TEST:T1_C');
+  ok(await V.decryptJSON(box, wrong).then(() => false, () => true), 'workbook: a wrong PIN cannot read it');
+  ok(V.calc('650 - 7*50') === 300 && V.calc('1.5L + 50,000') === 200000 && V.calc('alert(1)') === null, 'scratch pad: 650 - 7*50, 1.5L + 50,000, rejects code');
+}

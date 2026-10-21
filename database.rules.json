@@ -32,6 +32,14 @@
         }
       }
     },
+    "notes": {
+      "$aid": {
+        "$seat": {
+          ".read": "auth != null && root.child('captains/' + $aid + '/' + auth.uid + '/team').val() + '_' + root.child('captains/' + $aid + '/' + auth.uid + '/as').val() === $seat",
+          ".write": "auth != null && root.child('captains/' + $aid + '/' + auth.uid + '/team').val() + '_' + root.child('captains/' + $aid + '/' + auth.uid + '/as').val() === $seat"
+        }
+      }
+    },
     "coadmins": {
       "$aid": {
         ".read": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
