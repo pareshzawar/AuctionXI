@@ -2,22 +2,75 @@ import { db, isLocal } from './db.js';
 import { createAuction, claimCaptain, claimCoadmin, isAdmin } from './actions.js';
 import { $, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
-import { vcCanBid, withDefaults } from './engine.js';
+import { vcCanBid, withDefaults, normalize } from './engine.js';
 
 mountHeader();
 
 let found = null; // { aid, meta, teams }
 
-function renderMine() {
+// Auctions this device knows, with their meta, newest season first: [{ id, role, meta }].
+let known = [];
+let kind = 'major';
+
+async function loadKnown() {
   const list = myAuctions();
-  if (!list.length) return;
-  $('#mine').innerHTML = `<table class="grid-table"><tbody>${list.map((x) => `
-    <tr><td><b>${esc(x.name)}</b><br><small>${esc(x.id)} · ${esc(x.role)}</small></td>
-    <td style="text-align:right" class="row">
-      ${x.role === 'admin' ? `<a class="btn btn-sm" href="${pageUrl('admin.html', { a: x.id })}">Admin</a>` : ''}
-      <a class="btn btn-sm" href="${pageUrl('live.html', { a: x.id })}">Live</a>
-      <a class="btn btn-sm" href="${pageUrl('results.html', { a: x.id })}">Results</a>
-    </td></tr>`).join('')}</tbody></table>`;
+  const metas = await Promise.all(list.map((x) => db.get(`auctions/${x.id}/meta`).catch(() => null)));
+  known = list.map((x, i) => ({ ...x, meta: metas[i] })).filter((x) => x.meta)
+    .sort((x, y) => String(y.meta.season || '').localeCompare(String(x.meta.season || ''), undefined, { numeric: true }) || (y.meta.createdAt || 0) - (x.meta.createdAt || 0));
+}
+
+const kindBadge = (m) => badge(m.kind === 'mini' ? 'retained' : 'upcoming', { text: m.kind === 'mini' ? 'Mini' : 'Major' });
+const statusText = (m) => (m.status === 'live' ? 'live' : m.status === 'completed' ? 'completed' : 'in setup');
+const label = (x) => `${x.meta.season ? `${x.meta.season} · ` : ''}${x.meta.kind === 'mini' ? 'Mini' : 'Major'} · ${x.meta.name} (${x.id})`;
+
+// My tournaments: grouped by tournament name, seasons newest first.
+function renderMine() {
+  if (!known.length) return;
+  const groups = new Map();
+  for (const x of known) {
+    const t = x.meta.tournament || 'Other auctions';
+    if (!groups.has(t)) groups.set(t, []);
+    groups.get(t).push(x);
+  }
+  $('#mine').innerHTML = [...groups].map(([t, items]) => `
+    <h3 style="margin:var(--space-4) 0 var(--space-2)">${esc(t)}</h3>
+    <table class="grid-table"><tbody>${items.map((x) => `
+      <tr><td>${kindBadge(x.meta)} <b>${esc(x.meta.season || '')}</b> ${esc(x.meta.name)}
+        <br><small>${esc(x.id)} · ${statusText(x.meta)} · you: ${esc(x.role)}${x.meta.parentName ? ` · based on ${esc(x.meta.parentName)}` : ''}${x.meta.copiedFromName ? ` · rules from ${esc(x.meta.copiedFromName)}` : ''}</small></td>
+      <td style="text-align:right" class="row">
+        ${x.role === 'admin' ? `<a class="btn btn-sm" href="${pageUrl('admin.html', { a: x.id })}">Admin</a>` : ''}
+        <a class="btn btn-sm" href="${pageUrl('live.html', { a: x.id })}">Live</a>
+        <a class="btn btn-sm" href="${pageUrl('results.html', { a: x.id })}">Results</a>
+      </td></tr>`).join('')}</tbody></table>`).join('');
+}
+
+// Create form: Major / Mini, the auctions to copy from or follow, and a suggested name.
+function renderCreateOptions() {
+  const tournament = $('#c-tournament').value.trim().toLowerCase();
+  const names = [...new Set(known.map((x) => x.meta.tournament).filter(Boolean))];
+  $('#c-tournaments').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+  // Same tournament first; all others after, so a renamed tournament still works.
+  const ordered = [...known.filter((x) => (x.meta.tournament || '').toLowerCase() === tournament), ...known.filter((x) => (x.meta.tournament || '').toLowerCase() !== tournament)];
+  const keepCopy = $('#c-copy').value;
+  const keepParent = $('#c-parent').value;
+  $('#c-copy').innerHTML = '<option value="">Nothing: start from the setup questionnaire</option>'
+    + ordered.map((x) => `<option value="${esc(x.id)}">${esc(label(x))}</option>`).join('');
+  $('#c-parent').innerHTML = '<option value="">Choose the auction it follows…</option>'
+    + ordered.filter((x) => x.role === 'admin').map((x) => `<option value="${esc(x.id)}">${esc(label(x))}${x.meta.status === 'completed' ? '' : ' (not ended yet)'}</option>`).join('');
+  $('#c-copy').value = keepCopy;
+  $('#c-parent').value = keepParent;
+  $('#major-opts').classList.toggle('hidden', kind !== 'major');
+  $('#mini-opts').classList.toggle('hidden', kind !== 'mini');
+  document.querySelectorAll('[data-kind]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === kind)));
+  $('#c-submit').textContent = kind === 'mini' ? 'Next: choose who each team keeps' : 'Create major auction';
+  $('#c-name').placeholder = suggestedName() || 'Filled in from tournament and season';
+}
+
+function suggestedName() {
+  const t = $('#c-tournament').value.trim();
+  const season = $('#c-season').value.trim();
+  if (!t && !season) return '';
+  return [t, season, kind === 'mini' ? 'mini auction' : 'player auction'].filter(Boolean).join(' ');
 }
 
 async function renderArchive() {
@@ -95,20 +148,45 @@ if (!isLocal) {
   });
 }
 
+document.querySelectorAll('[data-kind]').forEach((b) => (b.onclick = () => { kind = b.dataset.kind; renderCreateOptions(); }));
+['#c-tournament', '#c-season'].forEach((sel) => $(sel).addEventListener('input', renderCreateOptions));
+$('#c-season').value ||= String(new Date().getFullYear());
+
 $('#create-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const btn = e.submitter;
+  const btn = $('#c-submit');
   btn.disabled = true;
   try {
+    const name = $('#c-name').value.trim() || suggestedName();
+    const season = $('#c-season').value.trim();
+    if (!name) throw new Error('Enter the tournament or an auction name');
+    if (kind === 'mini') {
+      // A mini auction is built from the auction it follows: that auction's Results tab lists every
+      // team's players to keep or release (admin access to it is needed).
+      const parent = ($('#c-parent-code').value.trim() || $('#c-parent').value).toUpperCase();
+      if (!parent) throw new Error('Choose the auction this mini auction follows');
+      if (!(await db.get(`auctions/${parent}/meta`))) throw new Error(`No auction with code ${parent}`);
+      location.href = pageUrl('admin.html', { a: parent, mini: 1, mname: name, season });
+      return;
+    }
+    const copyId = $('#c-copy').value;
+    let copyFrom = null;
+    if (copyId) {
+      const v = await db.get(`auctions/${copyId}`);
+      if (!v) throw new Error('Could not read the auction to copy from');
+      copyFrom = { ...normalize(v), id: copyId };
+    }
     const { aid, adminCode } = await createAuction({
-      name: $('#c-name').value.trim(),
-      tournament: $('#c-tournament').value.trim(),
+      name,
+      tournament: $('#c-tournament').value.trim() || copyFrom?.meta.tournament || '',
+      season,
       venue: $('#c-venue').value.trim(),
       date: $('#c-date').value,
-      organiser: $('#c-organiser').value.trim(),
+      organiser: $('#c-organiser').value.trim() || copyFrom?.meta.organiser || '',
+      copyFrom,
     });
     setSession(aid, { role: 'admin' });
-    rememberAuction(aid, $('#c-name').value.trim(), 'admin');
+    rememberAuction(aid, name, 'admin');
     location.href = pageUrl('admin.html', { a: aid, created: adminCode });
   } catch (err) {
     toast(err.message, 'error');
@@ -116,6 +194,7 @@ $('#create-form').addEventListener('submit', async (e) => {
   }
 });
 
-renderMine();
+loadKnown().then(() => { renderMine(); renderCreateOptions(); });
+renderCreateOptions();
 renderArchive();
 if (param('a')) find(param('a'));

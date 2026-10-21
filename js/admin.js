@@ -28,7 +28,10 @@ let pendingRender = false;
 let drawMode = localStorage.getItem('auctionxi:drawmode') || null;
 let drawPool = '';
 let drawRole = '';
-let miniKeep = null; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
+let miniKeep = null;
+// Arriving from "Create → Mini" on the home page: open the mini-auction builder pre-filled.
+const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
+if (miniPreset) tab = 'results'; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
 
 mountHeader(`<a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
   <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid, screen: 1 })}">Open stage screen</a>`);
@@ -71,7 +74,8 @@ async function boot() {
     $('#title').textContent = A.meta.name;
     const st = A.meta.status;
     $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
-      + (A.meta.kind === 'mini' ? ` ${badge('retained', { text: 'Mini auction' })} <small>from ${esc(A.meta.parentName || A.meta.parent)}</small>` : '');
+      + ` ${badge(A.meta.kind === 'mini' ? 'retained' : 'upcoming', { text: A.meta.kind === 'mini' ? 'Mini auction' : 'Major auction' })}`
+      + ` <small>${esc([A.meta.tournament, A.meta.season && `season ${A.meta.season}`, A.meta.kind === 'mini' && `based on ${A.meta.parentName || A.meta.parent}`].filter(Boolean).join(' · '))}</small>`;
     render();
   });
 
@@ -816,10 +820,12 @@ function results(el) {
 
 function miniBuilder() {
   const teamIds = Object.keys(A.teams);
-  if (!teamIds.length || !Object.keys(A.sales).length) return '';
+  if (!teamIds.length || !Object.keys(A.sales).length) {
+    return miniPreset ? '<div class="notice notice-warn" style="margin-top:var(--space-4)"><b>Mini auction:</b> this auction has no squads yet, so there is nothing to keep or release. A mini auction follows an auction that has been run.</div>' : '';
+  }
   if (!miniKeep) miniKeep = Object.fromEntries(teamIds.map((id) => [id, new Set(teamSummary(A, id).players.map((p) => p.id))]));
   return `
-    <div class="card" style="margin-top:var(--space-4)">
+    <div class="card" style="margin-top:var(--space-4)" id="m-anchor">
       <h2>Next season: mini auction</h2>
       <p>Tick the players each team keeps. Everyone unticked is released, and their value goes back into the team's budget:
         <b>budget = remaining purse + value of released players</b> (captain / vice-captain value, or the price paid).
@@ -839,7 +845,8 @@ function miniBuilder() {
         </div>`;
       }).join('')}</div>
       <div class="grid grid-2" style="margin-top:var(--space-4);align-items:end">
-        <div><label for="m-name">Mini auction name</label><input id="m-name" value="${esc(`${A.meta.tournament || A.meta.name} mini auction ${new Date().getFullYear() + 1}`)}"></div>
+        <div><label for="m-name">Mini auction name</label><input id="m-name" value="${esc(miniPreset?.name || `${A.meta.tournament || A.meta.name} ${Number(A.meta.season) ? Number(A.meta.season) + 1 : new Date().getFullYear() + 1} mini auction`)}"></div>
+        <div><label for="m-season">Season</label><input id="m-season" value="${esc(miniPreset?.season || (Number(A.meta.season) ? Number(A.meta.season) + 1 : new Date().getFullYear() + 1))}"></div>
         <label class="check"><input type="checkbox" id="m-pool" checked> Put released and unsold players back into the player pool</label>
       </div>
       <p class="hint">Rules, teams and house rules are copied; new captain / vice-captain codes are made. Add new registrations in the Players tab of the mini auction before locking. If a captain is released, pick a new one there (Players → As).</p>
@@ -857,12 +864,13 @@ function wireMiniBuilder(el) {
   }));
   const btn = $('#m-create', el);
   if (!btn) return;
+  if (miniPreset && !miniPreset.shown) { miniPreset.shown = true; setTimeout(() => $('#m-anchor')?.scrollIntoView({ block: 'start' }), 50); }
   btn.onclick = run(async () => {
     const name = $('#m-name').value.trim();
     if (!name) throw new Error('Name the mini auction');
     const lines = Object.keys(A.teams).map((id) => `${A.teams[id].name}: keeps ${miniKeep[id].size}, budget ${money(miniBudget(A, id, miniKeep[id]).budget, A.rules)}`);
     if (!confirm(`Create "${name}"?\n\n${lines.join('\n')}`)) return;
-    const { aid: next, adminCode } = await createMiniAuction(aid, A, { name, keep: miniKeep, addToPool: $('#m-pool').checked });
+    const { aid: next, adminCode } = await createMiniAuction(aid, A, { name, season: $('#m-season').value.trim(), keep: miniKeep, addToPool: $('#m-pool').checked });
     rememberAuction(next, name, 'admin');
     location.href = pageUrl('admin.html', { a: next, created: adminCode });
   });

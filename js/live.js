@@ -118,7 +118,7 @@ function renderPhone() {
     <div class="page-head">
       <div>
         <h1 style="margin:0">${esc(meta.name)}</h1>
-        <small>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</small>
+        <small>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date].filter(Boolean).join(' · '))}</small>
       </div>
       ${badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? `Live · Round ${meta.round || 1}` : meta.status === 'completed' ? 'Completed' : 'Not started' })}
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>

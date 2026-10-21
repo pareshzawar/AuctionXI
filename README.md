@@ -66,6 +66,17 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 
 The full day-of checklist is in **[docs/AUCTION_DAY.md](docs/AUCTION_DAY.md)**.
 
+## Tournaments, seasons, major and mini auctions
+
+One site and one Firebase project serve all your tournaments, e.g. a society league and a friends' tournament.
+
+- **Tournament**: type the same name every season (the home page suggests the names you've used). Auctions are grouped by tournament under *My tournaments and auctions*, newest season first.
+- **Season**: e.g. `2026`. Shown on the stage, phones and results.
+- **Major auction**: a fresh player list. Optionally **copy rules, house rules and teams** from an earlier auction (usually last season's), then upload this season's players. New captain / vice-captain codes are made.
+- **Mini auction**: choose **which auction it is based on** (any earlier major or mini auction of that tournament). You're taken to that auction's keep/release list: tick who each team keeps; each team's budget = remaining purse + value of the players it releases. Released, unsold and new players go into the pool.
+
+A typical year: *Society Premier League 2026* (major) → *2027* (mini, based on 2026) → *2028* (major, rules copied from 2027); and separately *Friends Cup 2026* (major) → *2027* (major, rules copied). Keep each tournament's filled setup questionnaire too, so you can re-upload it any time.
+
 ## Templates
 
 All in [`templates/`](templates), also downloadable from the home page and admin console. CSVs open in Excel or Google Sheets. Amounts can be `500000`, `5,00,000`, `5L` or `1Cr`.
