@@ -220,8 +220,8 @@ function setupFields() {
 
   f.push(['Captain and vice-captain', 'leaders', 'Allotted to each team before the auction (captain / captain_vc)', 'captain = only a captain; captain_vc = a captain and a vice-captain. Mark them in the players CSV',
     (m, r) => r.leaders, (m, r, v, warn) => { if (/^c(apt(ain)?)?$/i.test(v)) r.leaders = 'captain'; else if (/v/i.test(v)) r.leaders = 'captain_vc'; else if (v) warn(`leaders: "${v}" should be captain or captain_vc`); }]);
-  number('Captain and vice-captain', 'captain_price', 'Captain price (taken from the purse)', 'e.g. 200', 'captainPrice');
-  number('Captain and vice-captain', 'vc_price', 'Vice-captain price (taken from the purse)', 'e.g. 150. Ignored with captain only', 'vcPrice');
+  number('Captain and vice-captain', 'captain_price', 'Captain value (not taken from the purse)', 'e.g. 200. Recorded as the captain\'s value: if the captain is unavailable next season, this amount is added to the team\'s mini-auction budget', 'captainPrice');
+  number('Captain and vice-captain', 'vc_price', 'Vice-captain value (not taken from the purse)', 'e.g. 150. Same as above for the vice-captain. Ignored with captain only', 'vcPrice');
   f.push(['Captain and vice-captain', 'bidders', 'Who bids for the team (captain / captain_vc)', 'captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code',
     (m, r) => r.bidders, (m, r, v, warn) => { if (/^c(apt(ain)?)?$/i.test(v)) r.bidders = 'captain'; else if (/v/i.test(v)) r.bidders = 'captain_vc'; else if (v) warn(`bidders: "${v}" should be captain or captain_vc`); }]);
   f.push(['Captain and vice-captain', 'purse_visibility', `Who sees remaining purse and max bid (${Object.keys(PURSE_VISIBILITY).join(' / ')})`, 'own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all',
@@ -306,9 +306,9 @@ export function importSetup(rows, meta, rules) {
   const catMin = r.categories.reduce((t, c) => t + (Number(c.min) || 0), 0);
   const roleMin = Object.values(r.roleMin).reduce((t, n) => t + (Number(n) || 0), 0);
   if (Math.max(catMin, roleMin) > r.squadSize) warn('Category or role minimums add up to more than squad_size');
-  const leaders = Number(r.captainPrice || 0) + (r.leaders === 'captain_vc' ? Number(r.vcPrice || 0) : 0);
-  const need = (Number(r.squadSize) - (r.leaders === 'captain_vc' ? 2 : 1)) * Math.min(...r.categories.map((c) => Number(c.base) || 0));
-  if (leaders + need > Number(r.purse)) warn(`The purse (${r.purse}) cannot cover the captain/VC prices (${leaders}) plus the rest of the squad at base price (${need})`);
+  const toBuy = Number(r.squadSize) - (r.leaders === 'captain_vc' ? 2 : 1);
+  const need = toBuy * Math.min(...r.categories.map((c) => Number(c.base) || 0));
+  if (need > Number(r.purse)) warn(`The purse (${r.purse}) cannot buy ${toBuy} players even at base price (${need})`);
   delete r.reservesPerTeam; delete r.reserveBasePrice; delete r.retainedPriceDefault;
   return { meta: m, rules: withDefaults(r), warnings };
 }

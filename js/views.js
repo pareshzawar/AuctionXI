@@ -140,13 +140,12 @@ export function poolTable(a) {
 // The max-bid rule in words, with a worked example from this tournament's numbers.
 export function maxBidExplainer(r) {
   const base = minBase(r);
-  const leaders = Number(r.captainPrice || 0) + (hasVC(r) ? Number(r.vcPrice || 0) : 0);
-  const left = Number(r.purse) - leaders;
+  const left = Number(r.purse);
   const toBuy = Number(r.squadSize) - (hasVC(r) ? 2 : 1);
   const max = Math.max(0, Math.min(left, left - (toBuy - 1) * base));
   return {
     rule: `Max bid = purse left − (players still to buy − 1) × base price ${money(base, r)}, and never more than the purse left.`,
-    example: `Example at the start: ${money(r.purse, r)} − ${hasVC(r) ? `captain ${money(r.captainPrice, r)} − vice-captain ${money(r.vcPrice, r)}` : `captain ${money(r.captainPrice, r)}`} = ${money(left, r)} left with ${toBuy} players to buy, so the first max bid is ${money(left, r)} − ${toBuy - 1} × ${money(base, r)} = ${money(max, r)}.`,
+    example: `Example at the start: the full purse ${money(left, r)} (${hasVC(r) ? 'captain and vice-captain values are' : 'the captain value is'} not taken from it) with ${toBuy} players to buy, so the first max bid is ${money(left, r)} − ${toBuy - 1} × ${money(base, r)} = ${money(max, r)}.`,
   };
 }
 
@@ -159,8 +158,8 @@ export function rulesSummary(a) {
     ['Squad', `Every team must own exactly ${r.squadSize} players${res ? ` (${r.playersPerSide} playing + ${res} reserve${res === 1 ? '' : 's'})` : ''}, ${hasVC(r) ? 'captain and vice-captain' : 'captain'} included`],
     ['Purse per team', money(r.purse, r)],
     [hasVC(r) ? 'Captain and vice-captain' : 'Captain', hasVC(r)
-      ? `Allotted to their team before the auction: captain ${money(r.captainPrice, r)}, vice-captain ${money(r.vcPrice, r)}, taken from the purse`
-      : `Allotted to their team before the auction for ${money(r.captainPrice, r)}, taken from the purse`],
+      ? `Allotted to their team before the auction, not auctioned. Values: captain ${money(r.captainPrice, r)}, vice-captain ${money(r.vcPrice, r)}. These are not taken from the purse; if one is unavailable next season, their value is added to the team's mini-auction budget`
+      : `Allotted to their team before the auction, not auctioned. Value ${money(r.captainPrice, r)}, not taken from the purse; if the captain is unavailable next season, it is added to the team's mini-auction budget`],
     ['Who bids', vcCanBid(r) ? 'The captain and the vice-captain, each from their own phone' : 'The captain'],
     ['Base price', r.categories.map((c) => `${r.categories.length > 1 ? `${c.label} ` : ''}${money(c.base, r)}${Number(c.min) ? `, at least ${c.min} per team` : ''}${Number(c.max) ? `, at most ${c.max} per team` : ''}`).join(' · ')],
     ['Max bid', `${mb.rule} ${mb.example}`],

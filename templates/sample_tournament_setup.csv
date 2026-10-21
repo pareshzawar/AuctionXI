@@ -12,8 +12,8 @@ Money,max_price_per_player,Highest price allowed for one player (blank = no cap)
 Squad,players_per_side,Players per side in a match,8,"e.g. 8, 11, or 6 for box cricket"
 Squad,squad_size,"Players each team must own in total, captain and vice-captain included",10,e.g. 10 for an 8-a-side tournament with 2 reserves. Every team must reach exactly this number
 Captain and vice-captain,leaders,Allotted to each team before the auction (captain / captain_vc),captain_vc,captain = only a captain; captain_vc = a captain and a vice-captain. Mark them in the players CSV
-Captain and vice-captain,captain_price,Captain price (taken from the purse),200,e.g. 200
-Captain and vice-captain,vc_price,Vice-captain price (taken from the purse),150,e.g. 150. Ignored with captain only
+Captain and vice-captain,captain_price,Captain value (not taken from the purse),200,"e.g. 200. Recorded as the captain's value: if the captain is unavailable next season, this amount is added to the team's mini-auction budget"
+Captain and vice-captain,vc_price,Vice-captain value (not taken from the purse),150,e.g. 150. Same as above for the vice-captain. Ignored with captain only
 Captain and vice-captain,bidders,Who bids for the team (captain / captain_vc),captain_vc,"captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code"
 Captain and vice-captain,purse_visibility,Who sees remaining purse and max bid (own / bidders / everyone),own,own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all
 Categories,category_1_id,Category 1: short ID used in the players CSV,P,e.g. P. One category is enough when every player has the same base price. Categories come up in this order
