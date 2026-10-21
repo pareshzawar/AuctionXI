@@ -1,6 +1,7 @@
 import { db, isLocal } from './db.js';
 import { createAuction, claimCaptain, claimCoadmin, isAdmin } from './actions.js';
 import { $, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
+import { badge } from './ds.js';
 
 mountHeader();
 
@@ -9,9 +10,9 @@ let found = null; // { aid, meta, teams }
 function renderMine() {
   const list = myAuctions();
   if (!list.length) return;
-  $('#mine').innerHTML = `<table><tbody>${list.map((x) => `
+  $('#mine').innerHTML = `<table class="grid-table"><tbody>${list.map((x) => `
     <tr><td><b>${esc(x.name)}</b><br><small>${esc(x.id)} · ${esc(x.role)}</small></td>
-    <td style="text-align:right">
+    <td style="text-align:right" class="row">
       ${x.role === 'admin' ? `<a class="btn btn-sm" href="${pageUrl('admin.html', { a: x.id })}">Admin</a>` : ''}
       <a class="btn btn-sm" href="${pageUrl('live.html', { a: x.id })}">Live</a>
       <a class="btn btn-sm" href="${pageUrl('results.html', { a: x.id })}">Results</a>
@@ -35,17 +36,17 @@ function updateJoinFields() {
   $('#join-team-wrap').classList.toggle('hidden', !['captain', 'member'].includes(role));
   $('#join-code-wrap').classList.toggle('hidden', !['captain', 'admin'].includes(role));
   $('#join-name-wrap').classList.toggle('hidden', !['captain', 'admin'].includes(role));
-  $('#join-code-label').textContent = role === 'admin' ? 'Admin code (from the auction creator)' : 'Captain code for this team (from the admin)';
+  $('#join-code-label').textContent = role === 'admin' ? 'Admin code (from the person who created the auction)' : 'Captain code for this team (from the organiser)';
 }
 
 async function find(code) {
   const aid = code.trim().toUpperCase();
   const [meta, teams] = await Promise.all([db.get(`auctions/${aid}/meta`), db.get(`auctions/${aid}/teams`)]);
-  if (!meta) { toast('No auction with that code', 'error'); return; }
+  if (!meta) { toast('No auction with that code. Check it with the organiser.', 'error'); return; }
   found = { aid, meta, teams: teams || {} };
   $('#join-code').value = aid;
   $('#join-name').textContent = meta.name;
-  $('#join-status').textContent = meta.status;
+  $('#join-status').innerHTML = badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? 'Live' : meta.status === 'completed' ? 'Completed' : 'Not started' });
   $('#join-team').innerHTML = Object.entries(found.teams).map(([id, t]) => `<option value="${esc(id)}">${esc(t.name)}</option>`).join('')
     || '<option value="">(no teams yet)</option>';
   $('#join-step').classList.remove('hidden');

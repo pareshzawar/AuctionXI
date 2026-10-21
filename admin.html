@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin - AuctionXI</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='%23b91c1c'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230d0f12'/><text x='50' y='68' font-size='54' font-family='Arial Narrow,sans-serif' font-weight='700' fill='%23f2b84b' text-anchor='middle'>XI</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/ds-components.css">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 </head>
@@ -13,25 +15,25 @@
   <main>
     <div id="gate" class="card hidden" style="max-width:480px;margin:40px auto">
       <h2>Admin access</h2>
-      <p class="muted">This device is not an admin for this auction yet. Enter the admin code shown to the auction creator.</p>
+      <p class="muted">This device is not an admin for this auction yet. Enter the admin code from the person who created the auction.</p>
       <form id="gate-form">
-        <label>Admin code</label><input id="gate-code" required style="text-transform:uppercase">
-        <label>Your name</label><input id="gate-name">
-        <p><button class="btn-primary">Unlock admin</button></p>
+        <label for="gate-code">Admin code</label><input id="gate-code" class="code-input" required autocomplete="off">
+        <label for="gate-name">Your name</label><input id="gate-name" autocomplete="name">
+        <p style="margin-top:var(--space-4)"><button class="btn-primary">Open admin console</button></p>
       </form>
     </div>
     <div id="app" class="hidden">
-      <div class="row" style="margin-bottom:6px">
-        <h1 id="title" style="margin:0;font-size:1.5rem"></h1>
-        <span id="status" class="pill"></span>
+      <div class="section-title">
+        <h1 id="title" style="margin:0"></h1>
+        <span id="status"></span>
         <span class="spacer"></span>
-        <span class="muted">Code <span class="code" id="aid"></span></span>
+        <span class="muted">Auction code</span> <span class="secret" id="aid"></span>
       </div>
       <nav class="tabs" id="tabs">
-        <button data-tab="setup">1. Setup &amp; rules</button>
+        <button data-tab="setup">1. Setup and rules</button>
         <button data-tab="teams">2. Teams</button>
         <button data-tab="players">3. Players</button>
-        <button data-tab="access">4. Access &amp; sharing</button>
+        <button data-tab="access">4. Access and sharing</button>
         <button data-tab="control">5. Control room</button>
         <button data-tab="results">6. Results</button>
       </nav>

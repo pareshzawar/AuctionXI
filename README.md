@@ -13,17 +13,19 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 
 | | |
 |---|---|
-| 🧑‍⚖️ **Roles** | Admin (creator), co-admin/auctioneer (admin code), captain/owner (secret team code), team member, audience, big screen |
-| 📄 **CSV templates** | Download the player and team templates, fill them in Excel or Google Sheets, upload. Validates roles, categories, duplicate IDs |
-| ✏️ **Edit everything** | Edit players and teams inline, add or delete them, bulk-edit by export → spreadsheet → re-upload |
+| 🧑‍⚖️ **Roles** | Admin (creator), co-admin/auctioneer (admin code), captain/owner (secret team code), team member, audience, stage screen |
+| 📋 **Setup questionnaire** | One CSV covers each tournament's format, purse, squad, reserves, categories, role minimums, increments, bid mode **and house rules**. Fill it in, upload it, and reuse it next season |
+| 📄 **Player & team templates** | Fill them in Excel or Google Sheets, upload. Amounts can be written `5L`, `1Cr`, `5,00,000` |
+| ✏️ **Edit everything** | Inline editing, add/delete, or bulk-edit by export → spreadsheet → re-upload |
 | 🔒 **Lock per auction** | Lock the player list for an auction. Every new auction gets its own fresh upload |
-| ⚙️ **Your rules** | Purse, min/max squad, categories with base prices, increment slabs, bid timer, pick order, unsold re-auction rounds |
-| 🛡️ **Purse protection** | A team can't bid more than it needs to keep for a minimum squad. The database rules enforce this too |
-| 📱 **Bid from phones** | Captains get one big **BID** button. Or switch it off and let the auctioneer enter paddle bids |
-| 🎯 **Retained players** | Pre-assign captains/icons to teams at a fixed price (`retained_by` column) |
-| 📺 **Big-screen mode** | Projector view with a SOLD! animation |
-| 🔁 **Unsold rounds, undo** | Re-auction unsold players, undo the last sale, keyboard shortcuts (N / S / U) |
-| 📦 **Permanent archive** | Export the results as JSON and commit them to `archive/`. GitHub Pages serves them for free, permanently |
+| 🪑 **Reserve players** | `pool = reserve` players are auctioned last into each team's reserve slots |
+| 🛡️ **House rules enforced** | Purse kept for the minimum squad, category min/max (e.g. at least 1 junior, max 2 icons), role minimums (e.g. 1 WK), per-player price cap. Also checked by the database rules |
+| 📱 **Phones, paddles or both** | Captains get one big **BID** button. If they struggle, switch to *Room only*: the auctioneer records paddle bids, or just enters the winning team and final amount |
+| 💰 **Virtual ₹** | Shown the IPL way: ₹10 L, ₹1.25 Cr (or points) |
+| 📺 **Stage screen** | Fixed 1920×1080 projector layout with lot counter, purses, ticker and SOLD stamp |
+| 🔁 **Rounds, undo** | Re-auction unsold players, undo last bid, reverse last sale, keyboard shortcuts |
+| 📦 **Permanent archive** | Export results as JSON into `archive/`. GitHub Pages serves them permanently |
+| 🎨 **Design system** | Built on the AuctionXI design system from Claude Design: tokens, Barlow fonts, components (see `design/`) |
 
 ## Where things live (all free)
 
@@ -34,6 +36,8 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | **Logins** | **Firebase Auth** (Google sign-in + anonymous) | Free. Captains need no account, just a team code |
 | **Finished auctions** | **This repo** (`archive/<name>/auction.json`) | Version-controlled, free forever, viewable at `results.html?archive=<name>` even if Firebase is deleted |
 | **Player sheets** | Your own Google Sheet / Excel → CSV | You keep the master copy |
+
+**The Firebase config, in one sentence:** it's the "address" of your free database that you paste into `js/config.js`, so every phone talks to the same auction. It isn't a password, and the database rules keep the data safe. Step-by-step: [docs/SETUP.md](docs/SETUP.md#5-connect-the-app-the-firebase-config).
 
 Without Firebase configured, the app runs in **demo mode**: data is stored only in the current browser. That's good for trying it out or for a single-laptop auction on a projector where the auctioneer enters every bid.
 
@@ -49,31 +53,40 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 ## Running an auction
 
 1. **Create** an auction on the home page. Save the **admin code** shown under *Access & sharing*.
-2. **Setup & rules:** purse, squad sizes, categories and base prices, increments, timer. See **[docs/RULES.md](docs/RULES.md)** for recommended rules by tournament size.
+2. **Setup and rules:** upload your filled **setup questionnaire** (or use the form). See **[docs/RULES.md](docs/RULES.md)** for house rules and presets.
 3. **Teams:** add them or upload `templates/teams_template.csv`.
-4. **Players:** download the template, fill it in, upload, review, **Lock**.
+4. **Players:** download the template, fill it in (mark reserves with `pool = reserve`), upload, review, **Lock**.
 5. **Access & sharing:** share the QR code or join link. Send each captain *only* their own code (there's a "Copy message" button for WhatsApp).
-6. **Control room:** Start → Next player → bids come in → SOLD / Unsold. Open **Big screen** on the projector.
+6. **Control room:** Start → Next player → bids come in → Mark sold / Unsold. Open the **stage screen** on the projector. If phones don't work out, switch to *Room only* and enter paddle results.
 7. **Results:** download the CSV/JSON and archive it (see below).
 
 The full day-of checklist is in **[docs/AUCTION_DAY.md](docs/AUCTION_DAY.md)**.
 
-## CSV templates
+## Templates
 
-`templates/players_template.csv`
+All in [`templates/`](templates), also downloadable from the home page and admin console. CSVs open in Excel or Google Sheets. Amounts can be `500000`, `5,00,000`, `5L` or `1Cr`.
+
+| File | What it's for |
+|---|---|
+| `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, purse, squad and reserves, categories (base price, min/max per team), role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
+| `sample_tournament_setup.csv` | A filled example (society league with juniors, reserves and house rules) |
+| `teams_template.csv` | `id, name, short_name, color, owner, captain, logo_url` |
+| `players_template.csv` | One row per player (columns below) |
+| `sample_*.csv` | Demo data used by *Load sample data* |
+
+Players columns:
 
 | column | required | notes |
 |---|---|---|
 | `id` | no | e.g. `P001`. Auto-generated if empty or duplicate |
 | `name` | **yes** | |
-| `role` | no | `Batsman`, `Bowler`, `All-rounder`, `Wicket-keeper` (also accepts `bat`, `bowl`, `ar`, `wk`) |
-| `category` | no | Category ID or label from your rules (`A`/`Icon`, ...). Defaults to the last category |
+| `role` | no | `Batter`, `Bowler`, `All-rounder`, `Wicket-keeper` (also accepts `bat`, `bowl`, `ar`, `wk`) |
+| `category` | no | Category ID or name from your setup (`A` / `Icon`, …). Defaults to the last category |
+| `pool` | no | `main` (default) or `reserve` |
 | `base_price` | no | Overrides the category base price |
 | `batting_style`, `bowling_style`, `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
-| `photo_url` | no | Direct image link. Google Drive share links are converted automatically (file must be shared "Anyone with the link") |
+| `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link") |
 | `retained_by`, `retained_price` | no | Team ID and price. The player joins that team when the auction starts |
-
-`templates/teams_template.csv`: `id, name, short_name, color, owner, captain, logo_url`
 
 > ⚠️ Auction data is publicly readable by anyone with the auction code. **Do not put phone numbers or other private data in the CSV.**
 
@@ -93,10 +106,16 @@ live.html         live view for audience, team members, captains (?screen=1 for 
 results.html      squads & results (live or ?archive=slug)
 js/config.js      ← paste your Firebase config here
 js/db.js          Firebase / local-demo storage backend
-js/engine.js      auction rules (increments, max bid, pick order)
+js/engine.js      auction rules (increments, max bid, house-rule limits, reserves, pick order)
+js/ds.js          design-system components as HTML (same markup as the Claude Design bundle)
+js/views.js       screen sections built from those components
 js/actions.js     database writes (bid, sell, undo, rounds…)
 database.rules.json  Firebase security rules (who can write what)
-templates/        CSV templates + sample data
+css/tokens.css    design tokens (generated from design/tokens.json)
+css/ds-components.css  design-system component styles
+fonts/            Barlow, Barlow Condensed, Teko (SIL OFL)
+design/           the design-system source: tokens.json and notes
+templates/        setup questionnaire, player & team templates, sample data
 archive/          permanently archived auctions
 docs/             setup, rules guide, auction-day checklist
 ```

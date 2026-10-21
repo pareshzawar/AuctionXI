@@ -65,9 +65,9 @@ export function pageUrl(page, params) {
 export function modeBadge() {
   const el = document.createElement('span');
   el.className = `mode-badge ${isLocal ? 'mode-demo' : 'mode-live'}`;
-  el.textContent = isLocal ? 'Demo mode · this browser only' : 'Live · Firebase';
+  el.textContent = isLocal ? 'Demo mode' : 'Connected';
   el.title = isLocal
-    ? 'No Firebase config found. Data is saved in this browser only. See docs/SETUP.md to go live.'
+    ? 'No Firebase config: data stays in this browser only. See docs/SETUP.md to let phones join.'
     : 'Connected to Firebase Realtime Database';
   return el;
 }
@@ -76,7 +76,7 @@ export function mountHeader(extra = '') {
   const header = $('header.top');
   if (!header) return;
   header.innerHTML = `
-    <a class="brand" href="index.html"><span class="brand-ball"></span>Auction<b>XI</b></a>
+    <a class="brand" href="index.html">AuctionXI</a>
     <div class="top-extra">${extra}</div>`;
   header.append(modeBadge());
 }

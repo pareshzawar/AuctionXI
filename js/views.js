@@ -1,116 +1,157 @@
-// HTML fragments shared by the admin control room, live view and results page.
+// Screen sections shared by the admin console, live view, stage and results page,
+// assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, initials, photoUrl } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, isReserve, roleId, ROLES, pool } from './engine.js';
+import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
-export function avatar(p, cls = '') {
-  const url = photoUrl(p?.photoUrl);
-  return `<div class="avatar ${cls}">${url ? `<img src="${esc(url)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}${url ? '' : esc(initials(p?.name))}</div>`;
+export function playerStatus(a, pid) {
+  const s = a.sales[pid];
+  if (s) return s.retained ? 'retained' : 'sold';
+  if (a.live?.playerId === pid && a.live.status === 'bidding') return 'live';
+  if (a.unsold[pid]) return 'unsold';
+  return 'upcoming';
 }
 
-export function teamName(a, id) {
-  const t = a.teams[id];
-  return t ? `<span class="team-dot" style="background:${esc(t.color)}"></span>${esc(t.name)}` : '<span class="muted">-</span>';
+// "Lot n of m": players brought up so far, counting the current one.
+export function lotInfo(a) {
+  const total = Object.values(a.players).length;
+  const done = Object.values(a.sales).filter((s) => !s.retained).length + Object.keys(a.unsold).filter((pid) => !a.sales[pid]).length;
+  const live = a.live?.status === 'bidding' ? 1 : 0;
+  return { lot: done + live, total };
 }
 
-export function playerCard(a, pid) {
+export function cardFor(a, pid, variant = 'tile') {
   const p = a.players[pid];
-  if (!p) return '<p class="muted">Waiting for the auctioneer to bring up the next player...</p>';
+  if (!p) return '';
+  const status = a.live?.playerId === pid && a.live.status === 'bidding' ? 'live' : playerStatus(a, pid);
   const cat = category(a.rules, p.category);
-  const stat = (label, v) => (v != null && v !== '' ? `<span>${label} <b>${esc(v)}</b></span>` : '');
-  return `
-    <div class="player-card">
-      ${avatar(p)}
-      <div>
-        <div class="row" style="gap:6px">
-          <span class="pill pill-blue">${esc(p.role || '')}</span>
-          ${cat ? `<span class="pill pill-gold">${esc(cat.label)}</span>` : ''}
-          <span class="pill">Base ${money(basePrice(p, a.rules), a.rules)}</span>
-        </div>
-        <p class="player-name">${esc(p.name)}</p>
-        <div class="muted">${[p.battingStyle, p.bowlingStyle, p.locality].filter(Boolean).map(esc).join(' · ')}</div>
-        <div class="stats">${stat('Age', p.age)}${stat('Matches', p.matches)}${stat('Runs', p.runs)}${stat('Wickets', p.wickets)}</div>
-        ${p.notes ? `<div class="muted" style="margin-top:6px">${esc(p.notes)}</div>` : ''}
-      </div>
-    </div>`;
+  const sale = a.sales[pid];
+  return playerCard(p, {
+    variant,
+    status,
+    rules: a.rules,
+    base: basePrice(p, a.rules),
+    category: cat ? { label: cat.label, featured: a.rules.categories[0]?.id === cat.id } : null,
+    reserve: isReserve(p),
+    currentBid: status === 'live' && a.live.bid?.team ? a.live.bid.amount : null,
+    soldTo: sale ? a.teams[sale.team] : null,
+    soldPrice: sale ? sale.price : null,
+  });
 }
 
-export function bidBox(a) {
+export function livePanel(a, size = '') {
   const live = a.live;
-  if (!live || !live.bid) return '<div class="bid-box"><p class="muted">No bidding in progress</p></div>';
-  const b = live.bid;
-  const until = live.status === 'bidding' ? b.until || '' : '';
-  const label = live.status === 'sold' ? 'Sold for' : live.status === 'unsold' ? 'Unsold' : b.team ? 'Current bid' : 'Opening at base price';
-  return `
-    <div class="bid-box">
-      <div class="muted">${label}</div>
-      <div class="bid-amount">${live.status === 'unsold' ? '-' : money(b.amount, a.rules)}</div>
-      <div class="bid-team">${b.team ? teamName(a, b.team) : '<span class="muted">No bids yet</span>'}</div>
-      <div class="timer ${until ? '' : 'hidden'}" data-until="${until}" data-total="${(a.rules.bidTimer || 0) * 1000}"><div></div></div>
-      <div class="muted" data-countdown></div>
-    </div>`;
+  const p = live && a.players[live.playerId];
+  if (!p) return '';
+  const b = live.bid || {};
+  const bidding = live.status === 'bidding';
+  const timerTotal = (Number(a.rules.bidTimer) || 0) * 1000;
+  return bidPanel({
+    size,
+    rules: a.rules,
+    base: basePrice(p, a.rules),
+    current: b.team ? Number(b.amount) : undefined,
+    leading: b.team ? a.teams[b.team] : null,
+    next: bidding ? nextBid(live, a.rules) : null,
+    status: bidding ? 'live' : live.status === 'sold' ? 'sold' : live.status === 'unsold' ? 'unsold' : 'paused',
+    timer: bidding && b.until && timerTotal ? { until: b.until, total: timerTotal } : null,
+  });
 }
 
-export function teamsStrip(a, { mine = null } = {}) {
+export function purses(a, { mine = null, size = '' } = {}) {
   const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
-  return `<div class="teams-strip">${Object.entries(a.teams).map(([id, t]) => {
-    const s = teamSummary(a, id);
-    return `
-      <div class="team-tile ${id === leading ? 'leading' : ''} ${id === mine ? 'mine' : ''}" style="--c:${esc(t.color)}">
-        <div class="t-name">${esc(t.name)}</div>
-        <div class="t-meta">Left <b>${money(s.remaining, a.rules)}</b> · Max bid ${money(s.maxBid, a.rules)}</div>
-        <div class="t-meta">Players ${s.count}/${a.rules.maxSquad} · min ${a.rules.minSquad}</div>
-      </div>`;
-  }).join('')}</div>`;
+  return Object.entries(a.teams).map(([id, t]) =>
+    teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === mine })).join('');
+}
+
+export function tickerItems(a, limit = 12) {
+  const sales = Object.entries(a.sales).filter(([, s]) => !s.retained)
+    .map(([pid, s]) => ({ at: s.at, player: a.players[pid]?.name || pid, team: a.teams[s.team], price: s.price }));
+  const unsold = Object.entries(a.unsold).filter(([pid]) => !a.sales[pid])
+    .map(([pid, u]) => ({ at: u.at, player: a.players[pid]?.name || pid, result: 'unsold' }));
+  return [...sales, ...unsold].sort((x, y) => y.at - x.at).slice(0, limit);
+}
+
+export function ticker(a, opts) {
+  const items = tickerItems(a);
+  return items.length ? salesTicker(items, a.rules, opts) : '';
 }
 
 export function feed(a, limit = 30) {
   const items = Object.values(a.log).sort((x, y) => y.at - x.at).slice(0, limit);
-  const name = (pid) => esc(a.players[pid]?.name || pid);
+  const name = (pid) => `<b>${esc(a.players[pid]?.name || pid)}</b>`;
   const line = (e) => {
     switch (e.type) {
-      case 'sold': return `🔨 <b>${name(e.playerId)}</b> sold to ${teamName(a, e.team)} for <b>${money(e.amount, a.rules)}</b>`;
-      case 'unsold': return `❌ <b>${name(e.playerId)}</b> unsold`;
-      case 'up': return `🏏 <b>${name(e.playerId)}</b> is up, base ${money(e.amount, a.rules)}`;
-      case 'undo': return `↩️ Sale of <b>${name(e.playerId)}</b> undone`;
-      case 'round': return `🔁 Round ${e.round} - unsold players return`;
-      case 'start': return '🚀 Auction started';
-      case 'end': return '🏁 Auction completed';
+      case 'sold': return `${badge('sold')} ${name(e.playerId)} ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm', tone: 'sold' })}`;
+      case 'unsold': return `${badge('unsold')} ${name(e.playerId)}`;
+      case 'up': return `${badge('upcoming', { text: 'Up' })} ${name(e.playerId)} <span class="muted">base ${esc(money(e.amount, a.rules))}</span>`;
+      case 'undo': return `${badge('paused', { text: 'Reversed' })} Sale of ${name(e.playerId)} reversed`;
+      case 'round': return `${badge('upcoming', { text: 'Round' })} Round ${esc(e.round)}: unsold players return`;
+      case 'start': return `${badge('live')} Auction started`;
+      case 'end': return `${badge('paused', { text: 'Closed' })} Auction completed`;
       default: return esc(e.type);
     }
   };
+  const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return items.length
-    ? `<div class="feed">${items.map((e) => `<div>${line(e)} <small>${new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small></div>`).join('')}</div>`
+    ? `<div class="feed">${items.map((e) => `<div>${line(e)}<time>${time(e.at)}</time></div>`).join('')}</div>`
     : '<p class="muted">Nothing yet.</p>';
 }
 
-export function squads(a, { mine = null } = {}) {
-  return `<div class="grid grid-3">${Object.entries(a.teams).map(([id, t]) => {
-    const s = teamSummary(a, id);
-    return `
-      <div class="card" style="border-top:4px solid ${esc(t.color)}${id === mine ? ';outline:2px solid var(--gold)' : ''}">
-        <h3>${esc(t.name)}</h3>
-        <div class="muted" style="font-size:.85rem">${[t.owner && `Owner: ${esc(t.owner)}`, t.captain && `Captain: ${esc(t.captain)}`].filter(Boolean).join(' · ')}</div>
-        <div class="muted" style="font-size:.85rem;margin:4px 0 8px">Spent ${money(s.spent, a.rules)} · Left ${money(s.remaining, a.rules)} · ${s.count} players</div>
-        <ul class="squad-list">${s.players.sort((x, y) => y.price - x.price).map((p) => `
-          <li><span>${esc(p.name)} <small class="muted">${esc(p.role || '')}${p.retained ? ' · retained' : ''}</small></span><b>${money(p.price, a.rules)}</b></li>`).join('') || '<li class="muted">No players yet</li>'}
-        </ul>
-      </div>`;
-  }).join('')}</div>`;
+export function squadRows(a, teamId) {
+  return teamSummary(a, teamId).players.sort((x, y) => Number(x.reserve) - Number(y.reserve) || y.price - x.price).map((p) => ({
+    id: p.id,
+    name: p.name,
+    sub: [p.reserve ? 'Reserve' : null, p.retained ? 'Retained' : null, p.battingStyle, p.bowlingStyle].filter(Boolean).join(' · '),
+    role: p.role,
+    category: category(a.rules, p.category)?.label,
+    status: p.retained ? 'retained' : 'sold',
+    price: p.price,
+  }));
 }
 
-// Animate countdown bars rendered by bidBox(). Call once per page.
-export function startTimers(now) {
-  setInterval(() => {
-    document.querySelectorAll('.timer[data-until]').forEach((el) => {
-      const until = Number(el.dataset.until);
-      const total = Number(el.dataset.total) || 1;
-      const cd = el.parentElement.querySelector('[data-countdown]');
-      if (!until) { if (cd) cd.textContent = ''; return; }
-      const left = Math.max(0, until - now());
-      el.firstElementChild.style.width = `${Math.min(100, (left / total) * 100)}%`;
-      el.classList.toggle('low', left < 5000);
-      if (cd) cd.textContent = left > 0 ? `${Math.ceil(left / 1000)}s` : 'Time up - going, going...';
-    });
-  }, 250);
+export function squads(a, { mine = null } = {}) {
+  const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
+  // The viewer's own team first.
+  const ids = Object.keys(a.teams).sort((x, y) => (y === mine) - (x === mine));
+  return `<div class="grid grid-2">${ids.map((id) => `
+    <div class="stack">
+      ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading })}
+      ${playerTable(squadRows(a, id), a.rules, { dense: true, columns: ['player', 'role', 'price'] })}
+    </div>`).join('')}</div>`;
+}
+
+export function poolTable(a) {
+  const rows = pool(a).map((p) => ({
+    id: p.id,
+    name: p.name,
+    sub: [isReserve(p) ? 'Reserve' : null, p.age ? `Age ${p.age}` : null, p.locality].filter(Boolean).join(' · '),
+    role: p.role,
+    category: category(a.rules, p.category)?.label,
+    base: basePrice(p, a.rules),
+    status: playerStatus(a, p.id),
+  }));
+  return playerTable(rows, a.rules, { dense: true, columns: ['player', 'role', 'category', 'base', 'status'] });
+}
+
+export function rulesSummary(a) {
+  const r = a.rules;
+  const items = [
+    ['Purse per team', money(r.purse, r)],
+    ['Squad', `${r.minSquad} to ${r.maxSquad} players${Number(r.reservesPerTeam) ? `, plus up to ${r.reservesPerTeam} reserves` : ''}`],
+    ['Categories', r.categories.map((c) => `${c.label} ${money(c.base, r)}${Number(c.min) ? `, min ${c.min}` : ''}${Number(c.max) ? `, max ${c.max}` : ''}`).join(' · ')],
+    ...(Object.entries(r.roleMin).some(([, n]) => Number(n)) ? [['Each team needs', Object.entries(r.roleMin).filter(([, n]) => Number(n)).map(([k, n]) => `${n} ${ROLES[roleId(k)].code}`).join(', ')]] : []),
+    ['Bid increments', r.increments.map((s) => (Number(s.upto) ? `+${money(s.step, r)} below ${money(s.upto, r)}` : `+${money(s.step, r)} above`)).join(' · ')],
+    ...(Number(r.maxPlayerPrice) ? [['Price cap per player', money(r.maxPlayerPrice, r)]] : []),
+    ['Bidding', r.bidMode === 'room' ? 'Room paddles; the auctioneer records bids' : 'Captains bid from their phones; the auctioneer confirms every sale'],
+    ['Timer', Number(r.bidTimer) ? `${r.bidTimer} seconds after each bid` : 'Off'],
+  ];
+  const house = r.houseRules.filter((h) => h.a);
+  return `<div class="grid grid-2">
+    <div class="card"><h2>Auction rules</h2><dl class="rules-list">${items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+    <div class="card"><h2>House rules</h2>${house.length
+      ? `<dl class="rules-list">${house.map((h) => (h.q ? `<dt>${esc(h.q)}</dt><dd>${esc(h.a)}</dd>` : `<dt>${esc(h.a)}</dt>`)).join('')}</dl>`
+      : '<p class="muted">The organisers have not added house rules.</p>'}</div>
+  </div>`;
 }
