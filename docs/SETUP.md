@@ -70,12 +70,12 @@ Each person who forks AuctionXI puts their **own** Firebase config in their fork
 |---|---|---|
 | Owner | Device/Google account that created the auction | Everything |
 | Co-admin | Admin code | Everything except removing other co-admins |
-| Captain / vice-captain | Their own code (6 characters; vice-captains only when the tournament lets them bid) | See their team's remaining purse and max bid, and place bids for their own team only, within purse, only while bidding is open and the bid mode is not "Room only"; never above their max bid or the per-player cap |
+| Captain / vice-captain | Their own code (6 characters; vice-captains only when the tournament lets them bid) | See their team's remaining purse and max bid, and place bids for their own team only, within purse, only while bidding is open and the bid mode is not "Room only"; never above their max bid or the per-player cap. Read and write their own encrypted workbook (`notes/`); nobody else can, admins included |
 | Team member / audience / big screen | Nothing | Read only: the auction, squads and rules, but not remaining purses (unless the tournament shows them to everyone) |
 
-Secret codes are stored in a separate `secrets/` area that only admins can read.
+Secret codes are stored in a separate `secrets/` area that only admins can read. Player photos and the league logo and banner live in `media/`: everyone can see them, only admins can change them. They take about 8 KB a photo, well inside the free plan.
 
 ## Housekeeping
 
-- Old auctions can be deleted in the Firebase console (Realtime Database → Data → `auctions/<code>`, `secrets/<code>`, `captains/<code>`, `coadmins/<code>`). Archive the JSON in the repo first.
+- Old auctions can be deleted in the Firebase console (Realtime Database → Data → `auctions/<code>`, `secrets/<code>`, `captains/<code>`, `coadmins/<code>`, `media/<code>`, `notes/<code>`). Archive the JSON in the repo first.
 - To start completely fresh, create a new auction. Each auction is independent and has its own locked player list.

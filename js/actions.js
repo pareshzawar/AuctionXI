@@ -39,6 +39,8 @@ export async function createAuction({ name, tournament, season, venue, date, org
   });
   await db.set(`secrets/${aid}`, { adminCode, ...codes });
   if (copyFrom) await db.update(`auctions/${aid}`, capsUpdate(normalize({ meta: {}, rules: copyFrom.rules, teams })));
+  // The league logo and banner carry over; player photos belong to the players uploaded later.
+  if (copyFrom?.media?.logo || copyFrom?.media?.banner) await db.set(`media/${aid}`, { logo: copyFrom.media.logo || null, banner: copyFrom.media.banner || null });
   return { aid, adminCode };
 }
 
@@ -49,6 +51,7 @@ export async function createAuction({ name, tournament, season, venue, date, org
 // addToPool: put released and never-sold players back into the player pool.
 export async function createMiniAuction(prevAid, a, { name, season, keep, addToPool }) {
   const aid = await newAuctionId(name, a.meta.tournament);
+  const own = (p) => { const { photoData: _, ...rest } = p; return rest; }; // photos live under media/
   const teams = {};
   const players = {};
   const codes = { teamCodes: {}, vcCodes: {} };
@@ -57,15 +60,15 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
     const { spent, maxBid, ...rest } = t;
     teams[id] = { ...rest, purse: mb.budget, carriedOver: mb.remaining, releasedValue: mb.releasedValue };
     for (const p of mb.kept) {
-      players[p.id] = { ...a.players[p.id], allottedTeam: id, allottedAs: p.as === 'C' || p.as === 'VC' ? p.as : 'R', allottedPrice: p.price };
+      players[p.id] = { ...own(a.players[p.id]), allottedTeam: id, allottedAs: p.as === 'C' || p.as === 'VC' ? p.as : 'R', allottedPrice: p.price };
     }
-    if (addToPool) for (const p of mb.released) players[p.id] = { ...a.players[p.id], allottedTeam: null, allottedAs: null, allottedPrice: null };
+    if (addToPool) for (const p of mb.released) players[p.id] = { ...own(a.players[p.id]), allottedTeam: null, allottedAs: null, allottedPrice: null };
     codes.teamCodes[id] = randomCode(6);
     codes.vcCodes[id] = randomCode(6);
   }
   if (addToPool) {
     for (const [pid, p] of Object.entries(a.players)) {
-      if (!a.sales[pid] && !p.allottedTeam) players[pid] = { ...p, allottedTeam: null, allottedAs: null, allottedPrice: null };
+      if (!a.sales[pid] && !p.allottedTeam) players[pid] = { ...own(p), allottedTeam: null, allottedAs: null, allottedPrice: null };
     }
   }
   const adminCode = randomCode(8);
@@ -82,6 +85,9 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
   await db.set(`auctions/${aid}`, { meta: next.meta, rules: next.rules, teams: next.teams, players: next.players });
   await db.set(`secrets/${aid}`, { adminCode, ...codes });
   await db.update(`auctions/${aid}`, capsUpdate(next));
+  const m = a.media || {};
+  const photos = Object.fromEntries(Object.keys(players).filter((pid) => m.players?.[pid]).map((pid) => [pid, m.players[pid]]));
+  if (m.logo || m.banner || Object.keys(photos).length) await db.set(`media/${aid}`, { logo: m.logo || null, banner: m.banner || null, players: photos });
   return { aid, adminCode };
 }
 
@@ -265,5 +271,6 @@ export async function finishAuction(aid) {
 export function exportSnapshot(a) {
   const { meta, rules, teams, players, sales, unsold, log: history } = a;
   const { ownerUid, ...publicMeta } = meta;
-  return { format: 'auctionxi/1', exportedAt: new Date().toISOString(), meta: publicMeta, rules, teams, players, sales, unsold, log: history };
+  const plain = Object.fromEntries(Object.entries(players).map(([id, { photoData, ...p }]) => [id, p]));
+  return { format: 'auctionxi/1', exportedAt: new Date().toISOString(), meta: publicMeta, rules, teams, players: plain, sales, unsold, log: history, media: a.media || null };
 }

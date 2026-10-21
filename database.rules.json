@@ -32,6 +32,12 @@
         }
       }
     },
+    "media": {
+      "$aid": {
+        ".read": true,
+        ".write": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())"
+      }
+    },
     "notes": {
       "$aid": {
         "$seat": {

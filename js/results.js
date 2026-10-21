@@ -7,6 +7,7 @@ import { toCSV } from './csv.js';
 import { $, esc, param, download, mountHeader, getSession } from './ui.js';
 import { price, teamBadge, playerTable } from './ds.js';
 import { squads, rulesSummary } from './views.js';
+import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 
 mountHeader();
 
@@ -18,6 +19,8 @@ function render(A) {
   const { meta, rules } = A;
   document.title = `${meta.name} - Results`;
   $('#title').textContent = meta.name;
+  $('#brand').innerHTML = bannerImg(A, { cls: 'phone-banner' });
+  $('#logo').innerHTML = logoImg(A, { size: 64 });
   $('#subtitle').textContent = [meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date, meta.status === 'completed' ? 'Completed' : meta.status === 'live' ? 'In progress' : null].filter(Boolean).join(' · ');
 
   const sales = Object.entries(A.sales).filter(([, s]) => !s.allotted && !s.retained);
@@ -51,10 +54,13 @@ function render(A) {
 if (archive) {
   fetch(`archive/${encodeURIComponent(archive)}/auction.json`)
     .then((r) => (r.ok ? r.json() : null))
-    .then((data) => render(normalize(data)))
+    .then((data) => render(applyMedia(normalize(data), data?.media)))
     .catch(() => render(null));
 } else if (aid) {
-  db.on(`auctions/${aid}`, (v) => render(normalize(v)));
+  let media = {};
+  let last = null;
+  watchMedia(aid, (m) => { media = m; if (last) render(applyMedia(last, media)); });
+  db.on(`auctions/${aid}`, (v) => { last = normalize(v); render(applyMedia(last, media)); });
 } else {
   render(null);
 }

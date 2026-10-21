@@ -174,7 +174,7 @@ $('#create-form').addEventListener('submit', async (e) => {
     if (copyId) {
       const v = await db.get(`auctions/${copyId}`);
       if (!v) throw new Error('Could not read the auction to copy from');
-      copyFrom = { ...normalize(v), id: copyId };
+      copyFrom = { ...normalize(v), id: copyId, media: await db.get(`media/${copyId}`).catch(() => null) };
     }
     const { aid, adminCode } = await createAuction({
       name,

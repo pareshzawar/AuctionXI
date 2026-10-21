@@ -16,6 +16,7 @@ import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, set
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
+import { watchMedia, applyMedia, setPlayerPhoto, setBrand, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -23,6 +24,7 @@ let A = null;
 let secrets = { teamCodes: {}, vcCodes: {} };
 let captains = {};
 let coadmins = {};
+let media = {}; // uploaded player photos, league logo and banner
 let tab = localStorage.getItem('auctionxi:admintab') || 'setup';
 let pendingRender = false;
 // Next-player panel: 'random' draw (optionally from one pool / role) or 'chit' (search by name).
@@ -73,8 +75,9 @@ async function boot() {
   db.on(`secrets/${aid}`, (v) => { secrets = v || {}; secrets.teamCodes ||= {}; secrets.vcCodes ||= {}; render(); });
   db.on(`captains/${aid}`, (v) => { captains = v || {}; render(); });
   db.on(`coadmins/${aid}`, (v) => { coadmins = v || {}; render(); });
+  watchMedia(aid, (m) => { media = m; if (A) { applyMedia(A, media); render(); } });
   db.on(P, (v) => {
-    A = normalize(v);
+    A = applyMedia(normalize(v), media);
     if (!A) return;
     commentator.update(A);
     $('#title').textContent = A.meta.name;
@@ -112,7 +115,7 @@ const numIn = (id, v) => `<input id="${id}" inputmode="numeric" value="${esc(v ?
 function setup(el) {
   const { meta, rules } = A;
   const house = Object.fromEntries(rules.houseRules.map((h) => [h.key, h.a]));
-  el.innerHTML = `
+  el.innerHTML = `${brandingCard()}
     <div class="card" style="margin-bottom:var(--space-4)">
       <div class="section-title"><h2>Fill the setup from a questionnaire</h2></div>
       <p>Every tournament is different. Download the questionnaire (it already has this auction's current answers), fill in the
@@ -198,6 +201,7 @@ function setup(el) {
     ${A.meta.status !== 'setup' ? '<p class="notice notice-warn" style="margin-top:var(--space-4)">The auction has started. Changing purse or squad rules now affects every team immediately.</p>' : ''}
     <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="save-setup">Save setup</button></p>`;
 
+  wireBranding(el);
   $('#add-cat').onclick = () => $('#cats').insertAdjacentHTML('beforeend', catRow({ id: '', label: '', base: '', min: '', max: '' }));
   $('#add-inc').onclick = () => $('#incs').insertAdjacentHTML('beforeend', incRow({ upto: '', step: '' }));
   el.onclick = (e) => { if (e.target.matches('[data-del-row]')) e.target.closest('tr').remove(); };
@@ -419,7 +423,9 @@ function players(el) {
       <span class="hint">Base blank = the pool's base price. "Allotted to" + "As" make a player that team's captain or vice-captain:
         they join the team at the captain / vice-captain price when the auction starts and are never auctioned.
         To change many players, export, edit in a spreadsheet and upload again.</span>
-    </div>`;
+    </div>
+    ${list.length ? photosCard(list) : ''}`;
+  wirePhotos(el);
 
   $('#p-template').onclick = () => download('players_template.csv', playerTemplate());
   $('#p-export').onclick = () => download(`${aid}_players.csv`, playersToCSV(A.players));
@@ -450,7 +456,7 @@ function players(el) {
     if (!confirm('Load the sample tournament setup (8-a-side, squads of 10), 4 teams and 44 players with captains and vice-captains?')) return;
     const s = importSetup(parseCSV(st), A.meta, A.rules);
     await saveRules({ ...A.meta, name: A.meta.name }, s.rules);
-    A = normalize(await db.get(P));
+    A = applyMedia(normalize(await db.get(P)), media);
     if (!Object.keys(A.teams).length) await addTeams(importTeams(parseCSV(tt)).teams);
     await importPlayerRows(parseCSV(pt), true);
   });
@@ -486,6 +492,89 @@ function players(el) {
     if (!confirm(`Remove ${A.players[id].name}?`)) return;
     await db.set(`${P}/players/${id}`, null);
   });
+}
+
+/* Pictures: league logo and banner (Setup tab), player photos (Players tab) */
+
+const fileButton = (label, attrs, multiple = false) => `<label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">${label}<input type="file" accept="image/*" ${attrs} ${multiple ? 'multiple' : ''} hidden></label>`;
+
+function brandingCard() {
+  const m = A.media || {};
+  return `<div class="card" style="margin-bottom:var(--space-4)">
+    <div class="section-title"><h2>League logo and banner</h2><small>Shown on the stage screen, phones and results</small></div>
+    <div class="grid grid-2">
+      <div>
+        <label>Logo</label>
+        <div class="row" style="align-items:center">
+          <div class="brand-preview" style="width:120px;height:120px">${m.logo ? `<img src="${esc(m.logo)}" alt="League logo">` : '<span class="muted">No logo</span>'}</div>
+          <div class="stack" style="gap:var(--space-2)">${fileButton(m.logo ? 'Change logo' : 'Upload logo', 'id="b-logo"')}${m.logo ? '<button class="btn-sm btn-ghost" data-brand-del="logo">Remove</button>' : ''}</div>
+        </div>
+        <span class="hint">Square works best; a PNG with a transparent background looks cleanest. Shrunk to ${LOGO.max} px.</span>
+      </div>
+      <div>
+        <label>Banner</label>
+        <div class="brand-preview" style="aspect-ratio:4/1;width:100%">${m.banner ? `<img src="${esc(m.banner)}" alt="League banner">` : '<span class="muted">No banner</span>'}</div>
+        <p class="row" style="margin:var(--space-2) 0 0">${fileButton(m.banner ? 'Change banner' : 'Upload banner', 'id="b-banner"')}${m.banner ? '<button class="btn-sm btn-ghost" data-brand-del="banner">Remove</button>' : ''}</p>
+        <span class="hint">Wide picture, cropped to 4 : 1 (${BANNER.w} × ${BANNER.h}). Sponsor names, the season, the ground.</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function wireBranding(el) {
+  $('#b-logo', el).onchange = run(async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (f) { await setBrand(aid, 'logo', await resizeImage(f, LOGO)); toast('Logo saved', 'ok'); }
+  });
+  $('#b-banner', el).onchange = run(async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (f) { await setBrand(aid, 'banner', await resizeImage(f, BANNER)); toast('Banner saved', 'ok'); }
+  });
+  $$('[data-brand-del]', el).forEach((b) => (b.onclick = run(async () => {
+    if (confirm(`Remove the ${b.dataset.brandDel}?`)) await setBrand(aid, b.dataset.brandDel, null);
+  })));
+}
+
+function photosCard(list) {
+  const have = list.filter(([, p]) => p.photoData || p.photoUrl).length;
+  return `<div class="card" style="margin-top:var(--space-4)">
+    <div class="section-title"><h2>Player photos</h2><small>${have} of ${list.length} have a photo</small><span class="spacer"></span>
+      ${fileButton('Upload many photos', 'id="ph-bulk"', true)}</div>
+    <p class="muted">Tap a player to upload their photo from this phone or laptop, or choose many at once named by player ID or name
+      (<code>P001.jpg</code>, <code>Rohan Patil.jpg</code>). Photos are cropped to a 3 : 4 portrait and shrunk, and can be changed even after the list is locked.
+      A <code>photo_url</code> in the CSV still works; an uploaded photo replaces it.</p>
+    <div class="photo-grid">${list.map(([id, p]) => `
+      <div class="photo-tile">
+        <label class="photo-pick" title="Upload a photo of ${esc(p.name)}">
+          <span class="ax-avatar" style="width:72px;height:96px;border-radius:var(--radius-md)">${p.photoData ? `<img src="${esc(p.photoData)}" alt="">` : p.photoUrl ? '<small>URL</small>' : esc((p.name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join(''))}</span>
+          <input type="file" accept="image/*" data-photo="${esc(id)}" hidden>
+        </label>
+        <div style="min-width:0"><b>${esc(p.name)}</b><br><small><code>${esc(id)}</code></small>
+          ${p.photoData ? `<br><button class="btn-sm btn-ghost" data-photo-del="${esc(id)}">Remove</button>` : ''}</div>
+      </div>`).join('')}</div>
+  </div>`;
+}
+
+function wirePhotos(el) {
+  $$('[data-photo]', el).forEach((inp) => (inp.onchange = run(async (e) => {
+    e.stopPropagation();
+    const f = inp.files[0]; inp.value = '';
+    if (f) { await setPlayerPhoto(aid, inp.dataset.photo, await resizeImage(f, PHOTO)); toast(`Photo saved for ${A.players[inp.dataset.photo]?.name}`, 'ok'); }
+  })));
+  $$('[data-photo-del]', el).forEach((b) => (b.onclick = run(async () => {
+    if (confirm(`Remove the photo of ${A.players[b.dataset.photoDel]?.name}?`)) await setPlayerPhoto(aid, b.dataset.photoDel, null);
+  })));
+  const bulk = $('#ph-bulk', el);
+  if (bulk) {
+    bulk.onchange = run(async (e) => {
+      e.stopPropagation();
+      const { matched, unmatched } = matchPhotoFiles(A.players, [...bulk.files]);
+      bulk.value = '';
+      for (const { file, pid } of matched) await setPlayerPhoto(aid, pid, await resizeImage(file, PHOTO));
+      toast(`${matched.length} photo${matched.length === 1 ? '' : 's'} saved`, 'ok');
+      if (unmatched.length) alert(`No player matched these file names (use the player ID or the exact name):\n\n${unmatched.join('\n')}`);
+    });
+  }
 }
 
 async function importPlayerRows(rows, replaceAll = false) {
