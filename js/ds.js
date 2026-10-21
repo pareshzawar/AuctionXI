@@ -152,7 +152,7 @@ export function startCountdowns(now) {
 // opts: { variant 'row'|'card', size 'stage', leading, mine, maxBid, hidePurse }
 // hidePurse: the viewer may not see this team's money; show the squad count only.
 export function teamPurse(team, s, rules, o = {}) {
-  const purse = Number(rules.purse) || 0;
+  const purse = Number(s.purse ?? rules.purse) || 0;
   const pct = purse ? Math.min(100, Math.round((s.spent / purse) * 100)) : 0;
   const style = `--team:${esc(team.color || '')}`;
   const meter = `<div class="ax-meter" role="img" aria-label="${pct}% of purse spent"><i style="width:${pct}%"></i></div>`;
@@ -174,7 +174,7 @@ export function teamPurse(team, s, rules, o = {}) {
       + '</div>'
       + meter
       + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span></div>`
-      + (s.allottedValue ? `<div class="ax-purse-sub"><span>Captain${rules.leaders === 'captain_vc' ? ' and VC' : ''} value ${esc(moneyText(s.allottedValue, rules))}</span><span>not from the purse</span></div>` : '')
+      + (s.allottedValue ? `<div class="ax-purse-sub"><span>${s.players.some((p) => p.as === 'R') ? 'Kept players' : `Captain${rules.leaders === 'captain_vc' ? ' and VC' : ''}`} value ${esc(moneyText(s.allottedValue, rules))}</span><span>not from the purse</span></div>` : '')
       + (anyRoleMin ? `<div class="ax-slots">${Object.keys(ROLES).filter((k) => Number(roleMin[k])).map((k) => {
         const have = s.byRole[k] || 0;
         const need = Number(roleMin[k]);

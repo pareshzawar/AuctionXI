@@ -44,13 +44,20 @@ Each captain's phone shows **Purse left** and **Max bid** for their team, update
 
 ## Next season's mini auction
 
-Each team's captain / vice-captain values and remaining purse are kept in the results (the captain's card shows "Captain and VC value ₹350 · not from the purse"). For a mini auction next season, a team's budget is:
+The captain / vice-captain values and each team's remaining purse carry over to next season.
 
-```
-remaining purse from this auction
-+ value of the captain / vice-captain if they are unavailable
-+ the purchase price of any player who is released
-```
+1. After the auction, open **Admin → Results → Next season: mini auction**.
+2. For each team, tick the players it **keeps**. Everyone unticked is released. The team's budget updates as you tick:
+
+   ```
+   budget = remaining purse + value of released players
+   ```
+
+   A released captain or vice-captain brings back their value (e.g. ₹200 / ₹150); a released bought player brings back the price paid.
+   *Example:* a team ends with ₹650, releases its vice-captain (₹150) and a ₹300 player → **₹1,100** for the mini auction.
+3. Choose whether released and unsold players go back into the player pool, then **Create mini auction**.
+
+The new auction copies the rules, teams and house rules, and makes new captain / vice-captain codes. Kept players are already in their team (as captain, vice-captain or *Retained*) and are never auctioned. Each team's budget appears in the Teams tab, where it can be adjusted. Add new registrations in the Players tab (upload with "add to the list"), pick a new captain or vice-captain for any team that released one, lock, and run it like any auction. Max bid works the same: budget left − (players still to buy − 1) × base price.
 
 ## Who sees the remaining purse and max bid
 

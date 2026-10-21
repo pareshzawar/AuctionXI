@@ -20,6 +20,7 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🔒 **Lock per auction** | Lock the player list for an auction. Every new auction gets its own fresh upload |
 | 🧢 **Captain & vice-captain** | Allotted to their team before the auction with a value (e.g. ₹200 / ₹150) that is *not* taken from the purse. It's their budget for next season's mini auction if they're unavailable. Captain-only tournaments too. Choose whether only the captain or both can bid |
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
+| 🔁 **Mini auction next season** | Tick who each team keeps; budget = remaining purse + value of released players (C/VC value or price paid). Kept players start in their team; released and new players go into the pool |
 | 🙈 **Private purses** | Remaining purse and max bid are shown only to each team's captain/VC and the admins (or all bidders, or everyone, as you choose) |
 | 🛡️ **House rules** | Shown to everyone on a Rules tab. Number rules are enforced: role minimums (e.g. 1 WK), category min/max, per-player price cap. The database rules check them too |
 | 📱 **Phones, paddles or both** | Captains get one big **BID** button. If they struggle, switch to *Room only*: the auctioneer records paddle bids, or just enters the winning team and final amount |
@@ -60,7 +61,7 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 4. **Players:** download the template, fill it in (mark each team's captain and vice-captain with `allotted_team` + `allotted_as`), upload, review, **Lock**.
 5. **Access and sharing:** share the QR code or join link. Send each captain (and vice-captain) *only* their own code; there are "Copy message" buttons for WhatsApp.
 6. **Control room:** Start → Next player → bids come in → Mark sold / Unsold. Open the **stage screen** on the projector. If phones don't work out, switch to *Room only* and enter paddle results.
-7. **Results:** download the CSV/JSON and archive it (see below).
+7. **Results:** download the CSV/JSON and archive it (see below). Next season, create the **mini auction** from here.
 
 The full day-of checklist is in **[docs/AUCTION_DAY.md](docs/AUCTION_DAY.md)**.
 

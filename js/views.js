@@ -2,7 +2,7 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets } from './engine.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
@@ -156,13 +156,16 @@ export function rulesSummary(a) {
   const items = [
     ['Format', `${r.playersPerSide}-a-side${r.overs ? `, ${r.overs} overs` : ''}`],
     ['Squad', `Every team must own exactly ${r.squadSize} players${res ? ` (${r.playersPerSide} playing + ${res} reserve${res === 1 ? '' : 's'})` : ''}, ${hasVC(r) ? 'captain and vice-captain' : 'captain'} included`],
-    ['Purse per team', money(r.purse, r)],
+    variedBudgets(a)
+      ? ['Budget per team', `Mini auction${a.meta.parentName ? ` after ${a.meta.parentName}` : ''}: each team's budget = its remaining purse + the value of the players it released. Each captain sees their own team's budget`]
+      : ['Purse per team', money(r.purse, r)],
+    ...(variedBudgets(a) ? [['Kept players', 'Players a team kept from last season are already in its squad and are not auctioned']] : []),
     [hasVC(r) ? 'Captain and vice-captain' : 'Captain', hasVC(r)
       ? `Allotted to their team before the auction, not auctioned. Values: captain ${money(r.captainPrice, r)}, vice-captain ${money(r.vcPrice, r)}. These are not taken from the purse; if one is unavailable next season, their value is added to the team's mini-auction budget`
       : `Allotted to their team before the auction, not auctioned. Value ${money(r.captainPrice, r)}, not taken from the purse; if the captain is unavailable next season, it is added to the team's mini-auction budget`],
     ['Who bids', vcCanBid(r) ? 'The captain and the vice-captain, each from their own phone' : 'The captain'],
     ['Base price', r.categories.map((c) => `${r.categories.length > 1 ? `${c.label} ` : ''}${money(c.base, r)}${Number(c.min) ? `, at least ${c.min} per team` : ''}${Number(c.max) ? `, at most ${c.max} per team` : ''}`).join(' · ')],
-    ['Max bid', `${mb.rule} ${mb.example}`],
+    ['Max bid', variedBudgets(a) ? mb.rule : `${mb.rule} ${mb.example}`],
     ...(Object.entries(r.roleMin).some(([, n]) => Number(n)) ? [['Each team needs', Object.entries(r.roleMin).filter(([, n]) => Number(n)).map(([k, n]) => `${n} ${ROLES[roleId(k)].code}`).join(', ')]] : []),
     ['Bid increments', r.increments.map((s) => (Number(s.upto) ? `+${money(s.step, r)} below ${money(s.upto, r)}` : `+${money(s.step, r)} above`)).join(' · ')],
     ...(Number(r.maxPlayerPrice) ? [['Price cap per player', money(r.maxPlayerPrice, r)]] : []),

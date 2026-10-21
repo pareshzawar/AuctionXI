@@ -2,18 +2,18 @@ import { db, isLocal } from './db.js';
 import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
-  leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice,
+  leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
-  startAuction, nextRound, finishAuction, exportSnapshot,
+  startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
   HOUSE_RULE_QUESTIONS, TEAM_COLORS, num,
 } from './csv.js';
 import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction } from './ui.js';
-import { teamBadge, badge, startCountdowns } from './ds.js';
+import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
 
 const aid = (param('a') || '').toUpperCase();
@@ -24,6 +24,7 @@ let captains = {};
 let coadmins = {};
 let tab = localStorage.getItem('auctionxi:admintab') || 'setup';
 let pendingRender = false;
+let miniKeep = null; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
 
 mountHeader(`<a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
   <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid, screen: 1 })}">Open stage screen</a>`);
@@ -65,7 +66,8 @@ async function boot() {
     if (!A) return;
     $('#title').textContent = A.meta.name;
     const st = A.meta.status;
-    $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' });
+    $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
+      + (A.meta.kind === 'mini' ? ` ${badge('retained', { text: 'Mini auction' })} <small>from ${esc(A.meta.parentName || A.meta.parent)}</small>` : '');
     render();
   });
 
@@ -280,7 +282,7 @@ function teams(el) {
         <button class="btn-sm btn-primary" id="t-add">Add team</button>
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Owner</th><th>Captain / VC</th><th>Players</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Owner</th><th>Budget</th><th>Captain / VC</th><th>Players</th><th></th></tr></thead>
         <tbody>${entries.map(([id, t]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
@@ -288,10 +290,11 @@ function teams(el) {
             <td><input data-f="short" value="${esc(t.short || '')}" maxlength="4" style="width:70px;min-width:70px"></td>
             <td><input data-f="color" type="color" value="${esc(t.color || '#888888')}"></td>
             <td><input data-f="owner" value="${esc(t.owner || '')}"></td>
+            <td><input data-f="purse" inputmode="numeric" value="${esc(t.purse ?? '')}" placeholder="${esc(money(A.rules.purse, A.rules))}" style="width:100px" title="Blank = the standard purse. A mini auction fills in each team's carried-over budget"></td>
             <td>${(() => { const l = leadersOf(A, id); return [l.C && `C ${esc(l.C.name)}`, hasVC(A.rules) && l.VC && `VC ${esc(l.VC.name)}`].filter(Boolean).join('<br>') || '<span class="muted">Set in Players</span>'; })()}</td>
             <td>${teamSummary(A, id).count}</td>
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
-          </tr>`).join('') || '<tr><td colspan="8" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
+          </tr>`).join('') || '<tr><td colspan="9" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
       <span class="hint">Three-letter codes appear on the stage and phones. Captains and vice-captains are set in the Players tab. Each team gets secret codes under Access and sharing.</span>
     </div>`;
@@ -320,6 +323,12 @@ function teams(el) {
     if (!tr || !e.target.dataset.f) return;
     let v = e.target.value.trim() || null;
     if (e.target.dataset.f === 'short' && v) v = v.toUpperCase();
+    if (e.target.dataset.f === 'purse') {
+      if (v != null && num(v) == null) throw new Error(`"${v}" is not an amount`);
+      await db.update(P, { [`teams/${tr.dataset.id}/purse`]: v == null ? null : num(v) });
+      await db.update(P, capsUpdate(normalize(await db.get(P))));
+      return;
+    }
     await db.set(`${P}/teams/${tr.dataset.id}/${e.target.dataset.f}`, v);
   });
   el.onclick = run(async (e) => {
@@ -352,7 +361,7 @@ function players(el) {
   const list = Object.entries(A.players).sort(([x], [y]) => x.localeCompare(y, undefined, { numeric: true }));
   const catOpts = (v) => A.rules.categories.map((c) => `<option value="${esc(c.id)}" ${c.id === v ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
   const roleOpts = (v) => Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === roleId(v) ? 'selected' : ''}>${r.code} · ${r.name}</option>`).join('');
-  const asOpts = (v) => `<option value="">—</option><option value="C" ${v === 'C' ? 'selected' : ''}>Captain</option>${hasVC(A.rules) || v === 'VC' ? `<option value="VC" ${v === 'VC' ? 'selected' : ''}>Vice-captain</option>` : ''}`;
+  const asOpts = (v) => `<option value="">—</option><option value="C" ${v === 'C' ? 'selected' : ''}>Captain</option>${hasVC(A.rules) || v === 'VC' ? `<option value="VC" ${v === 'VC' ? 'selected' : ''}>Vice-captain</option>` : ''}${A.meta.kind === 'mini' || v === 'R' ? `<option value="R" ${v === 'R' ? 'selected' : ''}>Retained</option>` : ''}`;
   const teamOpts = (v) => `<option value="">—</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}" ${id === v ? 'selected' : ''}>${esc(t.short || t.name)}</option>`).join('')}`;
   const dis = locked ? 'disabled' : '';
   const allotted = list.filter(([, p]) => isAllotted(p)).length;
@@ -637,7 +646,10 @@ function controlStart(el) {
   const teamIds = Object.keys(A.teams);
   const teamN = teamIds.length;
   const toAuction = Object.values(A.players).filter((p) => !isAllotted(p)).length;
-  const perTeam = rules.squadSize - (hasVC(rules) ? 2 : 1);
+  // Players each team still has to buy (a mini auction's teams already keep some).
+  const toBuyOf = (id) => Math.max(0, rules.squadSize - Object.values(A.players).filter((p) => p.allottedTeam === id && (p.allottedAs !== 'VC' || hasVC(rules))).length);
+  const needed = teamIds.reduce((t, id) => t + toBuyOf(id), 0);
+  const short = teamIds.filter((id) => toBuyOf(id) * minBase(rules) > teamSummary(A, id).purse);
   const missing = teamIds.filter((id) => { const l = leadersOf(A, id); return !l.C || (hasVC(rules) && !l.VC); });
   const check = (ok, text) => `<li style="margin:var(--space-2) 0">${badge(ok ? 'sold' : 'upcoming', { text: ok ? 'Done' : 'To do' })} ${text}</li>`;
   el.innerHTML = `
@@ -646,8 +658,8 @@ function controlStart(el) {
       <ul style="list-style:none;padding:0">
         ${check(teamN >= 2, `At least 2 teams (${teamN})`)}
         ${check(!missing.length && teamN > 0, missing.length ? `${hasVC(rules) ? 'Captain and vice-captain' : 'Captain'} missing for ${missing.map((id) => esc(A.teams[id].name)).join(', ')} (set them in Players)` : `Every team has its ${hasVC(rules) ? 'captain and vice-captain' : 'captain'}`)}
-        ${check(toAuction >= teamN * perTeam, `Enough players to auction for every team to reach ${rules.squadSize} (${teamN} × ${perTeam} = ${teamN * perTeam}; you have ${toAuction})`)}
-        ${check(perTeam * Math.min(...rules.categories.map((c) => Number(c.base) || 0)) <= rules.purse, `Purse covers ${perTeam} players at base price`)}
+        ${check(toAuction >= needed, `Enough players to auction for every team to reach ${rules.squadSize} (teams need ${needed}; you have ${toAuction})`)}
+        ${check(!short.length, short.length ? `Budget too small to fill the squad at base price: ${short.map((id) => esc(A.teams[id].name)).join(', ')}` : 'Every budget covers the players still to buy at base price')}
         ${check(meta.locked, 'Player list locked')}
         ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>
@@ -704,7 +716,9 @@ function results(el) {
         </ol>
         <p>GitHub Pages then serves it at <code>results.html?archive=${esc(slug(A.meta.name))}</code>, even if the live database is cleaned up.</p>
       </div>
-    </div>`;
+    </div>
+    ${miniBuilder()}`;
+  wireMiniBuilder(el);
   $('#r-csv').onclick = () => {
     const rows = Object.entries(A.sales).map(([pid, s]) => {
       const p = A.players[pid] || {};
@@ -717,6 +731,62 @@ function results(el) {
     download(`${aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'category', 'price', 'how'], [...rows, ...unsold]));
   };
   $('#r-json').onclick = () => download(`${slug(A.meta.name) || aid}.auction.json`, JSON.stringify(exportSnapshot(A), null, 2), 'application/json');
+}
+
+/* ---------------- Next season's mini auction ---------------- */
+
+function miniBuilder() {
+  const teamIds = Object.keys(A.teams);
+  if (!teamIds.length || !Object.keys(A.sales).length) return '';
+  if (!miniKeep) miniKeep = Object.fromEntries(teamIds.map((id) => [id, new Set(teamSummary(A, id).players.map((p) => p.id))]));
+  return `
+    <div class="card" style="margin-top:var(--space-4)">
+      <h2>Next season: mini auction</h2>
+      <p>Tick the players each team keeps. Everyone unticked is released, and their value goes back into the team's budget:
+        <b>budget = remaining purse + value of released players</b> (captain / vice-captain value, or the price paid).
+        Kept players join their team before the mini auction and are never auctioned.</p>
+      ${A.meta.status !== 'completed' ? '<p class="notice notice-warn">This auction has not been ended yet. Budgets use the purses as they stand now.</p>' : ''}
+      <div class="grid grid-2">${teamIds.map((id) => {
+        const mb = miniBudget(A, id, miniKeep[id]);
+        const rows = teamSummary(A, id).players.sort((x, y) => Number(y.allotted) - Number(x.allotted) || y.price - x.price);
+        return `<div class="card" style="background:var(--ground)">
+          <div class="section-title">${teamBadge(A.teams[id], { showName: true })}<span class="spacer"></span>
+            <span class="ax-kv" style="text-align:right"><span class="ax-k">Mini-auction budget</span>${price(mb.budget, A.rules, { size: 'lg', tone: 'gold' })}</span></div>
+          <small>Remaining purse ${esc(money(mb.remaining, A.rules))} + released ${esc(money(mb.releasedValue, A.rules))} · keeps ${mb.kept.length} of ${A.rules.squadSize}, buys ${Math.max(0, A.rules.squadSize - mb.kept.length)}</small>
+          <div style="margin-top:var(--space-2)">${rows.map((p) => `
+            <label class="check" style="margin:6px 0"><input type="checkbox" data-keep="${esc(id)}" value="${esc(p.id)}" ${miniKeep[id].has(p.id) ? 'checked' : ''}>
+              <span style="flex:1">${esc(p.name)} <small>${esc([p.allotted ? leaderLabel(p.as) : null, ROLES[p.role].code].filter(Boolean).join(' · '))}</small></span>
+              <span class="ax-price ax-price-sm">${esc(money(p.price, A.rules))}</span></label>`).join('')}</div>
+        </div>`;
+      }).join('')}</div>
+      <div class="grid grid-2" style="margin-top:var(--space-4);align-items:end">
+        <div><label for="m-name">Mini auction name</label><input id="m-name" value="${esc(`${A.meta.tournament || A.meta.name} mini auction ${new Date().getFullYear() + 1}`)}"></div>
+        <label class="check"><input type="checkbox" id="m-pool" checked> Put released and unsold players back into the player pool</label>
+      </div>
+      <p class="hint">Rules, teams and house rules are copied; new captain / vice-captain codes are made. Add new registrations in the Players tab of the mini auction before locking. If a captain is released, pick a new one there (Players → As).</p>
+      <p style="margin-top:var(--space-3)"><button class="btn-primary btn-lg" id="m-create">Create mini auction</button></p>
+    </div>`;
+}
+
+function wireMiniBuilder(el) {
+  $$('[data-keep]', el).forEach((cb) => (cb.onchange = () => {
+    const set = miniKeep[cb.dataset.keep];
+    if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+    const y = scrollY;
+    render(true);
+    scrollTo(0, y);
+  }));
+  const btn = $('#m-create', el);
+  if (!btn) return;
+  btn.onclick = run(async () => {
+    const name = $('#m-name').value.trim();
+    if (!name) throw new Error('Name the mini auction');
+    const lines = Object.keys(A.teams).map((id) => `${A.teams[id].name}: keeps ${miniKeep[id].size}, budget ${money(miniBudget(A, id, miniKeep[id]).budget, A.rules)}`);
+    if (!confirm(`Create "${name}"?\n\n${lines.join('\n')}`)) return;
+    const { aid: next, adminCode } = await createMiniAuction(aid, A, { name, keep: miniKeep, addToPool: $('#m-pool').checked });
+    rememberAuction(next, name, 'admin');
+    location.href = pageUrl('admin.html', { a: next, created: adminCode });
+  });
 }
 
 boot();
