@@ -2,7 +2,7 @@
 // ?screen=1 for the projector stage (fixed 1920 x 1080 canvas, always night).
 
 import { db } from './db.js';
-import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse } from './engine.js';
+import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat } from './actions.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
@@ -72,7 +72,7 @@ function renderStage() {
     <div class="stage-frame"><div class="stage">
       <header class="stage-top">
         <div class="stage-brand">
-          <span class="stage-label">AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}</span>
+          <span class="stage-label">AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}${hasLot && live.status === 'bidding' && live.drawn ? ` · ${live.drawn === 'chit' ? 'Chit' : `Random draw${live.drawnPool ? ` from ${esc(category(rules, live.drawnPool)?.label || live.drawnPool)}` : ''}`}` : ''}</span>
           <h1 class="stage-title">${esc(meta.name)}</h1>
         </div>
         <div class="stage-tally">

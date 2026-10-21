@@ -86,7 +86,7 @@ export function feed(a, limit = 30) {
     switch (e.type) {
       case 'sold': return `${badge('sold')} ${name(e.playerId)} ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm', tone: 'sold' })}`;
       case 'unsold': return `${badge('unsold')} ${name(e.playerId)}`;
-      case 'up': return `${badge('upcoming', { text: 'Up' })} ${name(e.playerId)} <span class="muted">base ${esc(money(e.amount, a.rules))}</span>`;
+      case 'up': return `${badge('upcoming', { text: e.drawn === 'chit' ? 'Chit' : e.drawn === 'random' ? 'Drawn' : 'Up' })} ${name(e.playerId)} <span class="muted">base ${esc(money(e.amount, a.rules))}</span>`;
       case 'undo': return `${badge('paused', { text: 'Reversed' })} Sale of ${name(e.playerId)} reversed`;
       case 'round': return `${badge('upcoming', { text: 'Round' })} Round ${esc(e.round)}: unsold players return`;
       case 'start': return `${badge('live')} Auction started`;
@@ -164,7 +164,8 @@ export function rulesSummary(a) {
       ? `Allotted to their team before the auction, not auctioned. Values: captain ${money(r.captainPrice, r)}, vice-captain ${money(r.vcPrice, r)}. These are not taken from the purse; if one is unavailable next season, their value is added to the team's mini-auction budget`
       : `Allotted to their team before the auction, not auctioned. Value ${money(r.captainPrice, r)}, not taken from the purse; if the captain is unavailable next season, it is added to the team's mini-auction budget`],
     ['Who bids', vcCanBid(r) ? 'The captain and the vice-captain, each from their own phone' : 'The captain'],
-    ['Base price', r.categories.map((c) => `${r.categories.length > 1 ? `${c.label} ` : ''}${money(c.base, r)}${Number(c.min) ? `, at least ${c.min} per team` : ''}${Number(c.max) ? `, at most ${c.max} per team` : ''}`).join(' · ')],
+    [r.categories.length > 1 ? 'Pools and base prices' : 'Base price', r.categories.map((c) => `${r.categories.length > 1 ? `${c.label} ` : ''}${money(c.base, r)}${Number(c.min) ? `, at least ${c.min} per team` : ''}${Number(c.max) ? `, at most ${c.max} per team` : ''}`).join(' · ') + (r.categories.length > 1 ? `. ${r.categories[0].label} = the strongest players` : '')],
+    ['Player order', r.pickOrder === 'manual' ? 'Chits drawn in the hall; the auctioneer brings up each player by name' : r.pickOrder === 'random' ? 'Random draw from all pools' : r.pickOrder === 'category-sequence' ? 'Pool by pool, in player number order' : `Random draw, pool by pool (${r.categories.map((c) => c.label).join(' → ')}). The auctioneer may also draw from one pool or bring up a chit`],
     ['Max bid', variedBudgets(a) ? mb.rule : `${mb.rule} ${mb.example}`],
     ...(Object.entries(r.roleMin).some(([, n]) => Number(n)) ? [['Each team needs', Object.entries(r.roleMin).filter(([, n]) => Number(n)).map(([k, n]) => `${n} ${ROLES[roleId(k)].code}`).join(', ')]] : []),
     ['Bid increments', r.increments.map((s) => (Number(s.upto) ? `+${money(s.step, r)} below ${money(s.upto, r)}` : `+${money(s.step, r)} above`)).join(' · ')],

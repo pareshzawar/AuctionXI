@@ -24,6 +24,19 @@ Amounts can be written however people type them: `50`, `200`, `5,00,000`, `5L`, 
 
 In the players CSV, mark each team's captain and vice-captain with `allotted_team` (the team ID) and `allotted_as` (`C` or `VC`). Everyone else is auctioned.
 
+## Pools and choosing the next player
+
+Every player has a **role** (Batter, Bowler, All-rounder, Wicket-keeper) and a **pool**: Pool A = the strongest players, then Pool B, Pool C… The admin decides each player's pool from how they play, either in the players CSV (`pool` column: `A`, `B`, `Pool C`…) or in the Players tab. The number of pools, their names and base prices are set in the questionnaire (`pool_N_…`) or under Setup → Pools. Each pool can also have a per-team minimum or maximum (e.g. at most 3 Pool A players per team).
+
+The control room's **Next player** panel always offers both ways:
+
+| | How it works |
+|---|---|
+| **Random draw** | The built-in logic picks a random player from the strongest pool still in play: all of Pool A first, then B, then C. Choose a pool and/or a role to draw only from that group instead, e.g. "a random Pool B bowler". Key `N` |
+| **Chit (search)** | Draw a chit in the hall. Type the name or player number into the search box; matching players not yet auctioned this round appear. Press Enter or *Bring up* and the player is on the stage for bidding. `N` jumps to the search box |
+
+The stage shows how each player came up ("Random draw from Pool B", "Chit"). Captains and vice-captains are never offered, and neither are players already sold. Unsold players come back in the next round. `pick_order` in the questionnaire sets the default (`category-random` = random, pool by pool; `manual` = chits); you can switch at any moment.
+
 ## Max bid
 
 A team must always be able to fill its squad, so:

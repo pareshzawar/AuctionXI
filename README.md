@@ -20,6 +20,7 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🔒 **Lock per auction** | Lock the player list for an auction. Every new auction gets its own fresh upload |
 | 🧢 **Captain & vice-captain** | Allotted to their team before the auction with a value (e.g. ₹200 / ₹150) that is *not* taken from the purse. It's their budget for next season's mini auction if they're unavailable. Captain-only tournaments too. Choose whether only the captain or both can bid |
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
+| 🎲 **Pools, random draw or chits** | Players are grouped by role (BAT / BOWL / AR / WK) and pool (Pool A = strongest, B, C…). Next player by a built-in random draw (pool by pool, or from one pool or role), or draw a chit in the hall and search the name |
 | 🔁 **Mini auction next season** | Tick who each team keeps; budget = remaining purse + value of released players (C/VC value or price paid). Kept players start in their team; released and new players go into the pool |
 | 🙈 **Private purses** | Remaining purse and max bid are shown only to each team's captain/VC and the admins (or all bidders, or everyone, as you choose) |
 | 🛡️ **House rules** | Shown to everyone on a Rules tab. Number rules are enforced: role minimums (e.g. 1 WK), category min/max, per-player price cap. The database rules check them too |
@@ -84,7 +85,7 @@ Players columns:
 | `id` | no | e.g. `P001`. Auto-generated if empty or duplicate |
 | `name` | **yes** | |
 | `role` | no | `Batter`, `Bowler`, `All-rounder`, `Wicket-keeper` (also accepts `bat`, `bowl`, `ar`, `wk`) |
-| `category` | no | Category ID or name from your setup (`A` / `Icon`, …). Defaults to the last category |
+| `pool` | no | The player's pool: `A`, `B`, `C`… or `Pool A`. Pool A = the strongest players; the admin decides. Defaults to the last pool (older files with a `category` column still work) |
 | `base_price` | no | Overrides the category base price |
 | `batting_style`, `bowling_style`, `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link") |

@@ -1,6 +1,6 @@
 import { db, isLocal } from './db.js';
 import {
-  normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, capsUpdate, basePrice, withDefaults,
+  normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase,
 } from './engine.js';
@@ -24,6 +24,10 @@ let captains = {};
 let coadmins = {};
 let tab = localStorage.getItem('auctionxi:admintab') || 'setup';
 let pendingRender = false;
+// Next-player panel: 'random' draw (optionally from one pool / role) or 'chit' (search by name).
+let drawMode = localStorage.getItem('auctionxi:drawmode') || null;
+let drawPool = '';
+let drawRole = '';
 let miniKeep = null; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
 
 mountHeader(`<a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
@@ -145,11 +149,11 @@ function setup(el) {
         <p class="notice notice-info" style="margin:var(--space-4) 0 0">${esc(maxBidExplainer(rules).rule)}<br>${esc(maxBidExplainer(rules).example)}</p>
       </div>
       <div class="card wide">
-        <h2>Categories and base prices</h2>
+        <h2>Pools and base prices</h2>
         <div class="table-wrap"><table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Base price</th><th>Min / team</th><th>Max / team</th><th></th></tr></thead>
           <tbody id="cats">${rules.categories.map(catRow).join('')}</tbody></table></div>
-        <p style="margin-top:var(--space-2)"><button class="btn-sm" id="add-cat">Add category</button></p>
-        <span class="hint">Categories come up in this order. Min / max per team enforce rules like "at least 1 junior" or "at most 2 icon players".</span>
+        <p style="margin-top:var(--space-2)"><button class="btn-sm" id="add-cat">Add pool</button></p>
+        <span class="hint">Pool A = the strongest players, then B, C… The admin puts each player in a pool (Players tab or the pool column of the CSV). Random draws go pool by pool in this order. Min / max per team enforce rules like "at least 1 Pool A player" or "at most 3 Pool A players".</span>
       </div>
       <div class="card">
         <h2>Role minimums</h2>
@@ -212,8 +216,8 @@ async function saveSetup() {
     id: $('.c-id', tr).value.trim().replace(/[.#$/[\]\s]/g, ''), label: $('.c-label', tr).value.trim(),
     base: num($('.c-base', tr).value) || 0, min: num($('.c-min', tr).value) || 0, max: num($('.c-max', tr).value) || 0,
   })).filter((c) => c.id);
-  if (!categories.length) throw new Error('Add at least one category');
-  if (new Set(categories.map((c) => c.id)).size !== categories.length) throw new Error('Category IDs must be unique');
+  if (!categories.length) throw new Error('Add at least one pool');
+  if (new Set(categories.map((c) => c.id)).size !== categories.length) throw new Error('Pool IDs must be unique');
   categories.forEach((c) => { c.label ||= c.id; });
   const increments = $$('#incs tr').map((tr) => ({ upto: num($('.i-upto', tr).value) || 0, step: num($('.i-step', tr).value) || 0 }))
     .filter((s) => s.step > 0).sort((x, y) => (x.upto || Infinity) - (y.upto || Infinity));
@@ -383,7 +387,7 @@ function players(el) {
           <button class="btn-sm btn-primary" id="p-lock">Lock player list</button>`}
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Category</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Pool</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
         <tbody>${list.map(([id, p]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
@@ -398,7 +402,7 @@ function players(el) {
             <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
           </tr>`).join('') || '<tr><td colspan="10" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
-      <span class="hint">Base blank = category base. "Allotted to" + "As" make a player that team's captain or vice-captain:
+      <span class="hint">Base blank = the pool's base price. "Allotted to" + "As" make a player that team's captain or vice-captain:
         they join the team at the captain / vice-captain price when the auction starts and are never auctioned.
         To change many players, export, edit in a spreadsheet and upload again.</span>
     </div>`;
@@ -566,19 +570,7 @@ function control(el) {
 
   el.innerHTML = `
     ${meta.status === 'completed' ? '<div class="notice notice-ok">Auction completed. Export and archive the results from the Results tab.</div>' : ''}
-    <div class="row" style="margin-bottom:var(--space-4)">
-      <button class="btn-primary btn-lg" id="c-next" ${bidding || !remaining.length || rules.pickOrder === 'manual' || meta.status !== 'live' ? 'disabled' : ''}>Next player <kbd>N</kbd></button>
-      <select id="c-pick" style="width:auto;max-width:280px" ${bidding || meta.status !== 'live' ? 'disabled' : ''}>
-        <option value="">Pick a player…</option>
-        ${remaining.map((p) => `<option value="${esc(p.id)}">${esc(p.id)} · ${esc(p.name)} (${esc(category(rules, p.category)?.label || p.category)})</option>`).join('')}
-      </select>
-      <span class="spacer"></span>
-      <span class="muted">Bid mode</span>
-      <div class="ax-seg" role="group" aria-label="Bid mode">
-        <button type="button" data-mode="both" aria-pressed="${rules.bidMode !== 'room'}">Phones + room</button>
-        <button type="button" data-mode="room" aria-pressed="${rules.bidMode === 'room'}">Room only</button>
-      </div>
-    </div>
+    ${nextPlayerPanel(bidding, remaining)}
     <div class="live-grid">
       <div>${player ? cardFor(A, live.playerId) : '<div class="card"><h2>No player on the block</h2><p class="muted">Press Next player or pick one.</p></div>'}</div>
       <div>${player ? livePanel(A) : ''}</div>
@@ -618,8 +610,7 @@ function control(el) {
       <div class="card"><h2>Activity</h2>${feed(A)}</div>
     </div>`;
 
-  $('#c-next').onclick = run(doNext);
-  $('#c-pick').onchange = run(async (e) => { const id = e.target.value; e.target.blur(); if (id) await startPlayer(aid, A, id); });
+  wireNextPlayerPanel(el);
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
   $('#c-undobid').onclick = run(() => undoLastBid(aid, A));
@@ -673,17 +664,105 @@ function controlStart(el) {
   });
 }
 
+// The "Next player" panel: random draw with the built-in logic, or a chit searched by name.
+function nextPlayerPanel(bidding, remaining) {
+  const { rules, meta } = A;
+  drawMode ||= rules.pickOrder === 'manual' ? 'chit' : 'random';
+  const closed = bidding || meta.status !== 'live';
+  const counts = poolCounts(A);
+  const autoLabel = rules.pickOrder === 'random' ? 'Auto: any pool' : rules.pickOrder === 'category-sequence' ? `Auto: ${counts.map((c) => c.id).join(' → ')} in ID order` : `Auto: ${counts.map((c) => c.label).join(' → ')}`;
+  return `
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <div class="section-title">
+        <h2 style="margin:0">Next player</h2>
+        <div class="ax-seg" role="group" aria-label="How to choose the next player">
+          <button type="button" data-draw="random" aria-pressed="${drawMode === 'random'}">Random draw</button>
+          <button type="button" data-draw="chit" aria-pressed="${drawMode === 'chit'}">Chit (search)</button>
+        </div>
+        <span class="spacer"></span>
+        <span class="muted">Bid mode</span>
+        <div class="ax-seg" role="group" aria-label="Bid mode">
+          <button type="button" data-mode="both" aria-pressed="${rules.bidMode !== 'room'}">Phones + room</button>
+          <button type="button" data-mode="room" aria-pressed="${rules.bidMode === 'room'}">Room only</button>
+        </div>
+      </div>
+      ${drawMode === 'random' ? `
+        <div class="row">
+          <select id="d-pool" style="width:auto" aria-label="Pool to draw from">
+            <option value="">${esc(autoLabel)}</option>
+            ${counts.map((c) => `<option value="${esc(c.id)}" ${drawPool === c.id ? 'selected' : ''} ${c.left ? '' : 'disabled'}>${esc(c.label)} only (${c.left} left)</option>`).join('')}
+          </select>
+          <select id="d-role" style="width:auto" aria-label="Role to draw">
+            <option value="">Any role</option>
+            ${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${drawRole === k ? 'selected' : ''}>${r.name}s only</option>`).join('')}
+          </select>
+          <button class="btn-primary btn-lg" id="c-next" ${closed || !remaining.length ? 'disabled' : ''}>Draw random player <kbd>N</kbd></button>
+        </div>
+        <span class="hint">Auto follows the tournament's order: a random player from the strongest pool still in play. Choose a pool or role to draw from just that group.</span>`
+      : `
+        <div class="row" style="align-items:flex-start">
+          <div style="flex:1;min-width:260px;max-width:560px">
+            <input id="d-search" placeholder="Type the name or number on the chit" autocomplete="off" ${closed ? 'disabled' : ''}>
+            <div id="d-results" class="stack" style="gap:var(--space-1);margin-top:var(--space-2)"></div>
+          </div>
+        </div>
+        <span class="hint">${closed && bidding ? 'Finish the player on the block first. ' : ''}Draw a chit in the hall, type the name (or player number), and press Enter or Bring up. Only players not yet auctioned this round are found.</span>`}
+      <p style="margin:var(--space-3) 0 0"><small>Left this round: ${counts.map((c) => `${esc(c.label)} ${c.left}`).join(' · ')}</small></p>
+    </div>`;
+}
+
+function wireNextPlayerPanel(el) {
+  $$('[data-draw]', el).forEach((b) => (b.onclick = () => {
+    drawMode = b.dataset.draw;
+    localStorage.setItem('auctionxi:drawmode', drawMode);
+    render(true);
+    if (drawMode === 'chit') $('#d-search')?.focus();
+  }));
+  if ($('#c-next')) $('#c-next').onclick = run(doNext);
+  if ($('#d-pool')) $('#d-pool').onchange = (e) => { drawPool = e.target.value; e.target.blur(); };
+  if ($('#d-role')) $('#d-role').onchange = (e) => { drawRole = e.target.value; e.target.blur(); };
+  const input = $('#d-search');
+  if (!input) return;
+  const show = () => {
+    const found = searchPool(A, input.value);
+    $('#d-results').innerHTML = !input.value.trim() ? ''
+      : found.length ? found.map((p, i) => `
+        <div class="row" style="padding:var(--space-2) var(--space-3);border:1px solid ${i ? 'var(--line)' : 'var(--gold)'};border-radius:var(--radius-sm)">
+          <code>${esc(p.id)}</code> <b>${esc(p.name)}</b>
+          <small>${esc([category(A.rules, p.category)?.label, ROLES[roleId(p.role)].name].filter(Boolean).join(' · '))}</small>
+          <span class="spacer"></span>
+          <button class="btn-sm ${i ? '' : 'btn-primary'}" data-up="${esc(p.id)}">Bring up</button>
+        </div>`).join('')
+        : '<p class="muted" style="margin:0">No player left in this round matches. Already sold, unsold this round, or a captain / vice-captain?</p>';
+    $$('[data-up]', el).forEach((b) => (b.onclick = run(() => bringUp(b.dataset.up))));
+  };
+  input.oninput = show;
+  input.onkeydown = run(async (e) => {
+    if (e.key === 'Enter') { const first = searchPool(A, input.value)[0]; if (first) await bringUp(first.id); }
+    if (e.key === 'Escape') { input.value = ''; show(); }
+  });
+}
+
+async function bringUp(pid) {
+  $('#d-search') && ($('#d-search').value = '');
+  document.activeElement?.blur();
+  await startPlayer(aid, A, pid, { drawn: 'chit' });
+}
+
 async function doNext() {
-  const p = pickNext(A);
-  if (!p) throw new Error(pool(A).length ? 'Pick a player from the list' : 'No players left in this round');
-  await startPlayer(aid, A, p.id);
+  const p = pickNext(A, { pool: drawPool, role: drawRole });
+  if (!p) {
+    const what = [drawPool && category(A.rules, drawPool)?.label, drawRole && `${ROLES[drawRole].name.toLowerCase()}s`].filter(Boolean).join(', ');
+    throw new Error(what ? `No players left to draw (${what}). Change the pool or role.` : 'No players left in this round');
+  }
+  await startPlayer(aid, A, p.id, { drawn: 'random', pool: drawPool || null });
 }
 
 function onKey(e) {
   if (tab !== 'control' || !A || e.target.matches('input, select, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
   const bidding = A.live?.status === 'bidding';
-  if (k === 'n' && !bidding && A.meta.status === 'live') run(doNext)();
+  if (k === 'n' && !bidding && A.meta.status === 'live') { if (drawMode === 'chit') { e.preventDefault(); $('#d-search')?.focus(); } else run(doNext)(); }
   else if (k === 's' && bidding && A.live.bid?.team) run(() => sell(aid, A))();
   else if (k === 'u' && bidding) run(() => markUnsold(aid, A))();
   else if (k === 'z' && bidding) run(() => undoLastBid(aid, A))();

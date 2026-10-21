@@ -6,7 +6,7 @@ Three templates hold everything (all in `templates/`):
 
 - [ ] **Tournament setup questionnaire** (`tournament_setup_template.csv`): players per side and squad size, purse, captain and vice-captain values, who bids, who sees purses, base price, role minimums, increments, bid mode, and your house-rule answers. Fill it in with the committee and get every captain to agree to it. See [RULES.md](RULES.md).
 - [ ] **Teams** (`teams_template.csv`): names, 3-letter codes, colours, owners
-- [ ] **Players** (`players_template.csv`): name, role, batting/bowling style, age, flat/locality, photo (optional), past stats (optional), and each team's captain and vice-captain (`allotted_team`, `allotted_as`)
+- [ ] **Players** (`players_template.csv`): name, role, **pool** (A = strongest, B, C… decided by the committee), batting/bowling style, age, flat/locality, photo (optional), past stats (optional), and each team's captain and vice-captain (`allotted_team`, `allotted_as`)
 - [ ] Who is the auctioneer (admin), and who is the backup (co-admin)
 
 Tip: collect registrations with a Google Form → the responses go to a Google Sheet → rename the columns to match the template → *File → Download → CSV*.
@@ -29,7 +29,8 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 
 ## During
 
-- `N` next player → bids → `S` sold / `U` unsold
+- Next player: **Random draw** (`N`; auto = Pool A first, or pick a pool / role) or **Chit**: draw a chit, type the name, Enter → bids → `S` sold / `U` unsold
+- If you use chits, prepare one chit per player with their name and number (the Players tab or the CSV export lists them)
 - If a captain's phone dies: the auctioneer records that team's bids (keys `1`–`8`)
 - If captains can't manage the phones: switch the control room to **Room only**, run the bidding with paddles, and enter just the winning team and final amount under *Paddle auction*
 - Wrong bid recorded: `Z` undoes the last bid
