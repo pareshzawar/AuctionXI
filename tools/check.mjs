@@ -97,3 +97,26 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   const cap = Object.values(players).find((p) => p.allottedAs === 'C');
   ok(!E.searchPool(p2, cap.name).some((p) => p.name === cap.name), 'chit search never offers an allotted captain');
 }
+
+// live commentary
+{
+  const C = await import(root + '/js/commentary.js');
+  const a = E.normalize({ meta: { name: 'SPL 2026', round: 1 }, rules: s.rules, teams, players, sales: {}, log: {} });
+  for (const [pid, p] of Object.entries(players)) if (p.allottedTeam) a.sales[pid] = { team: p.allottedTeam, price: E.allottedPrice(p, s.rules), allotted: true };
+  const said = [];
+  const c = C.createCommentator({ onLine: (l) => said.push(l.text) });
+  c.update(a); // first update: history only, nothing said
+  const [p1, p2] = Object.keys(players).filter((id) => !players[id].allottedTeam);
+  a.log.a1 = { type: 'start', at: 1 }; a.log.a2 = { type: 'up', playerId: p1, amount: 50, drawn: 'random', at: 2 };
+  a.live = { playerId: p1, status: 'bidding', bid: { amount: 50, team: null } }; c.update(a);
+  for (const [team, amount] of [['T1', 50], ['T2', 60], ['T1', 70], ['T2', 80], ['T3', 90]]) { a.live.bid = { amount, team, at: amount }; c.update(a); }
+  a.sales[p1] = { team: 'T3', price: 90 }; a.live.status = 'sold'; a.log.a3 = { type: 'sold', playerId: p1, team: 'T3', amount: 90, at: 100 }; c.update(a);
+  a.log.a4 = { type: 'up', playerId: p2, amount: 50, drawn: 'chit', at: 101 }; a.live = { playerId: p2, status: 'bidding', bid: { amount: 50, team: null } }; c.update(a);
+  a.live.bid = { amount: 100, team: 'T1', at: 102 }; c.update(a); // past the 90 record? opening bid line wins
+  a.live.bid = { amount: 110, team: 'T2', at: 103 }; c.update(a);
+  console.log('     ' + said.join('\n     '));
+  ok(said.length === 11 && /open|first/i.test(said[2]) && /war|let go|again/i.test(said[5]) && /Sold|to Thunder|Hammer/.test(said[7]) && /chits/.test(said[8]), 'commentary covers start, intro, bids, war, sale, chit');
+  ok(!said.some((t) => /purse|left in/i.test(t)), 'no purse amounts when purses are private');
+  const again = []; const c2 = C.createCommentator({ onLine: (l) => again.push(l.text) }); c2.update(a);
+  ok(again.length === 0 && c2.lines.length > 0, 'a late joiner gets the history without it being read out');
+}

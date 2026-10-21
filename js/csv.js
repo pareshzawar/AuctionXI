@@ -265,6 +265,8 @@ function setupFields() {
   number('Bidding', 'bid_timer_seconds', 'Countdown after each bid, in seconds (0 = off)', 'e.g. 30', 'bidTimer');
   f.push(['Bidding', 'pick_order', `Order players come up (${Object.keys(PICK_ORDERS).join(' / ')})`, 'category-random = random draw, Pool A first. The control room can always also draw from one pool or bring up a chit',
     (m, r) => r.pickOrder, (m, r, v, warn) => { if (PICK_ORDERS[v]) r.pickOrder = v; else if (v) warn(`pick_order: "${v}" not recognised, kept ${r.pickOrder}`); }]);
+  f.push(['Bidding', 'live_commentary', 'Show live commentary on the stage and phones? (yes / no)', 'Generated from the auction itself; it can also be read aloud on any device',
+    (m, r) => (r.commentary === false ? 'no' : 'yes'), (m, r, v) => { r.commentary = !/^(n|no|off|false|0)$/i.test(v); }]);
   number('Bidding', 'unsold_rounds', 'How many times unsold players come back for another round', 'e.g. 1', 'unsoldRounds');
 
   for (const [key, q, help] of HOUSE_RULE_QUESTIONS) {

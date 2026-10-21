@@ -25,6 +25,7 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 - [ ] Projector/TV showing the **stage screen** link (full-screen with F11)
 - [ ] QR code from Access and sharing printed or shown at the start so the audience can join
 - [ ] Mic for the auctioneer
+- [ ] Optional: connect the admin laptop to the hall speakers and press *Read aloud on this laptop* for spoken commentary
 - [ ] Show the stage screen before the start (it lists the key rules) and announce them once
 
 ## During

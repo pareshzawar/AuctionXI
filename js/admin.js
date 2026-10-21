@@ -15,6 +15,7 @@ import {
 import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction } from './ui.js';
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
+import { createCommentator, createVoice } from './commentary.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -29,6 +30,8 @@ let drawMode = localStorage.getItem('auctionxi:drawmode') || null;
 let drawPool = '';
 let drawRole = '';
 let miniKeep = null;
+const voice = createVoice();
+const commentator = createCommentator({ onLine: (line) => { voice.say(line); if (tab === 'control') renderCommentary(); } });
 // Arriving from "Create → Mini" on the home page: open the mini-auction builder pre-filled.
 const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
 if (miniPreset) tab = 'results'; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
@@ -71,6 +74,7 @@ async function boot() {
   db.on(P, (v) => {
     A = normalize(v);
     if (!A) return;
+    commentator.update(A);
     $('#title').textContent = A.meta.name;
     const st = A.meta.status;
     $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
@@ -180,6 +184,7 @@ function setup(el) {
           ${field('Unsold re-auction rounds', numIn('r-rounds', rules.unsoldRounds))}
         </div>
         ${field('Order players come up', `<select id="r-order">${Object.entries(PICK_ORDERS).map(([k, v]) => `<option value="${k}" ${k === rules.pickOrder ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Allotted captains and vice-captains are never auctioned.')}
+        <label class="check" style="margin-top:var(--space-3)"><input type="checkbox" id="r-comm" ${rules.commentary === false ? '' : 'checked'}> Live commentary on the stage, phones and here</label>
       </div>
       <div class="card">
         <h2>House rules</h2>
@@ -242,6 +247,7 @@ async function saveSetup() {
     bidTimer: n('#r-timer'),
     unsoldRounds: n('#r-rounds'),
     pickOrder: $('#r-order').value,
+    commentary: $('#r-comm').checked,
     bidMode: $('#r-mode').value,
     roleMin: Object.fromEntries(Object.keys(ROLES).map((k) => [k, n(`#role-${k}`)])),
     categories,
@@ -611,10 +617,17 @@ function control(el) {
     </div>
     <div class="grid grid-2" style="margin-top:var(--space-4)">
       <div class="card"><h2>Purses</h2><div class="stack">${purses(A, { viewer: { role: 'admin' } })}</div></div>
-      <div class="card"><h2>Activity</h2>${feed(A)}</div>
+      <div class="stack">
+        ${A.rules.commentary === false ? '' : `<div class="card"><div class="section-title"><h2 style="margin:0">Commentary</h2><span class="spacer"></span>
+          ${voice.supported ? `<button class="btn-sm" id="c-voice">${voice.on ? 'Stop reading aloud' : 'Read aloud on this laptop'}</button>` : ''}</div>
+          <div id="c-comm" class="feed"></div></div>`}
+        <div class="card"><h2>Activity</h2>${feed(A)}</div>
+      </div>
     </div>`;
 
   wireNextPlayerPanel(el);
+  renderCommentary();
+  if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(); render(true); };
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
   $('#c-undobid').onclick = run(() => undoLastBid(aid, A));
@@ -666,6 +679,13 @@ function controlStart(el) {
     if (!missing.length && !confirm('Start the auction now?')) return;
     await startAuction(aid, A);
   });
+}
+
+function renderCommentary() {
+  const box = $('#c-comm');
+  if (!box) return;
+  const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  box.innerHTML = commentator.lines.slice(0, 12).map((l) => `<div><span>${esc(l.text)}</span><time>${time(l.at)}</time></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>';
 }
 
 // The "Next player" panel: random draw with the built-in logic, or a chit searched by name.
