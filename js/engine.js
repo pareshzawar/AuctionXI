@@ -42,6 +42,7 @@ export const DEFAULT_RULES = {
   // 'both': captains bid from phones and the auctioneer can also record room bids.
   // 'room': paddles in the room only; the auctioneer records every bid or just the final amount.
   bidMode: 'both',
+  commentary: true, // live commentary lines on the stage, phones and console
   houseRules: [],
 };
 

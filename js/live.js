@@ -4,6 +4,7 @@
 import { db } from './db.js';
 import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat } from './actions.js';
+import { createCommentator, createVoice } from './commentary.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
@@ -19,6 +20,8 @@ let A = null;
 let tab = null; // default: Rules before the auction starts, Squads after
 let sending = false;
 let lastResult = null;
+const voice = createVoice();
+const commentator = createCommentator({ onLine: (line) => voice.say(line) });
 
 if (stage) {
   document.documentElement.setAttribute('data-theme', 'night');
@@ -44,6 +47,7 @@ async function boot() {
   db.on(`auctions/${aid}`, (v) => {
     A = normalize(v);
     if (!A) { $('#app').innerHTML = '<div class="card"><h2>Auction not found</h2><p><a href="index.html">Back to home</a></p></div>'; return; }
+    commentator.update(A);
     document.title = `${A.meta.name} - AuctionXI`;
     if (stage) renderStage(); else renderPhone();
     showResult();
@@ -55,6 +59,8 @@ async function boot() {
     };
     addEventListener('resize', fit);
     fit();
+    // The stage takes no clicks; V switches the voice on or off (the browser needs a key press first).
+    addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'v' && voice.supported) { voice.toggle(); renderStage(); } });
   }
 }
 
@@ -87,6 +93,7 @@ function renderStage() {
              <p>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
+      ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm"><span class="stage-label">Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
       <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
     </div></div>`;
@@ -128,16 +135,20 @@ function renderPhone() {
       <div>${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
       <div>${hasLot ? livePanel(A) : ''}</div>
     </div>
+    ${A.rules.commentary === false ? '' : `<div class="card" style="margin-top:var(--space-4)"><div class="section-title"><h3 style="margin:0">Commentary</h3><span class="spacer"></span>
+      ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
+      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div><span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
     ${isBidder() && team ? `<div class="dock">${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
     <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
-      ${[['squads', 'Squads'], ['pool', 'Players left'], ['feed', 'Activity'], ['rules', 'Rules']].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
+      ${[['squads', 'Squads'], ['pool', 'Players left'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules']].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
     </nav>
     <section id="below">${below(current)}</section>`;
   if (keep) $('#below').scrollTop = keep;
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPhone(); }));
+  if ($('#voice-btn')) $('#voice-btn').onclick = () => { voice.toggle(); renderPhone(); };
   const btn = $('[data-bid-button]');
   if (btn) btn.onclick = bid;
 }
@@ -176,6 +187,7 @@ function below(tab) {
   if (tab === 'feed') return `<div class="card">${feed(A, 100)}</div>`;
   if (tab === 'pool') return poolTable(A);
   if (tab === 'rules') return rulesSummary(A);
+  if (tab === 'comm') return `<div class="card"><div class="feed" style="max-height:none">${commentator.lines.map((l) => `<div><span>${esc(l.text)}</span><time>${new Date(l.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<p class="muted">Nothing yet.</p>'}</div></div>`;
   return squads(A, { viewer: viewer() });
 }
 

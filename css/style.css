@@ -133,7 +133,7 @@ body.stage-mode main { max-width: none; padding: 0; }
 .stage {
   position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center;
   transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
-  display: grid; grid-template-rows: auto 1fr auto auto; grid-template-columns: minmax(0, 1fr); gap: var(--space-6);
+  display: grid; grid-template-rows: auto 1fr auto auto auto; grid-template-columns: minmax(0, 1fr); gap: var(--space-5);
   padding: var(--space-8) var(--space-10) 0; background: var(--ground); color: var(--ink); overflow: hidden;
 }
 .stage-top { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-8); }
@@ -144,6 +144,8 @@ body.stage-mode main { max-width: none; padding: 0; }
 .stage-tally div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .stage-tally b { font-family: var(--font-display); font-size: 44px; line-height: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stage-main { display: grid; grid-template-columns: minmax(0, 1fr) 600px; gap: var(--space-8); min-height: 0; }
+.stage-comm { display: flex; align-items: baseline; gap: var(--space-5); min-height: 40px; }
+.stage-comm p { margin: 0; font-size: 30px; line-height: 38px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stage-teams { display: grid; grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); gap: var(--space-4); }
 .stage-ticker { margin: 0 calc(-1 * var(--space-10)); }
 .stage-wait { display: grid; place-items: center; text-align: center; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }

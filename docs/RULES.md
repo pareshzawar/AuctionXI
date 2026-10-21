@@ -37,6 +37,12 @@ The control room's **Next player** panel always offers both ways:
 
 The stage shows how each player came up ("Random draw from Pool B", "Chit"). Captains and vice-captains are never offered, and neither are players already sold. Unsold players come back in the next round. `pick_order` in the questionnaire sets the default (`category-random` = random, pool by pool; `manual` = chits); you can switch at any moment.
 
+## Live commentary
+
+With **Live commentary** on (Setup → Bidding, or `live_commentary` in the questionnaire), the app writes a running commentary from what happens: each player's introduction (pool, role, stats), the opening bid, teams joining, bidding wars, record prices, sales with squad progress, unsold players and the closing summary. It appears on the stage (above the teams), on phones (under the bid panel and in a Commentary tab) and in the control room.
+
+**Read aloud:** the control room's *Read aloud on this laptop* button (plug the laptop into the hall speakers), *Read aloud* on any phone, or press `V` on the stage screen. It uses the device's own voice, free and offline-capable, preferring an Indian English voice. It never mentions a team's remaining purse unless purses are shown to everyone.
+
 ## Max bid
 
 A team must always be able to fill its squad, so:
