@@ -26,8 +26,8 @@ const tpl = csv.importSetup(csv.parseCSV(read('tournament_setup_template.csv')),
 ok(!tpl.warnings.length, 'blank template imports cleanly ' + tpl.warnings.join('; '));
 const capOnly = csv.importSetup([{ key: 'leaders', answer: 'captain' }, { key: 'bidders', answer: 'captain_vc' }, { key: 'bid_mode', answer: 'Room paddles' }], {}, {});
 ok(capOnly.rules.leaders === 'captain' && capOnly.rules.bidders === 'captain' && capOnly.rules.bidMode === 'room', 'captain-only forces captain-only bidding');
-const broke = csv.importSetup([{ key: 'purse_per_team', answer: '500' }], {}, {});
-ok(broke.warnings.some((w) => /cannot cover/.test(w)), 'warns when the purse cannot cover C + VC + squad at base');
+const broke = csv.importSetup([{ key: 'purse_per_team', answer: '300' }], {}, {});
+ok(broke.warnings.some((w) => /cannot buy/.test(w)), 'warns when the purse cannot buy the squad at base price');
 
 // players + max bid
 const { players, warnings } = csv.importPlayers(csv.parseCSV(read('sample_players.csv')), s.rules);
@@ -38,9 +38,9 @@ ok(dup.warnings.some((w) => /already has a captain/.test(w)), 'warns on two capt
 const a = E.normalize({ meta: { round: 1 }, rules: s.rules, teams, players, sales: {} });
 for (const [pid, p] of Object.entries(players)) if (p.allottedTeam) a.sales[pid] = { team: p.allottedTeam, price: E.allottedPrice(p, s.rules), allotted: true };
 const t1 = E.teamSummary(a, 'T1');
-ok(t1.remaining === 650 && t1.toBuy === 8 && t1.maxBid === 300, `example: ₹1000 − 200 − 150 = ₹650 left, 8 to buy → max bid ₹300 (got ${t1.remaining}, ${t1.toBuy}, ${t1.maxBid})`);
+ok(t1.remaining === 1000 && t1.toBuy === 8 && t1.maxBid === 650 && t1.allottedValue === 350, `example: full ₹1000 purse (C ₹200 + VC ₹150 = ₹350 recorded separately), 8 to buy → max bid 1000 − 7 × 50 = ₹650 (got ${t1.remaining}, ${t1.toBuy}, ${t1.maxBid}, ${t1.allottedValue})`);
 const anyone = Object.values(players).find((p) => !p.allottedTeam && E.roleId(p.role) !== 'wk');
-ok(E.bidLimit(a, 'T1', anyone).max === 300, 'bidLimit agrees: ₹300');
+ok(E.bidLimit(a, 'T1', anyone).max === 650, 'bidLimit agrees: ₹650');
 ok(E.pool(a).every((p) => !p.allottedTeam) && E.pool(a).length === 36, 'allotted players are never auctioned');
 // fill T1 to 9 with non-keepers who cost 50 → last slot must be a WK (T1's VC is a WK, so use T2: C batter, VC bowler)
 const plain = Object.entries(players).filter(([, p]) => !p.allottedTeam && E.roleId(p.role) !== 'wk');

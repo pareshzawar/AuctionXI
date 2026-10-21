@@ -134,9 +134,10 @@ function setup(el) {
         <h2>Captain and vice-captain</h2>
         ${field('Allotted to each team before the auction', `<select id="r-leaders">${Object.entries(LEADERS).map(([k, v]) => `<option value="${k}" ${k === rules.leaders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Mark them in the players list: Allotted to + As C / VC.')}
         <div class="grid grid-2" style="gap:var(--space-3)">
-          ${field('Captain price', numIn('r-cprice', rules.captainPrice))}
-          ${field('Vice-captain price', numIn('r-vcprice', rules.vcPrice), 'Ignored with captain only')}
+          ${field('Captain value', numIn('r-cprice', rules.captainPrice), 'Not taken from the purse')}
+          ${field('Vice-captain value', numIn('r-vcprice', rules.vcPrice), 'Not taken from the purse. Ignored with captain only')}
         </div>
+        <span class="hint">The value is recorded for next season's mini auction: if the captain or vice-captain is unavailable, it is added to the team's budget along with its remaining purse.</span>
         ${field('Who bids for the team', `<select id="r-bidders">${Object.entries(BIDDERS).map(([k, v]) => `<option value="${k}" ${k === rules.bidders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Vice-captains get their own code under Access and sharing.')}
         ${field('Who sees remaining purse and max bid', `<select id="r-visibility">${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.purseVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
         <p class="notice notice-info" style="margin:var(--space-4) 0 0">${esc(maxBidExplainer(rules).rule)}<br>${esc(maxBidExplainer(rules).example)}</p>
@@ -638,7 +639,6 @@ function controlStart(el) {
   const toAuction = Object.values(A.players).filter((p) => !isAllotted(p)).length;
   const perTeam = rules.squadSize - (hasVC(rules) ? 2 : 1);
   const missing = teamIds.filter((id) => { const l = leadersOf(A, id); return !l.C || (hasVC(rules) && !l.VC); });
-  const leaderCost = Number(rules.captainPrice) + (hasVC(rules) ? Number(rules.vcPrice) : 0);
   const check = (ok, text) => `<li style="margin:var(--space-2) 0">${badge(ok ? 'sold' : 'upcoming', { text: ok ? 'Done' : 'To do' })} ${text}</li>`;
   el.innerHTML = `
     <div class="card" style="max-width:760px">
@@ -647,11 +647,11 @@ function controlStart(el) {
         ${check(teamN >= 2, `At least 2 teams (${teamN})`)}
         ${check(!missing.length && teamN > 0, missing.length ? `${hasVC(rules) ? 'Captain and vice-captain' : 'Captain'} missing for ${missing.map((id) => esc(A.teams[id].name)).join(', ')} (set them in Players)` : `Every team has its ${hasVC(rules) ? 'captain and vice-captain' : 'captain'}`)}
         ${check(toAuction >= teamN * perTeam, `Enough players to auction for every team to reach ${rules.squadSize} (${teamN} × ${perTeam} = ${teamN * perTeam}; you have ${toAuction})`)}
-        ${check(leaderCost + perTeam * Math.min(...rules.categories.map((c) => Number(c.base) || 0)) <= rules.purse, `Purse covers the ${hasVC(rules) ? 'captain and vice-captain' : 'captain'} plus ${perTeam} players at base price`)}
+        ${check(perTeam * Math.min(...rules.categories.map((c) => Number(c.base) || 0)) <= rules.purse, `Purse covers ${perTeam} players at base price`)}
         ${check(meta.locked, 'Player list locked')}
         ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>
-      <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team at ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, and opens bidding.</p>
+      <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team (value ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, not taken from the purse), and opens bidding.</p>
       <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && toAuction ? '' : 'disabled'}>Start auction</button>
     </div>`;
   $('#c-start').onclick = run(async () => {

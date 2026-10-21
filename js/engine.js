@@ -11,7 +11,9 @@ export const DEFAULT_RULES = {
   playersPerSide: 8, // players in a match
   squadSize: 10, // players each team MUST own, captain and vice-captain included (extra = reserves)
   overs: null,
-  // Who is allotted to each team before the auction, and at what price (taken from the purse).
+  // Who is allotted to each team before the auction, and their value. The value is NOT taken from
+  // the purse: it is the budget that comes back to the team in next season's mini auction if the
+  // captain / vice-captain is unavailable.
   leaders: 'captain_vc', // 'captain' | 'captain_vc'
   captainPrice: 200,
   vcPrice: 150,
@@ -209,7 +211,9 @@ export function teamSummary(a, teamId) {
       const p = a.players[pid] || { name: '(removed)' };
       return { ...p, id: pid, role: roleId(p.role), price: Number(s.price), allotted: !!(s.allotted || s.retained), as: p.allottedAs || null };
     });
-  const spent = players.reduce((t, p) => t + p.price, 0);
+  // The purse pays only for auctioned players; captain / VC values are recorded separately.
+  const spent = players.filter((p) => !p.allotted).reduce((t, p) => t + p.price, 0);
+  const allottedValue = players.filter((p) => p.allotted).reduce((t, p) => t + p.price, 0);
   const count = players.length;
   const remaining = Number(rules.purse) - spent;
   const byCat = {};
@@ -219,7 +223,7 @@ export function teamSummary(a, teamId) {
     byRole[p.role] = (byRole[p.role] || 0) + 1;
   }
   const toBuy = Math.max(0, Number(rules.squadSize) - count);
-  const s = { players, spent, count, toBuy, remaining, slots: toBuy, byCat, byRole };
+  const s = { players, spent, allottedValue, squadValue: spent + allottedValue, count, toBuy, remaining, slots: toBuy, byCat, byRole };
   s.maxBid = looseMaxBid(s, rules);
   return s;
 }

@@ -4,7 +4,7 @@
 
 Three templates hold everything (all in `templates/`):
 
-- [ ] **Tournament setup questionnaire** (`tournament_setup_template.csv`): players per side and squad size, purse, captain and vice-captain prices, who bids, who sees purses, base price, role minimums, increments, bid mode, and your house-rule answers. Fill it in with the committee and get every captain to agree to it. See [RULES.md](RULES.md).
+- [ ] **Tournament setup questionnaire** (`tournament_setup_template.csv`): players per side and squad size, purse, captain and vice-captain values, who bids, who sees purses, base price, role minimums, increments, bid mode, and your house-rule answers. Fill it in with the committee and get every captain to agree to it. See [RULES.md](RULES.md).
 - [ ] **Teams** (`teams_template.csv`): names, 3-letter codes, colours, owners
 - [ ] **Players** (`players_template.csv`): name, role, batting/bowling style, age, flat/locality, photo (optional), past stats (optional), and each team's captain and vice-captain (`allotted_team`, `allotted_as`)
 - [ ] Who is the auctioneer (admin), and who is the backup (co-admin)

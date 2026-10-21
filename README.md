@@ -14,11 +14,11 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | | |
 |---|---|
 | 🧑‍⚖️ **Roles** | Admin (creator), co-admin/auctioneer (admin code), captain and vice-captain (each with a secret code), team member, audience, stage screen |
-| 📋 **Setup questionnaire** | One CSV covers each tournament's format, squad size, purse, captain/VC prices, who bids, who sees purses, base price, increments, bid mode **and house rules**. Fill it in, upload it, and reuse it next season |
+| 📋 **Setup questionnaire** | One CSV covers each tournament's format, squad size, purse, captain/VC values, who bids, who sees purses, base price, increments, bid mode **and house rules**. Fill it in, upload it, and reuse it next season |
 | 📄 **Player & team templates** | Fill them in Excel or Google Sheets, upload. Amounts can be written `5L`, `1Cr`, `5,00,000` |
 | ✏️ **Edit everything** | Inline editing, add/delete, or bulk-edit by export → spreadsheet → re-upload |
 | 🔒 **Lock per auction** | Lock the player list for an auction. Every new auction gets its own fresh upload |
-| 🧢 **Captain & vice-captain** | Allotted to their team before the auction at fixed prices (e.g. ₹200 / ₹150) from the purse. Captain-only tournaments too. Choose whether only the captain or both can bid |
+| 🧢 **Captain & vice-captain** | Allotted to their team before the auction with a value (e.g. ₹200 / ₹150) that is *not* taken from the purse. It's their budget for next season's mini auction if they're unavailable. Captain-only tournaments too. Choose whether only the captain or both can bid |
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
 | 🙈 **Private purses** | Remaining purse and max bid are shown only to each team's captain/VC and the admins (or all bidders, or everyone, as you choose) |
 | 🛡️ **House rules** | Shown to everyone on a Rules tab. Number rules are enforced: role minimums (e.g. 1 WK), category min/max, per-player price cap. The database rules check them too |
@@ -70,8 +70,8 @@ All in [`templates/`](templates), also downloadable from the home page and admin
 
 | File | What it's for |
 |---|---|
-| `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, players per side and squad size, purse, captain/VC prices, who bids, who sees purses, base price, role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
-| `sample_tournament_setup.csv` | A filled example: 8-a-side, squads of 10, purse ₹1,000, C ₹200, VC ₹150, base ₹50, house rules |
+| `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, players per side and squad size, purse, captain/VC values, who bids, who sees purses, base price, role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
+| `sample_tournament_setup.csv` | A filled example: 8-a-side, squads of 10, purse ₹1,000, C value ₹200, VC value ₹150, base ₹50, house rules |
 | `teams_template.csv` | `id, name, short_name, color, owner, logo_url` |
 | `players_template.csv` | One row per player (columns below) |
 | `sample_*.csv` | Demo data used by *Load sample data* |
@@ -87,7 +87,7 @@ Players columns:
 | `base_price` | no | Overrides the category base price |
 | `batting_style`, `bowling_style`, `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link") |
-| `allotted_team`, `allotted_as` | no | For each team's captain and vice-captain: the team ID and `C` or `VC`. They join that team at the captain / vice-captain price when the auction starts and are never auctioned |
+| `allotted_team`, `allotted_as` | no | For each team's captain and vice-captain: the team ID and `C` or `VC`. They join that team when the auction starts, with the captain / vice-captain value (not taken from the purse), and are never auctioned |
 
 > ⚠️ Auction data is publicly readable by anyone with the auction code. **Do not put phone numbers or other private data in the CSV.**
 

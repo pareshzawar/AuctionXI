@@ -17,7 +17,7 @@ Amounts can be written however people type them: `50`, `200`, `5,00,000`, `5L`, 
 | `squad_size` | 10 | Players every team **must own** by the end, captain and vice-captain included. The extra 2 are the reserves |
 | `purse_per_team` | ₹1,000 | Virtual money each team starts with |
 | `leaders` | `captain_vc` | Who is allotted to each team before the auction: `captain` only, or `captain_vc` (captain and vice-captain) |
-| `captain_price`, `vc_price` | ₹200, ₹150 | Their prices, taken from the purse when the auction starts. They are never auctioned |
+| `captain_price`, `vc_price` | ₹200, ₹150 | Their **value**. It is **not** taken from the purse: the purse is only for buying players. The value is the budget the team gets back for next season's mini auction if the captain or vice-captain is unavailable. They join their team when the auction starts and are never auctioned |
 | `bidders` | `captain_vc` | Who bids for the team: only the `captain`, or `captain_vc` (both, each with their own code) |
 | `purse_visibility` | `own` | Who sees remaining purse and max bid (below) |
 | Base price | ₹50 | Starting price of every auctioned player (one category). Add more categories if some players start higher |
@@ -35,12 +35,22 @@ max bid = purse left − (players still to buy − 1) × base price
 
 **Example** (8-a-side, squad of 10, purse ₹1,000, base ₹50):
 
-- Captain ₹200 + vice-captain ₹150 are allotted → ₹1,000 − ₹350 = **₹650 left**, **8 players to buy**
-- First max bid = ₹650 − 7 × ₹50 = **₹300** (₹350 is kept back for the other 7 players)
-- If the team buys a player for ₹300: ₹350 left, 7 to buy → max bid = ₹350 − 6 × ₹50 = ₹50
+- Captain (value ₹200) and vice-captain (value ₹150) are allotted. Their values are recorded but **not** taken from the purse → **₹1,000 left**, **8 players to buy**
+- First max bid = ₹1,000 − 7 × ₹50 = **₹650** (₹350 is kept back for the other 7 players)
+- If the team buys a player for ₹650: ₹350 left, 7 to buy → max bid = ₹350 − 6 × ₹50 = ₹50
 - For the last player, the max bid is the whole purse left
 
-Each captain's phone shows **Purse left** and **Max bid** for their team, updated after every sale. The **BID** button stops at the max bid and says why, e.g. *"Over your max bid of ₹300. Keep ₹350 for 7 more players."* Optional house rules (category limits, role minimums, price cap) can lower it further, as below.
+Each captain's phone shows **Purse left** and **Max bid** for their team, updated after every sale. The **BID** button stops at the max bid and says why, e.g. *"Over your max bid of ₹650. Keep ₹350 for 7 more players."* Optional house rules (category limits, role minimums, price cap) can lower it further, as below.
+
+## Next season's mini auction
+
+Each team's captain / vice-captain values and remaining purse are kept in the results (the captain's card shows "Captain and VC value ₹350 · not from the purse"). For a mini auction next season, a team's budget is:
+
+```
+remaining purse from this auction
++ value of the captain / vice-captain if they are unavailable
++ the purchase price of any player who is released
+```
 
 ## Who sees the remaining purse and max bid
 
@@ -59,7 +69,7 @@ Everyone always sees the player on the block, the current bid and who is leading
 The **Rules** tab on every phone, the results page, and the stage screen before the start show the tournament rules:
 
 - format and squad size
-- purse, captain/VC prices and base price
+- purse, captain/VC values (not from the purse) and base price
 - the max-bid formula with a worked example from your numbers
 - increments and timer
 - who bids, and who sees purses
@@ -103,11 +113,11 @@ You can switch at any moment in the control room. A common plan: start with phon
 
 ## Presets
 
-**Friends or family, 6-a-side, squads of 8:** purse ₹500 · C ₹100, VC ₹75 · base ₹25 · +₹5 below ₹100, +₹10 above · timer 20 s
+**Friends or family, 6-a-side, squads of 8:** purse ₹500 · C value ₹100, VC value ₹75 · base ₹25 · +₹5 below ₹100, +₹10 above · timer 20 s
 
-**Society league, 8-a-side, squads of 10** *(the filled sample)*: purse ₹1,000 · C ₹200, VC ₹150 · base ₹50 · at least 1 WK · +₹10 below ₹200, +₹25 above · timer 30 s
+**Society league, 8-a-side, squads of 10** *(the filled sample)*: purse ₹1,000 · C value ₹200, VC value ₹150 · base ₹50 · at least 1 WK · +₹10 below ₹200, +₹25 above · timer 30 s
 
-**11-a-side, squads of 14, captain only:** purse ₹1 Cr · C ₹10 L · base ₹1 L · +₹50,000 below ₹10 L, +₹1 L above · timer 30 s
+**11-a-side, squads of 14, captain only:** purse ₹1 Cr · C value ₹10 L · base ₹1 L · +₹50,000 below ₹10 L, +₹1 L above · timer 30 s
 
 ## Auctioneer controls
 
