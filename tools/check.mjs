@@ -54,3 +54,25 @@ const vis = (v, viewer, team) => E.canSeePurse({ purseVisibility: v }, viewer, t
 ok(vis('own', { role: 'captain', team: 'T1' }, 'T1') && !vis('own', { role: 'captain', team: 'T1' }, 'T2') && vis('own', { role: 'vc', team: 'T2' }, 'T2'), 'own: captain / VC see only their team');
 ok(!vis('own', { role: 'audience' }, 'T1') && !vis('bidders', { role: 'member', team: 'T1' }, 'T1') && !vis('own', { role: 'screen' }, 'T1'), 'audience, team members and the stage do not see purses');
 ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team: 'T1' }, 'T4') && vis('everyone', { role: 'audience' }, 'T1'), 'admin sees all; bidders / everyone modes');
+
+// mini auction: budget = remaining purse + value of released players
+{
+  const m = E.normalize({ meta: { round: 1 }, rules: s.rules, teams, players, sales: {} });
+  for (const [pid, p] of Object.entries(players)) if (p.allottedTeam) m.sales[pid] = { team: p.allottedTeam, price: E.allottedPrice(p, s.rules), allotted: true };
+  const bought = Object.keys(players).filter((pid) => !players[pid].allottedTeam).slice(0, 8);
+  bought.forEach((pid, i) => { m.sales[pid] = { team: 'T1', price: i === 0 ? 300 : 50 }; }); // spent 650, 350 left
+  const t = E.teamSummary(m, 'T1');
+  ok(t.remaining === 350 && t.count === 10, 'T1 full squad, ₹350 left');
+  const vcId = Object.keys(players).find((pid) => players[pid].allottedTeam === 'T1' && players[pid].allottedAs === 'VC');
+  const keep = new Set(t.players.map((p) => p.id).filter((id) => id !== vcId && id !== bought[0]));
+  const mb = E.miniBudget(m, 'T1', keep);
+  ok(mb.releasedValue === 450 && mb.budget === 800, `release VC (value ₹150) + ₹300 player → budget 350 + 450 = ₹800 (got ${mb.budget})`);
+  // the next season's auction: kept players are allotted, budget is the team's own purse
+  const nextPlayers = {};
+  for (const p of mb.kept) nextPlayers[p.id] = { ...players[p.id], allottedTeam: 'T1', allottedAs: p.as === 'C' || p.as === 'VC' ? p.as : 'R', allottedPrice: p.price };
+  const n = E.normalize({ meta: { round: 1 }, rules: s.rules, teams: { ...teams, T1: { ...teams.T1, purse: mb.budget } }, players: nextPlayers, sales: {} });
+  for (const [pid, p] of Object.entries(nextPlayers)) n.sales[pid] = { team: 'T1', price: E.allottedPrice(p, s.rules), allotted: true };
+  const nt = E.teamSummary(n, 'T1');
+  ok(nt.remaining === 800 && nt.toBuy === 2 && nt.maxBid === 750, `next season: ₹800 budget, 2 to buy → max bid 800 − 1 × 50 = ₹750 (got ${nt.remaining}, ${nt.toBuy}, ${nt.maxBid})`);
+  ok(E.teamSummary(n, 'T2').purse === 1000 && E.variedBudgets(n), 'other teams keep the standard purse; budgets marked as varied');
+}

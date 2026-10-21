@@ -181,7 +181,8 @@ export function minBase(rules) {
 
 // Captain / vice-captain allotted to a team before the auction.
 export const isAllotted = (p) => !!(p && p.allottedTeam);
-export const leaderLabel = (as) => (as === 'C' ? 'Captain' : as === 'VC' ? 'Vice-captain' : 'Allotted');
+// allottedAs: 'C' captain, 'VC' vice-captain, 'R' kept from last season (mini auction).
+export const leaderLabel = (as) => (as === 'C' ? 'Captain' : as === 'VC' ? 'Vice-captain' : as === 'R' ? 'Retained' : 'Allotted');
 
 export function allottedPrice(p, rules) {
   if (p.allottedPrice != null && p.allottedPrice !== '') return Number(p.allottedPrice);
@@ -203,8 +204,15 @@ export function nextBid(live, rules) {
 
 /* ---------------- teams ---------------- */
 
+// A team's budget: its own (a mini auction carries over each team's balance) or the standard purse.
+export function teamPurse(a, teamId) {
+  const own = a.teams[teamId]?.purse;
+  return own != null && own !== '' ? Number(own) : Number(a.rules.purse);
+}
+
 export function teamSummary(a, teamId) {
   const { rules } = a;
+  const purse = teamPurse(a, teamId);
   const players = Object.entries(a.sales)
     .filter(([, s]) => s.team === teamId)
     .map(([pid, s]) => {
@@ -215,7 +223,7 @@ export function teamSummary(a, teamId) {
   const spent = players.filter((p) => !p.allotted).reduce((t, p) => t + p.price, 0);
   const allottedValue = players.filter((p) => p.allotted).reduce((t, p) => t + p.price, 0);
   const count = players.length;
-  const remaining = Number(rules.purse) - spent;
+  const remaining = purse - spent;
   const byCat = {};
   const byRole = {};
   for (const p of players) {
@@ -223,7 +231,7 @@ export function teamSummary(a, teamId) {
     byRole[p.role] = (byRole[p.role] || 0) + 1;
   }
   const toBuy = Math.max(0, Number(rules.squadSize) - count);
-  const s = { players, spent, allottedValue, squadValue: spent + allottedValue, count, toBuy, remaining, slots: toBuy, byCat, byRole };
+  const s = { players, purse, spent, allottedValue, squadValue: spent + allottedValue, count, toBuy, remaining, slots: toBuy, byCat, byRole };
   s.maxBid = looseMaxBid(s, rules);
   return s;
 }
@@ -312,6 +320,19 @@ export function pickNext(a) {
   }
   return rnd(group);
 }
+
+// Next season's mini auction: a team keeps `keepIds`; everyone else is released and their value
+// (captain / VC value, or the price paid) goes back into the team's budget with its remaining purse.
+export function miniBudget(a, teamId, keepIds) {
+  const s = teamSummary(a, teamId);
+  const kept = s.players.filter((p) => keepIds.has(p.id));
+  const released = s.players.filter((p) => !keepIds.has(p.id));
+  const releasedValue = released.reduce((t, p) => t + p.price, 0);
+  return { remaining: s.remaining, releasedValue, budget: s.remaining + releasedValue, kept, released };
+}
+
+// True when teams have their own budgets (mini auction) instead of one shared purse.
+export const variedBudgets = (a) => Object.values(a.teams).some((t) => t.purse != null && t.purse !== '');
 
 // Multi-path update that stores each team's spent / maxBid for the database rules.
 export function capsUpdate(a) {

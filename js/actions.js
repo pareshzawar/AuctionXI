@@ -5,12 +5,17 @@
 //   coadmins/{aid}/{uid}      {code, name}        - a device that proved the admin code
 
 import { db, isLocal } from './db.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice } from './engine.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget } from './engine.js';
 
-export async function createAuction({ name, tournament, venue, date, organiser }) {
+async function newAuctionId(name, tournament) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
   let aid;
   do { aid = `${prefix}-${randomCode(4)}`; } while (await db.get(`auctions/${aid}/meta`));
+  return aid;
+}
+
+export async function createAuction({ name, tournament, venue, date, organiser }) {
+  const aid = await newAuctionId(name, tournament);
   const adminCode = randomCode(8);
   await db.set(`auctions/${aid}`, {
     meta: {
@@ -20,6 +25,49 @@ export async function createAuction({ name, tournament, venue, date, organiser }
     rules: DEFAULT_RULES,
   });
   await db.set(`secrets/${aid}`, { adminCode, teamCodes: {}, vcCodes: {} });
+  return { aid, adminCode };
+}
+
+// Next season's mini auction from a finished auction `a`.
+// keep: { teamId: Set(playerId) } - players each team keeps. Kept players join their team before
+// the auction (captain / vice-captain stay so; others as retained) and are never auctioned.
+// Each team's budget = remaining purse + value of its released players.
+// addToPool: put released and never-sold players back into the player pool.
+export async function createMiniAuction(prevAid, a, { name, keep, addToPool }) {
+  const aid = await newAuctionId(name, a.meta.tournament);
+  const teams = {};
+  const players = {};
+  const codes = { teamCodes: {}, vcCodes: {} };
+  for (const [id, t] of Object.entries(a.teams)) {
+    const mb = miniBudget(a, id, keep[id] || new Set());
+    const { spent, maxBid, ...rest } = t;
+    teams[id] = { ...rest, purse: mb.budget, carriedOver: mb.remaining, releasedValue: mb.releasedValue };
+    for (const p of mb.kept) {
+      players[p.id] = { ...a.players[p.id], allottedTeam: id, allottedAs: p.as === 'C' || p.as === 'VC' ? p.as : 'R', allottedPrice: p.price };
+    }
+    if (addToPool) for (const p of mb.released) players[p.id] = { ...a.players[p.id], allottedTeam: null, allottedAs: null, allottedPrice: null };
+    codes.teamCodes[id] = randomCode(6);
+    codes.vcCodes[id] = randomCode(6);
+  }
+  if (addToPool) {
+    for (const [pid, p] of Object.entries(a.players)) {
+      if (!a.sales[pid] && !p.allottedTeam) players[pid] = { ...p, allottedTeam: null, allottedAs: null, allottedPrice: null };
+    }
+  }
+  const adminCode = randomCode(8);
+  const next = normalize({
+    meta: {
+      name, tournament: a.meta.tournament || null, organiser: a.meta.organiser || null, venue: null, date: null,
+      ownerUid: db.uid(), createdAt: db.now(), status: 'setup', locked: false, round: 1,
+      kind: 'mini', parent: prevAid, parentName: a.meta.name,
+    },
+    rules: a.rules,
+    teams,
+    players,
+  });
+  await db.set(`auctions/${aid}`, { meta: next.meta, rules: next.rules, teams: next.teams, players: next.players });
+  await db.set(`secrets/${aid}`, { adminCode, ...codes });
+  await db.update(`auctions/${aid}`, capsUpdate(next));
   return { aid, adminCode };
 }
 
