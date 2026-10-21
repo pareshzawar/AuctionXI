@@ -2,9 +2,9 @@
 // from archive/<slug>/auction.json in the repo - works without any database).
 
 import { db } from './db.js';
-import { normalize, ROLES, roleId, isReserve, category, basePrice } from './engine.js';
+import { normalize, ROLES, roleId, isAllotted, leaderLabel, category, basePrice } from './engine.js';
 import { toCSV } from './csv.js';
-import { $, esc, param, download, mountHeader } from './ui.js';
+import { $, esc, param, download, mountHeader, getSession } from './ui.js';
 import { price, teamBadge, playerTable } from './ds.js';
 import { squads, rulesSummary } from './views.js';
 
@@ -20,7 +20,7 @@ function render(A) {
   $('#title').textContent = meta.name;
   $('#subtitle').textContent = [meta.tournament, meta.venue, meta.date, meta.status === 'completed' ? 'Completed' : meta.status === 'live' ? 'In progress' : null].filter(Boolean).join(' · ');
 
-  const sales = Object.entries(A.sales).filter(([, s]) => !s.retained);
+  const sales = Object.entries(A.sales).filter(([, s]) => !s.allotted && !s.retained);
   const top = [...sales].sort((x, y) => y[1].price - x[1].price)[0];
   const total = sales.reduce((t, [, s]) => t + Number(s.price), 0);
   const tile = (label, value, sub = '') => `<div class="card"><span class="ax-k">${label}</span><div style="margin:var(--space-1) 0">${value}</div><div class="muted">${sub}</div></div>`;
@@ -29,10 +29,12 @@ function render(A) {
     tile('Total spent', price(total, rules, { size: 'lg' }), sales.length ? `Average ${price(Math.round(total / sales.length), rules, { size: 'sm' })}` : ''),
     top ? tile('Highest price', price(top[1].price, rules, { size: 'lg', tone: 'gold' }), `${esc(A.players[top[0]]?.name || top[0])} · ${teamBadge(A.teams[top[1].team])}`) : '',
   ].join('');
-  $('#squads').innerHTML = squads(A);
-  const unsold = Object.entries(A.players).filter(([pid]) => !A.sales[pid]).map(([id, p]) => ({
+  // Remaining purses follow the tournament's visibility rule for this device's role.
+  const session = archive ? {} : getSession(aid);
+  $('#squads').innerHTML = squads(A, { viewer: { role: session.role || 'audience', team: session.team } });
+  const unsold = Object.entries(A.players).filter(([pid, p]) => !A.sales[pid] && !isAllotted(p)).map(([id, p]) => ({
     id, name: p.name, role: p.role, category: category(rules, p.category)?.label, base: basePrice(p, rules),
-    status: A.unsold[id] ? 'unsold' : 'upcoming', sub: isReserve(p) ? 'Reserve' : '',
+    status: A.unsold[id] ? 'unsold' : 'upcoming', sub: [p.age ? `Age ${p.age}` : null, p.locality].filter(Boolean).join(' · '),
   }));
   $('#unsold').innerHTML = playerTable(unsold, rules, { dense: true, columns: ['player', 'role', 'category', 'base', 'status'] });
   $('#rules').innerHTML = rulesSummary(A);
@@ -40,9 +42,9 @@ function render(A) {
   $('#dl-csv').onclick = () => {
     const rows = Object.entries(A.sales).map(([pid, s]) => {
       const p = A.players[pid] || {};
-      return [A.teams[s.team]?.name || s.team, pid, p.name, ROLES[roleId(p.role)].name, isReserve(p) ? 'reserve' : 'main', s.price];
+      return [A.teams[s.team]?.name || s.team, pid, p.name, ROLES[roleId(p.role)].name, s.allotted || s.retained ? leaderLabel(p.allottedAs) : 'auction', s.price];
     });
-    download(`${archive || aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'pool', 'price'], rows));
+    download(`${archive || aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'how', 'price'], rows));
   };
 }
 

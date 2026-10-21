@@ -2,19 +2,21 @@
 // ?screen=1 for the projector stage (fixed 1920 x 1080 canvas, always night).
 
 import { db } from './db.js';
-import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding } from './engine.js';
-import { placeBid, myCaptainTeam } from './actions.js';
+import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse } from './engine.js';
+import { placeBid, myBidderSeat } from './actions.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo } from './views.js';
+import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
 
 const aid = (param('a') || '').toUpperCase();
 const stage = param('screen') === '1';
 const session = getSession(aid);
 let role = stage ? 'screen' : session.role || 'audience';
-let myTeam = ['captain', 'member'].includes(role) ? session.team : null;
+let myTeam = ['captain', 'vc', 'member'].includes(role) ? session.team : null;
+const isBidder = () => role === 'captain' || role === 'vc';
+const viewer = () => ({ role, team: myTeam });
 let A = null;
-let tab = 'squads';
+let tab = null; // default: Rules before the auction starts, Squads after
 let sending = false;
 let lastResult = null;
 
@@ -27,14 +29,17 @@ if (stage) {
 }
 
 async function boot() {
-  if (role === 'captain') {
-    const team = await myCaptainTeam(aid);
-    if (!team) {
-      toast('This phone is not signed in as a captain. Join again with your team code.', 'error');
+  if (isBidder()) {
+    const seat = await myBidderSeat(aid);
+    if (!seat) {
+      toast('This phone is not signed in as a captain or vice-captain. Join again with your code.', 'error');
       role = 'audience';
       myTeam = null;
       setSession(aid, { role });
-    } else myTeam = team;
+    } else {
+      myTeam = seat.team;
+      role = seat.as === 'VC' ? 'vc' : 'captain';
+    }
   }
   db.on(`auctions/${aid}`, (v) => {
     A = normalize(v);
@@ -79,11 +84,25 @@ function renderStage() {
       <div class="stage-main">
         ${hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
           : `<div class="stage-wait" style="grid-column:1/-1"><div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
-             <p>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</p></div></div>`}
+             <p>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</p>
+             ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
-      <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage' })}</section>
+      <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
     </div></div>`;
+}
+
+// Key rules on the stage while the hall waits for the start.
+function stageRules() {
+  const r = A.rules;
+  const mb = maxBidExplainer(r);
+  const res = Math.max(0, r.squadSize - r.playersPerSide);
+  const lines = [
+    `${r.playersPerSide}-a-side · every team buys exactly ${r.squadSize} players${res ? ` (${res} reserve${res === 1 ? '' : 's'})` : ''}`,
+    `Purse ${money(r.purse, r)} · captain ${money(r.captainPrice, r)}${r.leaders === 'captain_vc' ? ` · vice-captain ${money(r.vcPrice, r)}` : ''} · base price ${money(r.categories[0]?.base, r)}`,
+    mb.rule,
+  ];
+  return `<div style="margin-top:var(--space-8);text-align:left;max-width:1400px">${lines.map((l) => `<p style="font-size:30px;line-height:40px;color:var(--ink)">${esc(l)}</p>`).join('')}</div>`;
 }
 
 /* ---------------- phones ---------------- */
@@ -92,7 +111,8 @@ function renderPhone() {
   const { meta, live, rules } = A;
   const hasLot = live && A.players[live.playerId];
   const team = myTeam && A.teams[myTeam];
-  const roleLabel = { audience: 'Audience', member: 'Team member', captain: 'Captain' }[role] || role;
+  const roleLabel = { audience: 'Audience', member: 'Team member', captain: 'Captain', vc: 'Vice-captain' }[role] || role;
+  const current = tab || (meta.status === 'setup' ? 'rules' : 'squads');
   const keep = $('#below')?.scrollTop;
   $('#app').innerHTML = `
     <div class="page-head">
@@ -103,19 +123,19 @@ function renderPhone() {
       ${badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? `Live · Round ${meta.round || 1}` : meta.status === 'completed' ? 'Completed' : 'Not started' })}
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>
     </div>
-    ${role === 'captain' && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined }) : ''}
+    ${isBidder() && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot && live.status === 'bidding' ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined, hidePurse: !canSeePurse(rules, viewer(), myTeam) }) : ''}
     <div class="live-grid" style="margin-top:var(--space-4)">
       <div>${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
       <div>${hasLot ? livePanel(A) : ''}</div>
     </div>
-    ${role === 'captain' && team ? `<div class="dock">${captainButton()}</div>` : ''}
+    ${isBidder() && team ? `<div class="dock">${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
-    <div class="purses">${purses(A, { mine: myTeam })}</div>
+    <div class="purses">${purses(A, { viewer: viewer() })}</div>
     <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
-      ${[['squads', 'Squads'], ['pool', 'Players left'], ['feed', 'Activity'], ['rules', 'Rules']].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'active' : ''}">${l}</button>`).join('')}
+      ${[['squads', 'Squads'], ['pool', 'Players left'], ['feed', 'Activity'], ['rules', 'Rules']].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
     </nav>
-    <section id="below">${below()}</section>`;
+    <section id="below">${below(current)}</section>`;
   if (keep) $('#below').scrollTop = keep;
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; renderPhone(); }));
   const btn = $('[data-bid-button]');
@@ -152,11 +172,11 @@ async function bid() {
   }
 }
 
-function below() {
+function below(tab) {
   if (tab === 'feed') return `<div class="card">${feed(A, 100)}</div>`;
   if (tab === 'pool') return poolTable(A);
   if (tab === 'rules') return rulesSummary(A);
-  return squads(A, { mine: myTeam });
+  return squads(A, { viewer: viewer() });
 }
 
 /* ---------------- SOLD / UNSOLD stamp ---------------- */

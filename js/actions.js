@@ -1,11 +1,11 @@
 // Database writes shared by the pages. Paths:
 //   auctions/{aid}            public: meta, rules, teams, players, sales, unsold, live, log
-//   secrets/{aid}             admin only: adminCode, teamCodes/{teamId}
-//   captains/{aid}/{uid}      {team, code, name}  - a device that proved a team code
+//   secrets/{aid}             admin only: adminCode, teamCodes/{teamId} (captains), vcCodes/{teamId} (vice-captains)
+//   captains/{aid}/{uid}      {team, as: 'C'|'VC', code, name} - a phone that proved its captain / vice-captain code
 //   coadmins/{aid}/{uid}      {code, name}        - a device that proved the admin code
 
 import { db, isLocal } from './db.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary } from './engine.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice } from './engine.js';
 
 export async function createAuction({ name, tournament, venue, date, organiser }) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
@@ -19,7 +19,7 @@ export async function createAuction({ name, tournament, venue, date, organiser }
     },
     rules: DEFAULT_RULES,
   });
-  await db.set(`secrets/${aid}`, { adminCode, teamCodes: {} });
+  await db.set(`secrets/${aid}`, { adminCode, teamCodes: {}, vcCodes: {} });
   return { aid, adminCode };
 }
 
@@ -41,21 +41,24 @@ export async function claimCoadmin(aid, code, name) {
   }
 }
 
-export async function claimCaptain(aid, team, code, name) {
+// as: 'C' (captain, team code) or 'VC' (vice-captain, vice-captain code).
+export async function claimCaptain(aid, team, code, name, as = 'C') {
+  const wrong = as === 'VC' ? 'Wrong vice-captain code for this team' : 'Wrong captain code for this team';
   if (isLocal) {
-    const s = await db.get(`secrets/${aid}/teamCodes/${team}`);
-    if (s !== code) throw new Error('Wrong captain code for this team');
+    const s = await db.get(`secrets/${aid}/${as === 'VC' ? 'vcCodes' : 'teamCodes'}/${team}`);
+    if (!s || s !== code) throw new Error(wrong);
   }
   try {
-    await db.set(`captains/${aid}/${db.uid()}`, { team, code, name: name || 'Captain', at: db.now() });
+    await db.set(`captains/${aid}/${db.uid()}`, { team, as, code, name: name || (as === 'VC' ? 'Vice-captain' : 'Captain'), at: db.now() });
   } catch {
-    throw new Error('Wrong captain code for this team');
+    throw new Error(wrong);
   }
 }
 
-export async function myCaptainTeam(aid) {
+// { team, as } for this phone, or null.
+export async function myBidderSeat(aid) {
   const c = await db.get(`captains/${aid}/${db.uid()}`).catch(() => null);
-  return c?.team || null;
+  return c?.team ? { team: c.team, as: c.as || 'C' } : null;
 }
 
 export function log(aid, entry) {
@@ -148,7 +151,7 @@ export async function markUnsold(aid, a) {
 }
 
 export async function undoLastSale(aid, a) {
-  const last = Object.entries(a.sales).filter(([, s]) => !s.retained).sort((x, y) => y[1].at - x[1].at)[0];
+  const last = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained).sort((x, y) => y[1].at - x[1].at)[0];
   if (!last) throw new Error('No sale to undo');
   const [pid, s] = last;
   const sales = { ...a.sales };
@@ -161,14 +164,14 @@ export async function undoLastSale(aid, a) {
   await log(aid, { type: 'undo', playerId: pid, team: s.team, amount: s.price });
 }
 
-// Apply retained/pre-assigned players (e.g. captains) and open the auction.
+// Put each team's captain / vice-captain in the team at their price, then open the auction.
 export async function startAuction(aid, a) {
   const sales = { ...a.sales };
   const upd = {};
   for (const [pid, p] of Object.entries(a.players)) {
-    if (p.retainedBy && a.teams[p.retainedBy] && !sales[pid]) {
-      const price = p.retainedPrice ?? a.rules.retainedPriceDefault ?? 0;
-      sales[pid] = { team: p.retainedBy, price: Number(price) || 0, at: db.now(), round: 0, retained: true };
+    if (p.allottedTeam && a.teams[p.allottedTeam] && !sales[pid]) {
+      if (p.allottedAs === 'VC' && a.rules.leaders === 'captain') continue;
+      sales[pid] = { team: p.allottedTeam, price: allottedPrice(p, a.rules), at: db.now(), round: 0, allotted: true };
       upd[`sales/${pid}`] = sales[pid];
     }
   }

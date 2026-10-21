@@ -1,7 +1,8 @@
 import { db, isLocal } from './db.js';
 import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, capsUpdate, basePrice, withDefaults,
-  ROLES, roleId, PICK_ORDERS, BID_MODES, randomCode, slug, isReserve, category,
+  ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
+  leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
@@ -13,12 +14,12 @@ import {
 } from './csv.js';
 import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction } from './ui.js';
 import { teamBadge, badge, startCountdowns } from './ds.js';
-import { cardFor, livePanel, purses, feed } from './views.js';
+import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
 let A = null;
-let secrets = { teamCodes: {} };
+let secrets = { teamCodes: {}, vcCodes: {} };
 let captains = {};
 let coadmins = {};
 let tab = localStorage.getItem('auctionxi:admintab') || 'setup';
@@ -56,7 +57,7 @@ async function boot() {
     history.replaceState(null, '', pageUrl('admin.html', { a: aid }));
   }
 
-  db.on(`secrets/${aid}`, (v) => { secrets = v || { teamCodes: {} }; secrets.teamCodes ||= {}; render(); });
+  db.on(`secrets/${aid}`, (v) => { secrets = v || {}; secrets.teamCodes ||= {}; secrets.vcCodes ||= {}; render(); });
   db.on(`captains/${aid}`, (v) => { captains = v || {}; render(); });
   db.on(`coadmins/${aid}`, (v) => { coadmins = v || {}; render(); });
   db.on(P, (v) => {
@@ -100,7 +101,7 @@ function setup(el) {
       <div class="section-title"><h2>Fill the setup from a questionnaire</h2></div>
       <p>Every tournament is different. Download the questionnaire (it already has this auction's current answers), fill in the
         <b>answer</b> column in Excel or Google Sheets with the organising committee, and upload it. It covers the format, purse,
-        squad and reserves, categories, role minimums, bid increments, bidding mode and house rules.</p>
+        squad size, captain and vice-captain prices, who bids, who sees purses, base price, bid increments, bidding mode and house rules.</p>
       <div class="row">
         <button class="btn-primary" id="q-download">Download setup questionnaire</button>
         <label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)">Upload filled questionnaire<input type="file" accept=".csv,text/csv" id="q-upload" hidden></label>
@@ -125,13 +126,20 @@ function setup(el) {
         <div class="grid grid-2" style="gap:var(--space-3)">
           ${field('Currency', `<input id="r-currency" value="${esc(rules.currency)}">`, '₹ = virtual rupees in L / Cr. Or pts.')}
           ${field('Purse per team', numIn('r-purse', rules.purse), `= ${money(rules.purse, rules)}. You can type 1Cr or 50L.`)}
-          ${field('Minimum squad', numIn('r-min', rules.minSquad), 'Not counting reserves')}
-          ${field('Maximum squad', numIn('r-max', rules.maxSquad), 'Not counting reserves')}
-          ${field('Reserves per team', numIn('r-res', rules.reservesPerTeam), 'Players with pool = reserve')}
-          ${field('Reserve base price', numIn('r-resbase', rules.reserveBasePrice || ''), 'Blank = category base')}
+          ${field('Squad size', numIn('r-squad', rules.squadSize), `Every team must own exactly this many, captain${hasVC(rules) ? ' and VC' : ''} included. ${Math.max(0, rules.squadSize - rules.playersPerSide)} reserve(s) for ${rules.playersPerSide}-a-side.`)}
           ${field('Price cap per player', numIn('r-cap', rules.maxPlayerPrice || ''), 'Blank = no cap')}
-          ${field('Default retained price', numIn('r-retain', rules.retainedPriceDefault || ''), 'When the CSV leaves it blank')}
         </div>
+      </div>
+      <div class="card">
+        <h2>Captain and vice-captain</h2>
+        ${field('Allotted to each team before the auction', `<select id="r-leaders">${Object.entries(LEADERS).map(([k, v]) => `<option value="${k}" ${k === rules.leaders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Mark them in the players list: Allotted to + As C / VC.')}
+        <div class="grid grid-2" style="gap:var(--space-3)">
+          ${field('Captain price', numIn('r-cprice', rules.captainPrice))}
+          ${field('Vice-captain price', numIn('r-vcprice', rules.vcPrice), 'Ignored with captain only')}
+        </div>
+        ${field('Who bids for the team', `<select id="r-bidders">${Object.entries(BIDDERS).map(([k, v]) => `<option value="${k}" ${k === rules.bidders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Vice-captains get their own code under Access and sharing.')}
+        ${field('Who sees remaining purse and max bid', `<select id="r-visibility">${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.purseVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+        <p class="notice notice-info" style="margin:var(--space-4) 0 0">${esc(maxBidExplainer(rules).rule)}<br>${esc(maxBidExplainer(rules).example)}</p>
       </div>
       <div class="card wide">
         <h2>Categories and base prices</h2>
@@ -160,7 +168,7 @@ function setup(el) {
           ${field('Timer after each bid (seconds)', numIn('r-timer', rules.bidTimer), '0 = off')}
           ${field('Unsold re-auction rounds', numIn('r-rounds', rules.unsoldRounds))}
         </div>
-        ${field('Order players come up', `<select id="r-order">${Object.entries(PICK_ORDERS).map(([k, v]) => `<option value="${k}" ${k === rules.pickOrder ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Reserve players always come up last.')}
+        ${field('Order players come up', `<select id="r-order">${Object.entries(PICK_ORDERS).map(([k, v]) => `<option value="${k}" ${k === rules.pickOrder ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Allotted captains and vice-captains are never auctioned.')}
       </div>
       <div class="card">
         <h2>House rules</h2>
@@ -211,12 +219,13 @@ async function saveSetup() {
     ...A.rules,
     currency: $('#r-currency').value.trim() || '₹',
     purse: n('#r-purse'),
-    minSquad: n('#r-min'),
-    maxSquad: n('#r-max') || 1,
-    reservesPerTeam: n('#r-res'),
-    reserveBasePrice: n('#r-resbase'),
+    squadSize: n('#r-squad') || 1,
     maxPlayerPrice: n('#r-cap'),
-    retainedPriceDefault: n('#r-retain'),
+    leaders: $('#r-leaders').value,
+    captainPrice: n('#r-cprice'),
+    vcPrice: n('#r-vcprice'),
+    bidders: $('#r-bidders').value,
+    purseVisibility: $('#r-visibility').value,
     playersPerSide: n('#r-side') || null,
     overs: n('#r-overs') || null,
     bidTimer: n('#r-timer'),
@@ -231,7 +240,7 @@ async function saveSetup() {
       return { key: t.dataset.house, q: t.dataset.house.startsWith('hr_other') ? '' : q[1], a: t.value.trim() };
     }),
   };
-  if (rules.minSquad > rules.maxSquad) throw new Error('Minimum squad cannot be larger than the maximum');
+  if (rules.playersPerSide && rules.squadSize < rules.playersPerSide) throw new Error('Squad size cannot be smaller than players per side');
   await saveRules({
     ...A.meta,
     name: $('#s-name').value.trim() || A.meta.name,
@@ -245,7 +254,7 @@ async function saveSetup() {
 }
 
 async function saveRules(meta, rules) {
-  delete rules.captainBidding;
+  for (const k of ['captainBidding', 'reservesPerTeam', 'reserveBasePrice', 'retainedPriceDefault', 'minSquad', 'maxSquad']) delete rules[k];
   await db.update(P, {
     'meta/name': meta.name || A.meta.name,
     'meta/tournament': meta.tournament || null,
@@ -270,7 +279,7 @@ function teams(el) {
         <button class="btn-sm btn-primary" id="t-add">Add team</button>
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Owner</th><th>Captain</th><th>Players</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Owner</th><th>Captain / VC</th><th>Players</th><th></th></tr></thead>
         <tbody>${entries.map(([id, t]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
@@ -278,12 +287,12 @@ function teams(el) {
             <td><input data-f="short" value="${esc(t.short || '')}" maxlength="4" style="width:70px;min-width:70px"></td>
             <td><input data-f="color" type="color" value="${esc(t.color || '#888888')}"></td>
             <td><input data-f="owner" value="${esc(t.owner || '')}"></td>
-            <td><input data-f="captain" value="${esc(t.captain || '')}"></td>
+            <td>${(() => { const l = leadersOf(A, id); return [l.C && `C ${esc(l.C.name)}`, hasVC(A.rules) && l.VC && `VC ${esc(l.VC.name)}`].filter(Boolean).join('<br>') || '<span class="muted">Set in Players</span>'; })()}</td>
             <td>${teamSummary(A, id).count}</td>
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
           </tr>`).join('') || '<tr><td colspan="8" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
-      <span class="hint">Three-letter codes appear on the stage and phones. Each team gets a secret captain code under Access and sharing.</span>
+      <span class="hint">Three-letter codes appear on the stage and phones. Captains and vice-captains are set in the Players tab. Each team gets secret codes under Access and sharing.</span>
     </div>`;
 
   $('#t-template').onclick = () => download('teams_template.csv', teamTemplate());
@@ -328,6 +337,7 @@ async function addTeams(map) {
   for (const [id, t] of Object.entries(map)) {
     upd[`teams/${id}`] = t;
     if (!secrets.teamCodes[id]) codes[`teamCodes/${id}`] = randomCode(6);
+    if (!secrets.vcCodes[id]) codes[`vcCodes/${id}`] = randomCode(6);
   }
   await db.update(P, upd);
   if (Object.keys(codes).length) await db.update(`secrets/${aid}`, codes);
@@ -341,11 +351,11 @@ function players(el) {
   const list = Object.entries(A.players).sort(([x], [y]) => x.localeCompare(y, undefined, { numeric: true }));
   const catOpts = (v) => A.rules.categories.map((c) => `<option value="${esc(c.id)}" ${c.id === v ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
   const roleOpts = (v) => Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === roleId(v) ? 'selected' : ''}>${r.code} · ${r.name}</option>`).join('');
-  const poolOpts = (v) => `<option value="main" ${v !== 'reserve' ? 'selected' : ''}>Main</option><option value="reserve" ${v === 'reserve' ? 'selected' : ''}>Reserve</option>`;
+  const asOpts = (v) => `<option value="">—</option><option value="C" ${v === 'C' ? 'selected' : ''}>Captain</option>${hasVC(A.rules) || v === 'VC' ? `<option value="VC" ${v === 'VC' ? 'selected' : ''}>Vice-captain</option>` : ''}`;
   const teamOpts = (v) => `<option value="">—</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}" ${id === v ? 'selected' : ''}>${esc(t.short || t.name)}</option>`).join('')}`;
   const dis = locked ? 'disabled' : '';
-  const reserves = list.filter(([, p]) => isReserve(p)).length;
-  const counts = [...A.rules.categories.map((c) => `${c.label} ${list.filter(([, p]) => p.category === c.id && !isReserve(p)).length}`), reserves ? `Reserve ${reserves}` : ''].filter(Boolean).join(' · ');
+  const allotted = list.filter(([, p]) => isAllotted(p)).length;
+  const counts = [`${list.length - allotted} to auction`, `${allotted} captains / vice-captains allotted`].join(' · ');
 
   el.innerHTML = `
     ${locked
@@ -363,24 +373,23 @@ function players(el) {
           <button class="btn-sm btn-primary" id="p-lock">Lock player list</button>`}
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Category</th><th>Pool</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Retained by</th><th>Ret. price</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Category</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
         <tbody>${list.map(([id, p]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
             <td><input data-f="name" value="${esc(p.name)}" ${dis} style="min-width:150px"></td>
             <td><select data-f="role" ${dis}>${roleOpts(p.role)}</select></td>
             <td><select data-f="category" ${dis}>${catOpts(p.category)}</select></td>
-            <td><select data-f="pool" ${dis}>${poolOpts(p.pool)}</select></td>
             <td><input data-f="basePrice" inputmode="numeric" value="${p.basePrice ?? ''}" placeholder="${esc(money(basePrice(p, A.rules), A.rules))}" ${dis} style="width:100px"></td>
             <td><input data-f="locality" value="${esc(p.locality || '')}" ${dis}></td>
             <td><input data-f="photoUrl" value="${esc(p.photoUrl || '')}" ${dis}></td>
-            <td><select data-f="retainedBy" ${dis}>${teamOpts(p.retainedBy)}</select></td>
-            <td><input data-f="retainedPrice" inputmode="numeric" value="${p.retainedPrice ?? ''}" ${dis} style="width:90px"></td>
+            <td><select data-f="allottedTeam" ${dis}>${teamOpts(p.allottedTeam)}</select></td>
+            <td><select data-f="allottedAs" ${dis}>${asOpts(p.allottedAs)}</select>${isAllotted(p) ? `<span class="hint">${esc(money(allottedPrice(p, A.rules), A.rules))}</span>` : ''}</td>
             <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
-          </tr>`).join('') || '<tr><td colspan="11" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
+          </tr>`).join('') || '<tr><td colspan="10" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
-      <span class="hint">Base blank = category base. Pool "Reserve" = auctioned after everyone else, into each team's reserve slots.
-        "Retained by" puts a player (for example the captain) in a team at the retained price when the auction starts.
+      <span class="hint">Base blank = category base. "Allotted to" + "As" make a player that team's captain or vice-captain:
+        they join the team at the captain / vice-captain price when the auction starts and are never auctioned.
         To change many players, export, edit in a spreadsheet and upload again.</span>
     </div>`;
 
@@ -399,7 +408,7 @@ function players(el) {
   $('#p-add').onclick = run(async () => {
     let i = list.length + 1;
     while (A.players['P' + String(i).padStart(3, '0')]) i++;
-    await db.set(`${P}/players/P${String(i).padStart(3, '0')}`, { name: 'New player', role: 'ar', category: A.rules.categories.at(-1).id, pool: 'main' });
+    await db.set(`${P}/players/P${String(i).padStart(3, '0')}`, { name: 'New player', role: 'ar', category: A.rules.categories.at(-1).id });
   });
   $('#p-upload').onchange = run(async (e) => {
     const file = e.target.files[0];
@@ -410,7 +419,7 @@ function players(el) {
   });
   $('#p-sample').onclick = run(async () => {
     const [st, pt, tt] = await Promise.all(['sample_tournament_setup', 'sample_players', 'sample_teams'].map((f) => fetch(`templates/${f}.csv`).then((r) => r.text())));
-    if (!confirm('Load the sample tournament setup, 4 teams and 52 players (8 of them reserves)?')) return;
+    if (!confirm('Load the sample tournament setup (8-a-side, squads of 10), 4 teams and 44 players with captains and vice-captains?')) return;
     const s = importSetup(parseCSV(st), A.meta, A.rules);
     await saveRules({ ...A.meta, name: A.meta.name }, s.rules);
     A = normalize(await db.get(P));
@@ -422,11 +431,25 @@ function players(el) {
     const f = e.target.dataset.f;
     if (!tr || !f) return;
     let v = e.target.value.trim();
-    if (['basePrice', 'retainedPrice'].includes(f)) {
+    if (f === 'basePrice') {
       if (v !== '' && num(v) == null) throw new Error(`"${v}" is not an amount. Try 500000 or 5L.`);
       v = v === '' ? null : num(v);
     }
     if (f === 'name' && !v) throw new Error('Name is required');
+    if (f === 'allottedTeam' && v) {
+      const as = A.players[tr.dataset.id].allottedAs || (leadersOf(A, v).C ? 'VC' : 'C');
+      const taken = leadersOf(A, v)[as];
+      if (taken && taken.id !== tr.dataset.id) throw new Error(`${A.teams[v].name} already has a ${leaderLabel(as).toLowerCase()}: ${taken.name}`);
+      await db.update(`${P}/players/${tr.dataset.id}`, { allottedTeam: v, allottedAs: as });
+      return;
+    }
+    if (f === 'allottedTeam' && !v) { await db.update(`${P}/players/${tr.dataset.id}`, { allottedTeam: null, allottedAs: null }); return; }
+    if (f === 'allottedAs' && v) {
+      const team = A.players[tr.dataset.id].allottedTeam;
+      if (!team) throw new Error('Choose the team first');
+      const taken = leadersOf(A, team)[v];
+      if (taken && taken.id !== tr.dataset.id) throw new Error(`${A.teams[team].name} already has a ${leaderLabel(v).toLowerCase()}: ${taken.name}`);
+    }
     await db.set(`${P}/players/${tr.dataset.id}/${f}`, v === '' ? null : v);
   });
   el.onclick = run(async (e) => {
@@ -478,14 +501,18 @@ function access(el) {
         <ul>${Object.entries(coadmins).map(([uid, c]) => `<li>${esc(c.name)} <button class="btn-sm btn-ghost" data-kick-admin="${esc(uid)}">Remove</button></li>`).join('') || '<li class="muted">None</li>'}</ul>
       </div>
       <div class="card" style="grid-column:1/-1">
-        <h2>Captain codes</h2>
-        <p>Send each captain only their own code. They open the join link, choose Captain and their team, and enter the code.</p>
-        <div class="table-wrap"><table class="grid-table"><thead><tr><th>Team</th><th>Code</th><th>Signed in</th><th></th></tr></thead><tbody>
+        <h2>${vcCanBid(A.rules) ? 'Captain and vice-captain codes' : 'Captain codes'}</h2>
+        <p>Send each person only their own code. They open the join link, choose ${vcCanBid(A.rules) ? 'Captain or Vice-captain' : 'Captain'} and their team, and enter the code.
+          With a code they bid and see ${A.rules.purseVisibility === 'own' ? 'their own team\'s' : 'the'} remaining purse and max bid.</p>
+        <div class="table-wrap"><table class="grid-table"><thead><tr><th>Team</th><th>Captain code</th>${vcCanBid(A.rules) ? '<th>Vice-captain code</th>' : ''}<th>Signed in</th><th></th></tr></thead><tbody>
         ${Object.entries(A.teams).map(([id, t]) => `
-          <tr><td>${teamBadge(t, { showName: true })}</td><td><span class="secret">${esc(secrets.teamCodes[id] || '—')}</span></td>
-          <td>${caps.filter(([, c]) => c.team === id).map(([uid, c]) => `${esc(c.name)} <button class="btn-sm btn-ghost" data-kick="${esc(uid)}">Sign out</button>`).join('<br>') || '<span class="muted">Not yet</span>'}</td>
-          <td class="row"><button class="btn-sm" data-copy="${esc(id)}">Copy WhatsApp message</button>
-              <button class="btn-sm btn-ghost" data-regen="${esc(id)}">New code</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Add teams first.</td></tr>'}
+          <tr><td>${teamBadge(t, { showName: true })}</td>
+          <td><span class="secret">${esc(secrets.teamCodes[id] || '—')}</span></td>
+          ${vcCanBid(A.rules) ? `<td><span class="secret">${esc(secrets.vcCodes[id] || '—')}</span></td>` : ''}
+          <td>${caps.filter(([, c]) => c.team === id).map(([uid, c]) => `${c.as === 'VC' ? 'VC' : 'C'} · ${esc(c.name)} <button class="btn-sm btn-ghost" data-kick="${esc(uid)}">Sign out</button>`).join('<br>') || '<span class="muted">Not yet</span>'}</td>
+          <td class="row"><button class="btn-sm" data-copy="${esc(id)}" data-as="C">Copy captain message</button>
+              ${vcCanBid(A.rules) ? `<button class="btn-sm" data-copy="${esc(id)}" data-as="VC">Copy VC message</button>` : ''}
+              <button class="btn-sm btn-ghost" data-regen="${esc(id)}">New codes</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">Add teams first.</td></tr>'}
         </tbody></table></div>
         ${isLocal ? '<p class="notice notice-warn" style="margin-top:var(--space-3)">Demo mode: only tabs in this browser can join. Connect Firebase (docs/SETUP.md) so phones can join.</p>' : ''}
       </div>
@@ -498,11 +525,13 @@ function access(el) {
     if (d.kickAdmin) await db.set(`coadmins/${aid}/${d.kickAdmin}`, null);
     if (d.regen) {
       if (!confirm('Make a new code? The old code stops working and this team\'s signed-in phones are signed out.')) return;
-      await db.set(`secrets/${aid}/teamCodes/${d.regen}`, randomCode(6));
+      await db.update(`secrets/${aid}`, { [`teamCodes/${d.regen}`]: randomCode(6), [`vcCodes/${d.regen}`]: randomCode(6) });
       for (const [uid, c] of caps) if (c.team === d.regen) await db.set(`captains/${aid}/${uid}`, null);
     }
     if (d.copy) {
-      const msg = `${A.meta.name}\nYou are the captain of ${A.teams[d.copy].name}.\n1. Open ${joinUrl}\n2. Choose Captain and team ${A.teams[d.copy].name}\n3. Enter code ${secrets.teamCodes[d.copy]}\nKeep this code private.`;
+      const vc = d.as === 'VC';
+      const who = vc ? 'vice-captain' : 'captain';
+      const msg = `${A.meta.name}\nYou are the ${who} of ${A.teams[d.copy].name}.\n1. Open ${joinUrl}\n2. Choose ${vc ? 'Vice-captain' : 'Captain'} and team ${A.teams[d.copy].name}\n3. Enter code ${(vc ? secrets.vcCodes : secrets.teamCodes)[d.copy]}\nKeep this code private.`;
       await navigator.clipboard.writeText(msg);
       toast('Copied. Paste it in WhatsApp.', 'ok');
     }
@@ -531,7 +560,7 @@ function control(el) {
       <button class="btn-primary btn-lg" id="c-next" ${bidding || !remaining.length || rules.pickOrder === 'manual' || meta.status !== 'live' ? 'disabled' : ''}>Next player <kbd>N</kbd></button>
       <select id="c-pick" style="width:auto;max-width:280px" ${bidding || meta.status !== 'live' ? 'disabled' : ''}>
         <option value="">Pick a player…</option>
-        ${remaining.map((p) => `<option value="${esc(p.id)}">${esc(p.id)} · ${esc(p.name)} (${esc(category(rules, p.category)?.label || p.category)}${isReserve(p) ? ', reserve' : ''})</option>`).join('')}
+        ${remaining.map((p) => `<option value="${esc(p.id)}">${esc(p.id)} · ${esc(p.name)} (${esc(category(rules, p.category)?.label || p.category)})</option>`).join('')}
       </select>
       <span class="spacer"></span>
       <span class="muted">Bid mode</span>
@@ -568,14 +597,14 @@ function control(el) {
         <button class="btn-sold" id="r-sell" ${bidding ? '' : 'disabled'}>Record sale</button>
       </div>
       <div class="row" style="margin-top:var(--space-4)">
-        <small>Round ${round} · ${remaining.length} players left this round · ${Object.values(A.sales).filter((s) => !s.retained).length} sold · ${unsoldNow.length} unsold</small>
+        <small>Round ${round} · ${remaining.length} players left this round · ${Object.values(A.sales).filter((s) => !s.allotted && !s.retained).length} sold · ${unsoldNow.length} unsold</small>
         <span class="spacer"></span>
         ${canNewRound ? `<button class="btn-sm btn-primary" id="c-round">Start round ${round + 1}: re-auction ${unsoldNow.length} unsold</button>` : ''}
         ${meta.status === 'live' ? '<button class="btn-sm btn-danger" id="c-finish">End auction</button>' : ''}
       </div>
     </div>
     <div class="grid grid-2" style="margin-top:var(--space-4)">
-      <div class="card"><h2>Purses</h2><div class="stack">${purses(A)}</div></div>
+      <div class="card"><h2>Purses</h2><div class="stack">${purses(A, { viewer: { role: 'admin' } })}</div></div>
       <div class="card"><h2>Activity</h2>${feed(A)}</div>
     </div>`;
 
@@ -587,8 +616,8 @@ function control(el) {
   $('#c-undo').onclick = run(async () => { if (confirm('Reverse the most recent sale? The player goes back to the pool.')) await undoLastSale(aid, A); });
   $('#c-round') && ($('#c-round').onclick = run(() => nextRound(aid, A)));
   $('#c-finish') && ($('#c-finish').onclick = run(async () => {
-    const short = teamIds.filter((id) => teamSummary(A, id).count < rules.minSquad);
-    const warn = short.length ? `\n\n${short.length} team(s) are below the minimum squad.` : '';
+    const short = teamIds.filter((id) => teamSummary(A, id).count < rules.squadSize);
+    const warn = short.length ? `\n\n${short.length} team(s) have fewer than ${rules.squadSize} players.` : '';
     if (confirm(`End the auction?${warn}`)) await finishAuction(aid);
   }));
   $$('[data-bid]', el).forEach((b) => (b.onclick = run(() => placeBid(aid, A, b.dataset.bid, 'room'))));
@@ -604,24 +633,30 @@ function control(el) {
 
 function controlStart(el) {
   const { meta, rules } = A;
-  const teamN = Object.keys(A.teams).length;
-  const main = Object.values(A.players).filter((p) => !isReserve(p)).length;
+  const teamIds = Object.keys(A.teams);
+  const teamN = teamIds.length;
+  const toAuction = Object.values(A.players).filter((p) => !isAllotted(p)).length;
+  const perTeam = rules.squadSize - (hasVC(rules) ? 2 : 1);
+  const missing = teamIds.filter((id) => { const l = leadersOf(A, id); return !l.C || (hasVC(rules) && !l.VC); });
+  const leaderCost = Number(rules.captainPrice) + (hasVC(rules) ? Number(rules.vcPrice) : 0);
   const check = (ok, text) => `<li style="margin:var(--space-2) 0">${badge(ok ? 'sold' : 'upcoming', { text: ok ? 'Done' : 'To do' })} ${text}</li>`;
   el.innerHTML = `
-    <div class="card" style="max-width:720px">
+    <div class="card" style="max-width:760px">
       <h2>Ready to start?</h2>
       <ul style="list-style:none;padding:0">
         ${check(teamN >= 2, `At least 2 teams (${teamN})`)}
-        ${check(main > 0, `Players uploaded (${main} main, ${Object.keys(A.players).length - main} reserve)`)}
-        ${check(main >= teamN * rules.minSquad, `Enough main players for every team's minimum squad (${teamN} × ${rules.minSquad} = ${teamN * rules.minSquad})`)}
+        ${check(!missing.length && teamN > 0, missing.length ? `${hasVC(rules) ? 'Captain and vice-captain' : 'Captain'} missing for ${missing.map((id) => esc(A.teams[id].name)).join(', ')} (set them in Players)` : `Every team has its ${hasVC(rules) ? 'captain and vice-captain' : 'captain'}`)}
+        ${check(toAuction >= teamN * perTeam, `Enough players to auction for every team to reach ${rules.squadSize} (${teamN} × ${perTeam} = ${teamN * perTeam}; you have ${toAuction})`)}
+        ${check(leaderCost + perTeam * Math.min(...rules.categories.map((c) => Number(c.base) || 0)) <= rules.purse, `Purse covers the ${hasVC(rules) ? 'captain and vice-captain' : 'captain'} plus ${perTeam} players at base price`)}
         ${check(meta.locked, 'Player list locked')}
-        ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Captains signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
+        ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>
-      <p>Starting locks the player list, puts retained players in their teams, and opens bidding.</p>
-      <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && main ? '' : 'disabled'}>Start auction</button>
+      <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team at ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, and opens bidding.</p>
+      <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && toAuction ? '' : 'disabled'}>Start auction</button>
     </div>`;
   $('#c-start').onclick = run(async () => {
-    if (!confirm('Start the auction now?')) return;
+    if (missing.length && !confirm(`${missing.length} team(s) have no ${hasVC(rules) ? 'captain or vice-captain' : 'captain'} set. Start anyway?`)) return;
+    if (!missing.length && !confirm('Start the auction now?')) return;
     await startAuction(aid, A);
   });
 }
@@ -649,7 +684,7 @@ function onKey(e) {
 /* ---------------- 6. Results ---------------- */
 
 function results(el) {
-  const sold = Object.values(A.sales).filter((s) => !s.retained).length;
+  const sold = Object.values(A.sales).filter((s) => !s.allotted && !s.retained).length;
   el.innerHTML = `
     <div class="grid grid-2">
       <div class="card">
@@ -673,13 +708,13 @@ function results(el) {
   $('#r-csv').onclick = () => {
     const rows = Object.entries(A.sales).map(([pid, s]) => {
       const p = A.players[pid] || {};
-      return [A.teams[s.team]?.name || s.team, pid, p.name, ROLES[roleId(p.role)].name, p.category, isReserve(p) ? 'reserve' : 'main', s.price, s.retained ? 'retained' : `round ${s.round} (${s.source || 'phone'})`];
-    }).sort((x, y) => String(x[0]).localeCompare(y[0]) || y[6] - x[6]);
-    const unsold = Object.keys(A.players).filter((pid) => !A.sales[pid]).map((pid) => {
+      return [A.teams[s.team]?.name || s.team, pid, p.name, ROLES[roleId(p.role)].name, p.category, s.price, s.allotted || s.retained ? leaderLabel(p.allottedAs) : `round ${s.round} (${s.source || 'phone'})`];
+    }).sort((x, y) => String(x[0]).localeCompare(y[0]) || y[5] - x[5]);
+    const unsold = Object.keys(A.players).filter((pid) => !A.sales[pid] && !isAllotted(A.players[pid])).map((pid) => {
       const p = A.players[pid];
-      return ['UNSOLD', pid, p.name, ROLES[roleId(p.role)].name, p.category, isReserve(p) ? 'reserve' : 'main', '', ''];
+      return ['UNSOLD', pid, p.name, ROLES[roleId(p.role)].name, p.category, '', ''];
     });
-    download(`${aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'category', 'pool', 'price', 'how'], [...rows, ...unsold]));
+    download(`${aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'category', 'price', 'how'], [...rows, ...unsold]));
   };
   $('#r-json').onclick = () => download(`${slug(A.meta.name) || aid}.auction.json`, JSON.stringify(exportSnapshot(A), null, 2), 'application/json');
 }

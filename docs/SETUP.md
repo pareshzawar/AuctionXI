@@ -67,8 +67,8 @@ Each person who forks AuctionXI puts their **own** Firebase config in their fork
 |---|---|---|
 | Owner | Device/Google account that created the auction | Everything |
 | Co-admin | Admin code | Everything except removing other co-admins |
-| Captain | Team code (6 characters) | Place bids for their own team only, within purse, only while bidding is open and the bid mode is not "Room only"; never above their max bid or the per-player cap |
-| Team member / audience / big screen | Nothing | Read only |
+| Captain / vice-captain | Their own code (6 characters; vice-captains only when the tournament lets them bid) | See their team's remaining purse and max bid, and place bids for their own team only, within purse, only while bidding is open and the bid mode is not "Room only"; never above their max bid or the per-player cap |
+| Team member / audience / big screen | Nothing | Read only: the auction, squads and rules, but not remaining purses (unless the tournament shows them to everyone) |
 
 Secret codes are stored in a separate `secrets/` area that only admins can read.
 

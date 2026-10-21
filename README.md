@@ -13,15 +13,17 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 
 | | |
 |---|---|
-| 🧑‍⚖️ **Roles** | Admin (creator), co-admin/auctioneer (admin code), captain/owner (secret team code), team member, audience, stage screen |
-| 📋 **Setup questionnaire** | One CSV covers each tournament's format, purse, squad, reserves, categories, role minimums, increments, bid mode **and house rules**. Fill it in, upload it, and reuse it next season |
+| 🧑‍⚖️ **Roles** | Admin (creator), co-admin/auctioneer (admin code), captain and vice-captain (each with a secret code), team member, audience, stage screen |
+| 📋 **Setup questionnaire** | One CSV covers each tournament's format, squad size, purse, captain/VC prices, who bids, who sees purses, base price, increments, bid mode **and house rules**. Fill it in, upload it, and reuse it next season |
 | 📄 **Player & team templates** | Fill them in Excel or Google Sheets, upload. Amounts can be written `5L`, `1Cr`, `5,00,000` |
 | ✏️ **Edit everything** | Inline editing, add/delete, or bulk-edit by export → spreadsheet → re-upload |
 | 🔒 **Lock per auction** | Lock the player list for an auction. Every new auction gets its own fresh upload |
-| 🪑 **Reserve players** | `pool = reserve` players are auctioned last into each team's reserve slots |
-| 🛡️ **House rules enforced** | Purse kept for the minimum squad, category min/max (e.g. at least 1 junior, max 2 icons), role minimums (e.g. 1 WK), per-player price cap. Also checked by the database rules |
+| 🧢 **Captain & vice-captain** | Allotted to their team before the auction at fixed prices (e.g. ₹200 / ₹150) from the purse. Captain-only tournaments too. Choose whether only the captain or both can bid |
+| 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
+| 🙈 **Private purses** | Remaining purse and max bid are shown only to each team's captain/VC and the admins (or all bidders, or everyone, as you choose) |
+| 🛡️ **House rules** | Shown to everyone on a Rules tab. Number rules are enforced: role minimums (e.g. 1 WK), category min/max, per-player price cap. The database rules check them too |
 | 📱 **Phones, paddles or both** | Captains get one big **BID** button. If they struggle, switch to *Room only*: the auctioneer records paddle bids, or just enters the winning team and final amount |
-| 💰 **Virtual ₹** | Shown the IPL way: ₹10 L, ₹1.25 Cr (or points) |
+| 💰 **Virtual ₹** | ₹50, ₹1,000, or IPL-style ₹10 L / ₹1.25 Cr (or points) |
 | 📺 **Stage screen** | Fixed 1920×1080 projector layout with lot counter, purses, ticker and SOLD stamp |
 | 🔁 **Rounds, undo** | Re-auction unsold players, undo last bid, reverse last sale, keyboard shortcuts |
 | 📦 **Permanent archive** | Export results as JSON into `archive/`. GitHub Pages serves them permanently |
@@ -55,8 +57,8 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 1. **Create** an auction on the home page. Save the **admin code** shown under *Access & sharing*.
 2. **Setup and rules:** upload your filled **setup questionnaire** (or use the form). See **[docs/RULES.md](docs/RULES.md)** for house rules and presets.
 3. **Teams:** add them or upload `templates/teams_template.csv`.
-4. **Players:** download the template, fill it in (mark reserves with `pool = reserve`), upload, review, **Lock**.
-5. **Access & sharing:** share the QR code or join link. Send each captain *only* their own code (there's a "Copy message" button for WhatsApp).
+4. **Players:** download the template, fill it in (mark each team's captain and vice-captain with `allotted_team` + `allotted_as`), upload, review, **Lock**.
+5. **Access and sharing:** share the QR code or join link. Send each captain (and vice-captain) *only* their own code; there are "Copy message" buttons for WhatsApp.
 6. **Control room:** Start → Next player → bids come in → Mark sold / Unsold. Open the **stage screen** on the projector. If phones don't work out, switch to *Room only* and enter paddle results.
 7. **Results:** download the CSV/JSON and archive it (see below).
 
@@ -68,9 +70,9 @@ All in [`templates/`](templates), also downloadable from the home page and admin
 
 | File | What it's for |
 |---|---|
-| `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, purse, squad and reserves, categories (base price, min/max per team), role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
-| `sample_tournament_setup.csv` | A filled example (society league with juniors, reserves and house rules) |
-| `teams_template.csv` | `id, name, short_name, color, owner, captain, logo_url` |
+| `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, players per side and squad size, purse, captain/VC prices, who bids, who sees purses, base price, role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
+| `sample_tournament_setup.csv` | A filled example: 8-a-side, squads of 10, purse ₹1,000, C ₹200, VC ₹150, base ₹50, house rules |
+| `teams_template.csv` | `id, name, short_name, color, owner, logo_url` |
 | `players_template.csv` | One row per player (columns below) |
 | `sample_*.csv` | Demo data used by *Load sample data* |
 
@@ -82,11 +84,10 @@ Players columns:
 | `name` | **yes** | |
 | `role` | no | `Batter`, `Bowler`, `All-rounder`, `Wicket-keeper` (also accepts `bat`, `bowl`, `ar`, `wk`) |
 | `category` | no | Category ID or name from your setup (`A` / `Icon`, …). Defaults to the last category |
-| `pool` | no | `main` (default) or `reserve` |
 | `base_price` | no | Overrides the category base price |
 | `batting_style`, `bowling_style`, `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link") |
-| `retained_by`, `retained_price` | no | Team ID and price. The player joins that team when the auction starts |
+| `allotted_team`, `allotted_as` | no | For each team's captain and vice-captain: the team ID and `C` or `VC`. They join that team at the captain / vice-captain price when the auction starts and are never auctioned |
 
 > ⚠️ Auction data is publicly readable by anyone with the auction code. **Do not put phone numbers or other private data in the CSV.**
 
