@@ -2,82 +2,112 @@
 
 Every tournament runs differently, so every auction carries its own rules. You set them in one of two ways:
 
-1. **The setup questionnaire (recommended).** Download `templates/tournament_setup_template.csv` (or, from Admin → Setup, a copy pre-filled with that auction's current answers). Fill in the **answer** column with your committee in Excel or Google Sheets, then upload it under Admin → Setup → *Upload filled questionnaire*. [`templates/sample_tournament_setup.csv`](../templates/sample_tournament_setup.csv) is a fully filled example.
+1. **The setup questionnaire (recommended).** Download `templates/tournament_setup_template.csv`, or from Admin → Setup a copy pre-filled with that auction's current answers. Fill in the **answer** column with your committee in Excel or Google Sheets, then upload it under Admin → Setup → *Upload filled questionnaire*. [`templates/sample_tournament_setup.csv`](../templates/sample_tournament_setup.csv) is a fully filled example.
 2. **The Setup form** in the admin console, which has the same fields.
 
 Keep the filled questionnaire. Next season, upload it again and change only what's different.
 
-Amounts can be written however people type them: `500000`, `5,00,000`, `5L`, `5 lakh`, `1Cr`, `1.5Cr`, `50k`.
+Amounts can be written however people type them: `50`, `200`, `5,00,000`, `5L`, `1Cr`, `50k`.
 
-## What the questionnaire asks
+## The core model
 
-| Section | Keys | Notes |
+| Setting | Example | Meaning |
 |---|---|---|
-| Tournament | `auction_name`, `tournament_name`, `venue`, `date`, `organiser`, `players_per_side`, `overs` | Shown on every screen |
-| Money | `currency`, `purse_per_team`, `max_price_per_player` | `₹` shows virtual rupees as ₹5 L / ₹1.2 Cr; `pts` for points. Leave the cap blank for no cap |
-| Squad | `min_squad`, `max_squad`, `reserves_per_team`, `reserve_base_price`, `retained_price_default` | Squad sizes do **not** count reserves |
-| Categories (up to 6) | `category_N_id`, `_name`, `_base_price`, `_min_per_team`, `_max_per_team` | Category order = the order players come up |
-| Roles | `min_batters`, `min_bowlers`, `min_allrounders`, `min_wicketkeepers` | Blank = no rule |
-| Bid increments (up to 4) | `increment_N_below`, `increment_N_raise_by` | Leave `below` blank on the last slab for "and above" |
-| Bidding | `bid_mode` (`phones` / `room`), `bid_timer_seconds`, `pick_order`, `unsold_rounds` | See bidding modes below |
-| House rules | `hr_eligibility`, `hr_captains`, `hr_special_players`, `hr_locality`, `hr_reserves`, `hr_unsold_end`, `hr_absent`, `hr_trades`, `hr_conduct`, `hr_disputes`, `hr_other_1..3` | Free text, shown to everyone under **Rules** on the live page |
+| `players_per_side` | 8 | Players in a match |
+| `squad_size` | 10 | Players every team **must own** by the end, captain and vice-captain included. The extra 2 are the reserves |
+| `purse_per_team` | ₹1,000 | Virtual money each team starts with |
+| `leaders` | `captain_vc` | Who is allotted to each team before the auction: `captain` only, or `captain_vc` (captain and vice-captain) |
+| `captain_price`, `vc_price` | ₹200, ₹150 | Their prices, taken from the purse when the auction starts. They are never auctioned |
+| `bidders` | `captain_vc` | Who bids for the team: only the `captain`, or `captain_vc` (both, each with their own code) |
+| `purse_visibility` | `own` | Who sees remaining purse and max bid (below) |
+| Base price | ₹50 | Starting price of every auctioned player (one category). Add more categories if some players start higher |
 
-## House rules: what the app enforces and what people check
+In the players CSV, mark each team's captain and vice-captain with `allotted_team` (the team ID) and `allotted_as` (`C` or `VC`). Everyone else is auctioned.
 
-Each group has its own house rules. The questionnaire asks the common questions; your answers appear on every phone under **Rules** and on the results page. Where a rule can be expressed as a number, the app **enforces** it:
+## Max bid
 
-| House rule | How to make the app enforce it |
+A team must always be able to fill its squad, so:
+
+```
+max bid = purse left − (players still to buy − 1) × base price
+          and never more than the purse left
+```
+
+**Example** (8-a-side, squad of 10, purse ₹1,000, base ₹50):
+
+- Captain ₹200 + vice-captain ₹150 are allotted → ₹1,000 − ₹350 = **₹650 left**, **8 players to buy**
+- First max bid = ₹650 − 7 × ₹50 = **₹300** (₹350 is kept back for the other 7 players)
+- If the team buys a player for ₹300: ₹350 left, 7 to buy → max bid = ₹350 − 6 × ₹50 = ₹50
+- For the last player, the max bid is the whole purse left
+
+Each captain's phone shows **Purse left** and **Max bid** for their team, updated after every sale. The **BID** button stops at the max bid and says why, e.g. *"Over your max bid of ₹300. Keep ₹350 for 7 more players."* Optional house rules (category limits, role minimums, price cap) can lower it further, as below.
+
+## Who sees the remaining purse and max bid
+
+| `purse_visibility` | Captains / vice-captains | Team members, audience, stage screen | Admins |
+|---|---|---|---|
+| `own` (default) | Their own team only | Nobody's: they see squad counts ("6/10 · 4 still to buy") | Every team |
+| `bidders` | Every team | Nobody's | Every team |
+| `everyone` | Every team | Every team | Every team |
+
+Everyone always sees the player on the block, the current bid and who is leading, as they would in the hall.
+
+> The app hides purses on screen. Sale prices are announced in the hall and stay on the activity feed, though, so a determined person could still add them up.
+
+## Rules for everyone to see
+
+The **Rules** tab on every phone, the results page, and the stage screen before the start show the tournament rules:
+
+- format and squad size
+- purse, captain/VC prices and base price
+- the max-bid formula with a worked example from your numbers
+- increments and timer
+- who bids, and who sees purses
+- your house-rule answers
+
+Phones open on the Rules tab until the auction starts.
+
+## House rules
+
+Each group has its own house rules. The questionnaire asks the common questions (eligibility, how captains are chosen, required players, same-wing limits, how reserves are used, unsold players, dropouts, trades, conduct, disputes, plus three free rules). Your answers are shown to everyone under **Rules**.
+
+Where a rule can be expressed as a number, the app **enforces** it:
+
+| House rule | Setting |
 |---|---|
-| "At least 1 junior / woman / senior per team" | Make a category for them (e.g. `J`, Junior) with `min_per_team` = 1 |
-| "At most 2 icon players per team" | Icon category `max_per_team` = 2 |
-| "Every team needs a wicket-keeper" | `min_wicketkeepers` = 1 |
-| "Nobody goes for more than ₹40 L" | `max_price_per_player` = 40L |
-| "Captains are retained by their team" | `retained_by` (team ID) in the players CSV; price from `retained_price` or `retained_price_default` |
-| "2 reserve players per team" | `reserves_per_team` = 2, and `pool` = `reserve` for those players in the players CSV |
+| "Every team needs a wicket-keeper" | `min_wicketkeepers` = 1 (also batters, bowlers, all-rounders) |
+| "At least 1 junior / woman / senior per team" | A category for them (e.g. `J`, Junior) with `min_per_team` = 1 |
+| "At most 2 icon players per team" | Icon category with `max_per_team` = 2 |
+| "Nobody goes for more than ₹400" | `max_price_per_player` = 400 |
 
 Rules like "max 4 players from the same wing", "no trades" or "unsold players go by lottery" are written in the house-rule answers and checked by the auctioneer.
 
-When a rule blocks a bid, the captain's button says why, for example *"Over your max bid of ₹30 L. Keep ₹10 L for 5 more players."* or *"Keep your last slots for 1 WK."*
+## The rest of the questionnaire
 
-## How the max bid works
-
-A team must always be able to complete its squad, so:
-
-```
-max bid = purse left − money needed for the players it must still buy
-```
-
-"Players it must still buy" uses the minimum squad, category minimums (at their base price) and role minimums. With a price cap, the max bid is never above the cap.
-
-Example: purse ₹1 Cr, min squad 11, lowest base ₹1 L. A team has 6 players and ₹30 L left. It needs 4 more after this one, so ₹4 L is kept back and its **max bid is ₹26 L**.
-
-## Reserve players
-
-- Mark them `pool` = `reserve` in the players CSV (or in the Players tab).
-- They are auctioned **after all main players**, at `reserve_base_price` (or their category base).
-- Each team can buy up to `reserves_per_team`. Reserves don't count towards min/max squad, but their price comes out of the same purse.
-- Squads show them separately, marked *Reserve*.
+| Section | Keys |
+|---|---|
+| Tournament | `auction_name`, `tournament_name`, `venue`, `date`, `organiser`, `players_per_side`, `overs` |
+| Money | `currency` (`₹` virtual rupees, or `pts`), `purse_per_team`, `max_price_per_player` |
+| Categories (up to 6) | `category_N_id`, `_name`, `_base_price`, `_min_per_team`, `_max_per_team`. One category is enough when everyone starts at the same base price |
+| Bid increments (up to 4) | `increment_N_below`, `increment_N_raise_by`; leave `below` blank on the last slab for "and above" |
+| Bidding | `bid_mode` (`phones` / `room`), `bid_timer_seconds`, `pick_order`, `unsold_rounds` |
 
 ## Bidding modes
 
 | Mode | What happens |
 |---|---|
-| **Phones + room** (`phones`) | Captains tap **BID** on their phones. The auctioneer can also record a room bid for any team (keys 1–8), or skip the bidding and enter just the final amount |
-| **Room only** (`room`) | Captains raise paddles. Their phones show the auction but can't bid. The auctioneer either records each bid (keys 1–8) or enters the **winning team and final amount** in *Paddle auction* and presses *Record sale* |
+| **Phones + room** (`phones`) | Captains (and vice-captains, if allowed) tap **BID**. The auctioneer can also record a bid for any team (keys 1–8), or enter just the final amount |
+| **Room only** (`room`) | Paddles in the hall. Phones show the auction but can't bid. The auctioneer records each bid, or enters the **winning team and final amount** under *Paddle auction* |
 
-You can switch modes at any moment from the control room. A common plan: start with phones, and if captains struggle, switch to **Room only** and enter final amounts.
+You can switch at any moment in the control room. A common plan: start with phones, and if captains struggle, switch to Room only and enter the final amounts.
 
-## Recommended presets (virtual ₹)
+## Presets
 
-**Friends or family (4 teams, 8-a-side, about 40 players)**
-purse ₹50 L · squad 8 to 10 · reserves 0 · Icon ₹5 L (max 1) / Regular ₹1 L · +₹25,000 below ₹10 L, +₹50,000 above · timer 20 s
+**Friends or family, 6-a-side, squads of 8:** purse ₹500 · C ₹100, VC ₹75 · base ₹25 · +₹5 below ₹100, +₹10 above · timer 20 s
 
-**Society league (6 to 8 teams, 11-a-side, 80 to 120 players)**
-purse ₹1 Cr · squad 11 to 13 · 2 reserves at ₹50,000 · Icon ₹10 L (max 2) / Gold ₹5 L / Silver ₹2 L / Junior ₹1 L (min 1) · at least 1 WK · cap ₹40 L · +₹50,000 below ₹20 L, +₹1 L below ₹50 L, +₹2 L above · timer 30 s · 1 unsold round
-*(this is the filled sample questionnaire)*
+**Society league, 8-a-side, squads of 10** *(the filled sample)*: purse ₹1,000 · C ₹200, VC ₹150 · base ₹50 · at least 1 WK · +₹10 below ₹200, +₹25 above · timer 30 s
 
-**Box cricket (6-a-side)**
-purse ₹30 L · squad 6 to 8 · two categories · timer 15 s
+**11-a-side, squads of 14, captain only:** purse ₹1 Cr · C ₹10 L · base ₹1 L · +₹50,000 below ₹10 L, +₹1 L above · timer 30 s
 
 ## Auctioneer controls
 

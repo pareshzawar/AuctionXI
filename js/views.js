@@ -2,12 +2,12 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, isReserve, roleId, ROLES, pool } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY } from './engine.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
   const s = a.sales[pid];
-  if (s) return s.retained ? 'retained' : 'sold';
+  if (s) return s.allotted || s.retained ? 'retained' : 'sold';
   if (a.live?.playerId === pid && a.live.status === 'bidding') return 'live';
   if (a.unsold[pid]) return 'unsold';
   return 'upcoming';
@@ -15,8 +15,8 @@ export function playerStatus(a, pid) {
 
 // "Lot n of m": players brought up so far, counting the current one.
 export function lotInfo(a) {
-  const total = Object.values(a.players).length;
-  const done = Object.values(a.sales).filter((s) => !s.retained).length + Object.keys(a.unsold).filter((pid) => !a.sales[pid]).length;
+  const total = Object.values(a.players).filter((p) => !p.allottedTeam).length;
+  const done = Object.values(a.sales).filter((s) => !s.allotted && !s.retained).length + Object.keys(a.unsold).filter((pid) => !a.sales[pid]).length;
   const live = a.live?.status === 'bidding' ? 1 : 0;
   return { lot: done + live, total };
 }
@@ -33,7 +33,7 @@ export function cardFor(a, pid, variant = 'tile') {
     rules: a.rules,
     base: basePrice(p, a.rules),
     category: cat ? { label: cat.label, featured: a.rules.categories[0]?.id === cat.id } : null,
-    reserve: isReserve(p),
+    leaderLabel: p.allottedTeam ? leaderLabel(p.allottedAs) : null,
     currentBid: status === 'live' && a.live.bid?.team ? a.live.bid.amount : null,
     soldTo: sale ? a.teams[sale.team] : null,
     soldPrice: sale ? sale.price : null,
@@ -59,14 +59,15 @@ export function livePanel(a, size = '') {
   });
 }
 
-export function purses(a, { mine = null, size = '' } = {}) {
+// viewer: { role, team } - decides whose remaining purse and max bid are shown.
+export function purses(a, { viewer = null, size = '' } = {}) {
   const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
   return Object.entries(a.teams).map(([id, t]) =>
-    teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === mine })).join('');
+    teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === viewer?.team, hidePurse: !canSeePurse(a.rules, viewer, id) })).join('');
 }
 
 export function tickerItems(a, limit = 12) {
-  const sales = Object.entries(a.sales).filter(([, s]) => !s.retained)
+  const sales = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained)
     .map(([pid, s]) => ({ at: s.at, player: a.players[pid]?.name || pid, team: a.teams[s.team], price: s.price }));
   const unsold = Object.entries(a.unsold).filter(([pid]) => !a.sales[pid])
     .map(([pid, u]) => ({ at: u.at, player: a.players[pid]?.name || pid, result: 'unsold' }));
@@ -100,24 +101,25 @@ export function feed(a, limit = 30) {
 }
 
 export function squadRows(a, teamId) {
-  return teamSummary(a, teamId).players.sort((x, y) => Number(x.reserve) - Number(y.reserve) || y.price - x.price).map((p) => ({
+  return teamSummary(a, teamId).players.sort((x, y) => Number(y.allotted) - Number(x.allotted) || y.price - x.price).map((p) => ({
     id: p.id,
     name: p.name,
-    sub: [p.reserve ? 'Reserve' : null, p.retained ? 'Retained' : null, p.battingStyle, p.bowlingStyle].filter(Boolean).join(' · '),
+    sub: [p.allotted ? leaderLabel(p.as) : null, p.battingStyle, p.bowlingStyle].filter(Boolean).join(' · '),
     role: p.role,
     category: category(a.rules, p.category)?.label,
-    status: p.retained ? 'retained' : 'sold',
+    status: p.allotted ? 'retained' : 'sold',
     price: p.price,
   }));
 }
 
-export function squads(a, { mine = null } = {}) {
+export function squads(a, { viewer = null } = {}) {
   const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
+  const mine = viewer?.team;
   // The viewer's own team first.
   const ids = Object.keys(a.teams).sort((x, y) => (y === mine) - (x === mine));
   return `<div class="grid grid-2">${ids.map((id) => `
     <div class="stack">
-      ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading })}
+      ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading, hidePurse: !canSeePurse(a.rules, viewer, id) })}
       ${playerTable(squadRows(a, id), a.rules, { dense: true, columns: ['player', 'role', 'price'] })}
     </div>`).join('')}</div>`;
 }
@@ -126,7 +128,7 @@ export function poolTable(a) {
   const rows = pool(a).map((p) => ({
     id: p.id,
     name: p.name,
-    sub: [isReserve(p) ? 'Reserve' : null, p.age ? `Age ${p.age}` : null, p.locality].filter(Boolean).join(' · '),
+    sub: [p.age ? `Age ${p.age}` : null, p.locality].filter(Boolean).join(' · '),
     role: p.role,
     category: category(a.rules, p.category)?.label,
     base: basePrice(p, a.rules),
@@ -135,21 +137,43 @@ export function poolTable(a) {
   return playerTable(rows, a.rules, { dense: true, columns: ['player', 'role', 'category', 'base', 'status'] });
 }
 
+// The max-bid rule in words, with a worked example from this tournament's numbers.
+export function maxBidExplainer(r) {
+  const base = minBase(r);
+  const leaders = Number(r.captainPrice || 0) + (hasVC(r) ? Number(r.vcPrice || 0) : 0);
+  const left = Number(r.purse) - leaders;
+  const toBuy = Number(r.squadSize) - (hasVC(r) ? 2 : 1);
+  const max = Math.max(0, Math.min(left, left - (toBuy - 1) * base));
+  return {
+    rule: `Max bid = purse left − (players still to buy − 1) × base price ${money(base, r)}, and never more than the purse left.`,
+    example: `Example at the start: ${money(r.purse, r)} − ${hasVC(r) ? `captain ${money(r.captainPrice, r)} − vice-captain ${money(r.vcPrice, r)}` : `captain ${money(r.captainPrice, r)}`} = ${money(left, r)} left with ${toBuy} players to buy, so the first max bid is ${money(left, r)} − ${toBuy - 1} × ${money(base, r)} = ${money(max, r)}.`,
+  };
+}
+
 export function rulesSummary(a) {
   const r = a.rules;
+  const res = reserves(r);
+  const mb = maxBidExplainer(r);
   const items = [
+    ['Format', `${r.playersPerSide}-a-side${r.overs ? `, ${r.overs} overs` : ''}`],
+    ['Squad', `Every team must own exactly ${r.squadSize} players${res ? ` (${r.playersPerSide} playing + ${res} reserve${res === 1 ? '' : 's'})` : ''}, ${hasVC(r) ? 'captain and vice-captain' : 'captain'} included`],
     ['Purse per team', money(r.purse, r)],
-    ['Squad', `${r.minSquad} to ${r.maxSquad} players${Number(r.reservesPerTeam) ? `, plus up to ${r.reservesPerTeam} reserves` : ''}`],
-    ['Categories', r.categories.map((c) => `${c.label} ${money(c.base, r)}${Number(c.min) ? `, min ${c.min}` : ''}${Number(c.max) ? `, max ${c.max}` : ''}`).join(' · ')],
+    [hasVC(r) ? 'Captain and vice-captain' : 'Captain', hasVC(r)
+      ? `Allotted to their team before the auction: captain ${money(r.captainPrice, r)}, vice-captain ${money(r.vcPrice, r)}, taken from the purse`
+      : `Allotted to their team before the auction for ${money(r.captainPrice, r)}, taken from the purse`],
+    ['Who bids', vcCanBid(r) ? 'The captain and the vice-captain, each from their own phone' : 'The captain'],
+    ['Base price', r.categories.map((c) => `${r.categories.length > 1 ? `${c.label} ` : ''}${money(c.base, r)}${Number(c.min) ? `, at least ${c.min} per team` : ''}${Number(c.max) ? `, at most ${c.max} per team` : ''}`).join(' · ')],
+    ['Max bid', `${mb.rule} ${mb.example}`],
     ...(Object.entries(r.roleMin).some(([, n]) => Number(n)) ? [['Each team needs', Object.entries(r.roleMin).filter(([, n]) => Number(n)).map(([k, n]) => `${n} ${ROLES[roleId(k)].code}`).join(', ')]] : []),
     ['Bid increments', r.increments.map((s) => (Number(s.upto) ? `+${money(s.step, r)} below ${money(s.upto, r)}` : `+${money(s.step, r)} above`)).join(' · ')],
     ...(Number(r.maxPlayerPrice) ? [['Price cap per player', money(r.maxPlayerPrice, r)]] : []),
-    ['Bidding', r.bidMode === 'room' ? 'Room paddles; the auctioneer records bids' : 'Captains bid from their phones; the auctioneer confirms every sale'],
+    ['Bidding', r.bidMode === 'room' ? 'Room paddles; the auctioneer records bids' : 'From phones; the auctioneer confirms every sale'],
     ['Timer', Number(r.bidTimer) ? `${r.bidTimer} seconds after each bid` : 'Off'],
+    ['Remaining purse and max bid shown to', PURSE_VISIBILITY[r.purseVisibility]],
   ];
   const house = r.houseRules.filter((h) => h.a);
   return `<div class="grid grid-2">
-    <div class="card"><h2>Auction rules</h2><dl class="rules-list">${items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+    <div class="card"><h2>Tournament rules</h2><dl class="rules-list">${items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
     <div class="card"><h2>House rules</h2>${house.length
       ? `<dl class="rules-list">${house.map((h) => (h.q ? `<dt>${esc(h.q)}</dt><dd>${esc(h.a)}</dd>` : `<dt>${esc(h.a)}</dt>`)).join('')}</dl>`
       : '<p class="muted">The organisers have not added house rules.</p>'}</div>

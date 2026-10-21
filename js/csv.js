@@ -1,25 +1,28 @@
 // CSV parsing / writing, the player + team templates, and the tournament setup
 // questionnaire (rules + house rules as a fill-in CSV).
 
-import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS } from './engine.js';
+import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILITY } from './engine.js';
 
+// allotted_team + allotted_as (C or VC): the captain / vice-captain given to a team before
+// the auction, at the captain / vice-captain price from the setup. Everyone else is auctioned.
 export const PLAYER_COLUMNS = [
-  'id', 'name', 'role', 'category', 'pool', 'base_price', 'batting_style', 'bowling_style', 'age',
-  'locality', 'photo_url', 'matches', 'runs', 'wickets', 'notes', 'retained_by', 'retained_price',
+  'id', 'name', 'role', 'category', 'base_price', 'batting_style', 'bowling_style', 'age',
+  'locality', 'photo_url', 'matches', 'runs', 'wickets', 'notes', 'allotted_team', 'allotted_as',
 ];
 
-export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'owner', 'captain', 'logo_url'];
+export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'owner', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
-  ['P001', 'Rohan Patil', 'All-rounder', 'A', 'main', '', 'Right-hand bat', 'Right-arm medium', '28', 'Wing A - 302', '', '12', '340', '9', 'Opening bat', '', ''],
-  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', 'main', '600000', 'Left-hand bat', '', '34', 'Wing C - 105', '', '8', '150', '0', '', '', ''],
-  ['P003', 'Vikram Rao', 'Bowler', 'C', 'main', '', 'Right-hand bat', 'Left-arm spin', '22', 'Wing B - 410', '', '', '', '', 'Captain of Tigers', 'T1', '0'],
-  ['P004', 'Nikhil Joshi', 'Batter', 'D', 'reserve', '', 'Right-hand bat', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
+  ['P001', 'Vikram Rao', 'All-rounder', 'P', '', 'Right-hand bat', 'Left-arm spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
+  ['P002', 'Amit Shah', 'Wicket-keeper', 'P', '', 'Left-hand bat', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
+  ['P003', 'Sanjay Mehta', 'Batter', 'P', '', 'Right-hand bat', '', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
+  ['P004', 'Rohan Patil', 'Bowler', 'P', '', 'Right-hand bat', 'Right-arm medium', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
+  ['P005', 'Nikhil Joshi', 'Batter', 'P', '', 'Right-hand bat', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
 ];
 
 const TEAM_EXAMPLE = [
-  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Mr. Kulkarni', 'Vikram Rao', ''],
-  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Mrs. Desai', 'Sanjay Mehta', ''],
+  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Mr. Kulkarni', ''],
+  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Mrs. Desai', ''],
 ];
 
 // Design-system default team colours (team-1 … team-8, night theme).
@@ -81,7 +84,7 @@ export function importPlayers(rows, rules, existingIds = []) {
   const catIds = (rules.categories || []).map((c) => c.id);
   const used = new Set(existingIds);
   let n = existingIds.length;
-  let reserves = 0;
+  const leaders = {};
   rows.forEach((r, i) => {
     const line = i + 2;
     if (!r.name) { warnings.push(`Row ${line}: skipped (no name)`); return; }
@@ -98,16 +101,24 @@ export function importPlayers(rows, rules, existingIds = []) {
       if (cat) warnings.push(`Row ${line}: unknown category "${cat}" for ${r.name}, set to ${catIds.at(-1)}`);
       cat = catIds.at(-1) || '';
     }
-    const pool = /^res/i.test(r.pool || '') ? 'reserve' : 'main';
-    if (pool === 'reserve') reserves++;
-    for (const f of ['base_price', 'retained_price']) {
-      if (r[f] && num(r[f]) == null) warnings.push(`Row ${line}: ${f} "${r[f]}" is not a number, ignored`);
+    if (r.base_price && num(r.base_price) == null) warnings.push(`Row ${line}: base_price "${r.base_price}" is not a number, ignored`);
+    // Older templates used retained_by / retained_price.
+    const team = (r.allotted_team || r.retained_by || '').trim() || null;
+    let as = String(r.allotted_as || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+    as = as.startsWith('V') ? 'VC' : as.startsWith('C') ? 'C' : as ? 'X' : '';
+    if (as === 'X') { warnings.push(`Row ${line}: allotted_as "${r.allotted_as}" should be C or VC`); as = ''; }
+    if (as && !team) { warnings.push(`Row ${line}: ${r.name} is ${as} but has no allotted_team`); as = ''; }
+    if (team && !as) as = 'C' in (leaders[team] || {}) ? 'VC' : 'C';
+    if (team) {
+      leaders[team] ||= {};
+      if (leaders[team][as]) warnings.push(`Row ${line}: team ${team} already has a ${as === 'C' ? 'captain' : 'vice-captain'} (${leaders[team][as]})`);
+      leaders[team][as] = r.name;
+      if (as === 'VC' && rules.leaders === 'captain') warnings.push(`Row ${line}: ${r.name} is vice-captain, but this tournament has captains only`);
     }
     players[id] = {
       name: r.name,
       role: roleId(r.role),
       category: cat,
-      pool,
       basePrice: num(r.base_price),
       battingStyle: r.batting_style || null,
       bowlingStyle: r.bowling_style || null,
@@ -118,13 +129,11 @@ export function importPlayers(rows, rules, existingIds = []) {
       runs: num(r.runs),
       wickets: num(r.wickets),
       notes: r.notes || null,
-      retainedBy: r.retained_by || null,
-      retainedPrice: num(r.retained_price),
+      allottedTeam: team,
+      allottedAs: team ? as : null,
+      allottedPrice: team && r.retained_price ? num(r.retained_price) : null,
     };
   });
-  if (reserves && !Number(rules.reservesPerTeam)) {
-    warnings.push(`${reserves} reserve players found but "Reserves per team" is 0 - set it in Setup or teams cannot buy them`);
-  }
   return { players, warnings };
 }
 
@@ -140,7 +149,6 @@ export function importTeams(rows) {
       short: (r.short_name || r.name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(),
       color: /^#[0-9a-f]{3,8}$/i.test(r.color) ? r.color : TEAM_COLORS[Object.keys(teams).length % TEAM_COLORS.length],
       owner: r.owner || null,
-      captain: r.captain || null,
       logoUrl: r.logo_url || null,
     };
   });
@@ -149,8 +157,8 @@ export function importTeams(rows) {
 
 export function playersToCSV(players) {
   return toCSV(PLAYER_COLUMNS, Object.entries(players).map(([id, p]) => [
-    id, p.name, ROLES[roleId(p.role)].name, p.category, p.pool || 'main', p.basePrice, p.battingStyle, p.bowlingStyle,
-    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.notes, p.retainedBy, p.retainedPrice,
+    id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice, p.battingStyle, p.bowlingStyle,
+    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.notes, p.allottedTeam, p.allottedAs,
   ]));
 }
 
@@ -164,12 +172,12 @@ const MAX_INCREMENTS = 4;
 // on the live page; where the app can enforce a rule, the help text says which setting does it.
 export const HOUSE_RULE_QUESTIONS = [
   ['hr_eligibility', 'Who can register to play?', 'e.g. Residents of the society only, age 16+, max 2 guest players per team'],
-  ['hr_captains', 'How are captains / owners chosen, and do they cost purse?', 'e.g. Captains chosen by committee, retained at ₹0. Set retained_by in the players CSV'],
+  ['hr_captains', 'How are captains and vice-captains chosen?', 'e.g. Chosen by the sports committee. Their prices are set above; mark them in the players CSV (allotted_team, allotted_as)'],
   ['hr_special_players', 'Any players every team must have?', 'e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a category min_per_team'],
   ['hr_locality', 'Any limit on players from the same wing / tower / family?', 'e.g. Max 4 players from the same wing per team (checked by the auctioneer)'],
-  ['hr_reserves', 'When and how are reserve players used?', 'e.g. Reserves play only if a squad player is absent; must be informed 1 day before'],
+  ['hr_reserves', 'How are the reserve players (squad beyond the playing side) used?', 'e.g. Any squad player may play; the playing 8 is told to the umpire before the toss'],
   ['hr_unsold_end', 'What happens to players still unsold at the end?', 'e.g. Lottery to teams short of players, at base price'],
-  ['hr_absent', 'What if a bought player drops out before the tournament?', 'e.g. Team picks a replacement from the unsold/reserve list at base price'],
+  ['hr_absent', 'What if a bought player drops out before the tournament?', 'e.g. The team picks a replacement from the unsold players at base price'],
   ['hr_trades', 'Are trades between teams allowed after the auction?', 'e.g. No trades'],
   ['hr_conduct', 'Bidding conduct', 'e.g. Bids only via the app or paddle; no bids after the hammer; no proxy bidding'],
   ['hr_disputes', 'Who settles disputes during the auction?', "e.g. The auctioneer's decision is final"],
@@ -203,25 +211,31 @@ function setupFields() {
   number('Tournament', 'players_per_side', 'Players per side in a match', 'e.g. 11, 8 or 6 (box cricket)', 'playersPerSide');
   number('Tournament', 'overs', 'Overs per innings', 'Information only', 'overs');
 
-  f.push(['Money', 'currency', 'Currency', '₹ for virtual rupees (shown as ₹5 L, ₹1.2 Cr), or pts for points', (m, r) => r.currency, (m, r, v) => { r.currency = v || '₹'; }]);
-  number('Money', 'purse_per_team', 'Purse per team', 'Amounts can be written 10000000, 1Cr, 100L or 1,00,00,000', 'purse', { required: true });
-  number('Money', 'max_price_per_player', 'Highest price allowed for one player (blank = no cap)', 'e.g. 30L', 'maxPlayerPrice');
+  f.push(['Money', 'currency', 'Currency', '₹ for virtual rupees (₹50, ₹5 L, ₹1.2 Cr), or pts for points', (m, r) => r.currency, (m, r, v) => { r.currency = v || '₹'; }]);
+  number('Money', 'purse_per_team', 'Purse per team', 'e.g. 1000. Amounts can also be written 1L, 1Cr or 1,00,000', 'purse', { required: true });
+  number('Money', 'max_price_per_player', 'Highest price allowed for one player (blank = no cap)', 'e.g. 400', 'maxPlayerPrice');
 
-  number('Squad', 'min_squad', 'Minimum players each team must buy (not counting reserves)', 'Usually players per side, e.g. 11. Retained players count', 'minSquad', { required: true });
-  number('Squad', 'max_squad', 'Maximum players per team (not counting reserves)', 'e.g. 13-15', 'maxSquad', { required: true });
-  number('Squad', 'reserves_per_team', 'Reserve players each team may buy (0 = none)', 'Reserve players are marked pool=reserve in the players CSV and are auctioned after everyone else', 'reservesPerTeam');
-  number('Squad', 'reserve_base_price', 'Base price for reserve players (blank = their category base)', 'e.g. 50000', 'reserveBasePrice');
-  number('Squad', 'retained_price_default', 'Price charged for a retained player when the CSV leaves retained_price blank', 'e.g. 0, or 10L', 'retainedPriceDefault');
+  number('Squad', 'players_per_side', 'Players per side in a match', 'e.g. 8, 11, or 6 for box cricket', 'playersPerSide', { required: true });
+  number('Squad', 'squad_size', 'Players each team must own in total, captain and vice-captain included', 'e.g. 10 for an 8-a-side tournament with 2 reserves. Every team must reach exactly this number', 'squadSize', { required: true });
+
+  f.push(['Captain and vice-captain', 'leaders', 'Allotted to each team before the auction (captain / captain_vc)', 'captain = only a captain; captain_vc = a captain and a vice-captain. Mark them in the players CSV',
+    (m, r) => r.leaders, (m, r, v, warn) => { if (/^c(apt(ain)?)?$/i.test(v)) r.leaders = 'captain'; else if (/v/i.test(v)) r.leaders = 'captain_vc'; else if (v) warn(`leaders: "${v}" should be captain or captain_vc`); }]);
+  number('Captain and vice-captain', 'captain_price', 'Captain price (taken from the purse)', 'e.g. 200', 'captainPrice');
+  number('Captain and vice-captain', 'vc_price', 'Vice-captain price (taken from the purse)', 'e.g. 150. Ignored with captain only', 'vcPrice');
+  f.push(['Captain and vice-captain', 'bidders', 'Who bids for the team (captain / captain_vc)', 'captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code',
+    (m, r) => r.bidders, (m, r, v, warn) => { if (/^c(apt(ain)?)?$/i.test(v)) r.bidders = 'captain'; else if (/v/i.test(v)) r.bidders = 'captain_vc'; else if (v) warn(`bidders: "${v}" should be captain or captain_vc`); }]);
+  f.push(['Captain and vice-captain', 'purse_visibility', `Who sees remaining purse and max bid (${Object.keys(PURSE_VISIBILITY).join(' / ')})`, 'own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all',
+    (m, r) => r.purseVisibility, (m, r, v, warn) => { if (PURSE_VISIBILITY[v]) r.purseVisibility = v; else if (v) warn(`purse_visibility: "${v}" not recognised, kept ${r.purseVisibility}`); }]);
 
   for (let i = 1; i <= MAX_CATEGORIES; i++) {
     const c = (r) => r.categories[i - 1] || {};
     const ensure = (r) => (r.categories[i - 1] ||= { id: '', label: '', base: 0, min: 0, max: 0 });
     const ex = DEFAULT_RULES.categories[i - 1];
-    f.push(['Categories', `category_${i}_id`, `Category ${i}: short ID used in the players CSV`, i === 1 ? 'e.g. A. Leave the whole category blank if not needed. Categories come up in this order' : ex ? `e.g. ${ex.id}` : '',
+    f.push(['Categories', `category_${i}_id`, `Category ${i}: short ID used in the players CSV`, i === 1 ? 'e.g. P. One category is enough when every player has the same base price. Categories come up in this order' : 'Optional, e.g. A for icon players',
       (m, r) => c(r).id ?? '', (m, r, v) => { if (v) ensure(r).id = v.replace(/[.#$/[\]\s]/g, ''); }]);
-    f.push(['Categories', `category_${i}_name`, `Category ${i}: name`, ex ? `e.g. ${ex.label}` : 'e.g. Juniors',
+    f.push(['Categories', `category_${i}_name`, `Category ${i}: name`, ex ? `e.g. ${ex.label}` : 'e.g. Icon, Junior',
       (m, r) => c(r).label ?? '', (m, r, v) => { if (v) ensure(r).label = v; }]);
-    f.push(['Categories', `category_${i}_base_price`, `Category ${i}: base (starting) price`, ex ? `e.g. ${ex.base / 1e5}L` : 'e.g. 50000',
+    f.push(['Categories', `category_${i}_base_price`, `Category ${i}: base (starting) price`, ex ? `e.g. ${ex.base}` : 'e.g. 100',
       (m, r) => c(r).base ?? '', (m, r, v, warn) => { if (v) { const n = num(v); if (n == null) warn(`category_${i}_base_price: "${v}" is not a number`); else ensure(r).base = n; } }]);
     f.push(['Categories', `category_${i}_min_per_team`, `Category ${i}: each team must buy at least (blank = no rule)`, 'e.g. 1 junior per team', (m, r) => c(r).min || '',
       (m, r, v) => { if (v) ensure(r).min = num(v) || 0; }]);
@@ -237,9 +251,9 @@ function setupFields() {
   for (let i = 1; i <= MAX_INCREMENTS; i++) {
     const s = (r) => r.increments[i - 1] || {};
     const ensure = (r) => (r.increments[i - 1] ||= { upto: 0, step: 0 });
-    f.push(['Bid increments', `increment_${i}_below`, `Slab ${i}: while the bid is below`, i === 1 ? 'e.g. 20L. Leave blank on the last slab to mean "and above"' : '',
+    f.push(['Bid increments', `increment_${i}_below`, `Slab ${i}: while the bid is below`, i === 1 ? 'e.g. 200. Leave blank on the last slab to mean "and above"' : '',
       (m, r) => s(r).upto || '', (m, r, v) => { if (v || s(r).step) ensure(r).upto = num(v) || 0; }]);
-    f.push(['Bid increments', `increment_${i}_raise_by`, `Slab ${i}: raise each bid by`, i === 1 ? 'e.g. 50000' : '',
+    f.push(['Bid increments', `increment_${i}_raise_by`, `Slab ${i}: raise each bid by`, i === 1 ? 'e.g. 10' : '',
       (m, r) => s(r).step || '', (m, r, v) => { if (v) ensure(r).step = num(v) || 0; }]);
   }
 
@@ -288,9 +302,13 @@ export function importSetup(rows, meta, rules) {
   if (!r.categories.length) { warn('No categories given - kept the defaults'); r.categories = withDefaults(rules).categories; }
   r.increments = r.increments.filter((s) => s && s.step > 0).sort((x, y) => (x.upto || Infinity) - (y.upto || Infinity));
   if (!r.increments.length) { warn('No bid increments given - kept the defaults'); r.increments = withDefaults(rules).increments; }
-  if (r.minSquad > r.maxSquad) warn(`min_squad (${r.minSquad}) is larger than max_squad (${r.maxSquad})`);
+  if (Number(r.playersPerSide) > Number(r.squadSize)) warn(`squad_size (${r.squadSize}) is smaller than players_per_side (${r.playersPerSide})`);
   const catMin = r.categories.reduce((t, c) => t + (Number(c.min) || 0), 0);
   const roleMin = Object.values(r.roleMin).reduce((t, n) => t + (Number(n) || 0), 0);
-  if (Math.max(catMin, roleMin) > r.maxSquad) warn('Category or role minimums add up to more than max_squad');
-  return { meta: m, rules: r, warnings };
+  if (Math.max(catMin, roleMin) > r.squadSize) warn('Category or role minimums add up to more than squad_size');
+  const leaders = Number(r.captainPrice || 0) + (r.leaders === 'captain_vc' ? Number(r.vcPrice || 0) : 0);
+  const need = (Number(r.squadSize) - (r.leaders === 'captain_vc' ? 2 : 1)) * Math.min(...r.categories.map((c) => Number(c.base) || 0));
+  if (leaders + need > Number(r.purse)) warn(`The purse (${r.purse}) cannot cover the captain/VC prices (${leaders}) plus the rest of the squad at base price (${need})`);
+  delete r.reservesPerTeam; delete r.reserveBasePrice; delete r.retainedPriceDefault;
+  return { meta: m, rules: withDefaults(r), warnings };
 }

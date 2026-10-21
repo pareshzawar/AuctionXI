@@ -2,6 +2,7 @@ import { db, isLocal } from './db.js';
 import { createAuction, claimCaptain, claimCoadmin, isAdmin } from './actions.js';
 import { $, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
+import { vcCanBid, withDefaults } from './engine.js';
 
 mountHeader();
 
@@ -33,15 +34,16 @@ async function renderArchive() {
 
 function updateJoinFields() {
   const role = $('#join-role').value;
-  $('#join-team-wrap').classList.toggle('hidden', !['captain', 'member'].includes(role));
-  $('#join-code-wrap').classList.toggle('hidden', !['captain', 'admin'].includes(role));
-  $('#join-name-wrap').classList.toggle('hidden', !['captain', 'admin'].includes(role));
-  $('#join-code-label').textContent = role === 'admin' ? 'Admin code (from the person who created the auction)' : 'Captain code for this team (from the organiser)';
+  $('#join-team-wrap').classList.toggle('hidden', !['captain', 'vc', 'member'].includes(role));
+  $('#join-code-wrap').classList.toggle('hidden', !['captain', 'vc', 'admin'].includes(role));
+  $('#join-name-wrap').classList.toggle('hidden', !['captain', 'vc', 'admin'].includes(role));
+  $('#join-code-label').textContent = role === 'admin' ? 'Admin code (from the person who created the auction)'
+    : role === 'vc' ? 'Vice-captain code for this team (from the organiser)' : 'Captain code for this team (from the organiser)';
 }
 
 async function find(code) {
   const aid = code.trim().toUpperCase();
-  const [meta, teams] = await Promise.all([db.get(`auctions/${aid}/meta`), db.get(`auctions/${aid}/teams`)]);
+  const [meta, teams, rules] = await Promise.all([db.get(`auctions/${aid}/meta`), db.get(`auctions/${aid}/teams`), db.get(`auctions/${aid}/rules`)]);
   if (!meta) { toast('No auction with that code. Check it with the organiser.', 'error'); return; }
   found = { aid, meta, teams: teams || {} };
   $('#join-code').value = aid;
@@ -49,6 +51,9 @@ async function find(code) {
   $('#join-status').innerHTML = badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? 'Live' : meta.status === 'completed' ? 'Completed' : 'Not started' });
   $('#join-team').innerHTML = Object.entries(found.teams).map(([id, t]) => `<option value="${esc(id)}">${esc(t.name)}</option>`).join('')
     || '<option value="">(no teams yet)</option>';
+  // Vice-captains get their own option only when this tournament lets them bid.
+  $('#join-role option[value="vc"]').hidden = !vcCanBid(withDefaults(rules));
+  if ($('#join-role').value === 'vc' && $('#join-role option[value="vc"]').hidden) $('#join-role').value = 'audience';
   $('#join-step').classList.remove('hidden');
   updateJoinFields();
 }
@@ -64,16 +69,16 @@ $('#join-go').addEventListener('click', async () => {
   const code = $('#join-secret').value.trim().toUpperCase();
   const person = $('#join-person').value.trim();
   try {
-    if (role === 'captain') {
+    if (role === 'captain' || role === 'vc') {
       if (!team) throw new Error('Choose a team');
-      await claimCaptain(aid, team, code, person);
+      await claimCaptain(aid, team, code, person, role === 'vc' ? 'VC' : 'C');
     }
     if (role === 'admin' && !(await isAdmin(aid, meta))) await claimCoadmin(aid, code, person);
   } catch (e) {
     toast(e.message, 'error');
     return;
   }
-  setSession(aid, { role, team: ['captain', 'member'].includes(role) ? team : null });
+  setSession(aid, { role, team: ['captain', 'vc', 'member'].includes(role) ? team : null });
   rememberAuction(aid, meta.name, role);
   location.href = role === 'admin' ? pageUrl('admin.html', { a: aid }) : pageUrl('live.html', { a: aid, ...(role === 'screen' ? { screen: 1 } : {}) });
 });

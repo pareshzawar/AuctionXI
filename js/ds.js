@@ -18,10 +18,10 @@ export function price(amount, rules, { size = 'md', tone = '', cls = '' } = {}) 
     + '</span>';
 }
 
-const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained', reserve: 'Reserve' };
+const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained' };
 
 export function badge(status, { size = '', text = '' } = {}) {
-  const cls = status === 'reserve' ? 'upcoming' : status;
+  const cls = status;
   return `<span class="${cx('ax-badge', `ax-badge-${cls}`, size === 'lg' && 'ax-badge-lg')}">`
     + (status === 'live' ? '<span class="ax-dot" aria-hidden="true"></span>' : '')
     + esc(text || STATUS[status] || status) + '</span>';
@@ -68,7 +68,7 @@ export function playerStats(p) {
 // opts: { status, category: {label, featured}, lot, base, rules, currentBid, soldTo, soldPrice }
 export function playerCard(p, o) {
   const status = o.status || 'upcoming';
-  const cat = [o.category?.label, o.reserve ? 'Reserve pool' : null, o.lot != null ? `Lot ${o.lot}` : null].filter(Boolean).join(' · ');
+  const cat = [o.category?.label, o.lot != null ? `Lot ${o.lot}` : null].filter(Boolean).join(' · ');
   const catEl = cat ? `<span class="${cx('ax-card-cat', o.category?.featured && 'is-featured')}">${esc(cat)}</span>` : '<span></span>';
   const notes = p.notes ? `<div class="ax-feat"><span>${esc(p.notes)}</span></div>` : '';
 
@@ -86,7 +86,7 @@ export function playerCard(p, o) {
 
   let right = '<span aria-hidden="true"></span>';
   if (o.soldTo && (status === 'sold' || status === 'retained')) {
-    right = `<div class="ax-kv"><span class="ax-k">${status === 'retained' ? 'Retained by' : 'Sold to'}</span>`
+    right = `<div class="ax-kv"><span class="ax-k">${status === 'retained' ? (o.leaderLabel ? `${o.leaderLabel} of` : 'Allotted to') : 'Sold to'}</span>`
       + `<span style="display:inline-flex;gap:var(--space-2);align-items:center">${teamBadge(o.soldTo)}${o.soldPrice != null ? price(o.soldPrice, o.rules, { tone: status === 'sold' ? 'sold' : '' }) : ''}</span></div>`;
   } else if (status === 'live' && o.currentBid != null) {
     right = `<div class="ax-kv"><span class="ax-k">Current bid</span>${price(o.currentBid, o.rules, { tone: 'gold' })}</div>`;
@@ -149,31 +149,42 @@ export function startCountdowns(now) {
   }, 250);
 }
 
-// opts: { summary (teamSummary), rules, variant 'row'|'card', size 'stage', leading, roleMin }
+// opts: { variant 'row'|'card', size 'stage', leading, mine, maxBid, hidePurse }
+// hidePurse: the viewer may not see this team's money; show the squad count only.
 export function teamPurse(team, s, rules, o = {}) {
   const purse = Number(rules.purse) || 0;
   const pct = purse ? Math.min(100, Math.round((s.spent / purse) * 100)) : 0;
   const style = `--team:${esc(team.color || '')}`;
   const meter = `<div class="ax-meter" role="img" aria-label="${pct}% of purse spent"><i style="width:${pct}%"></i></div>`;
-  const reserves = Number(rules.reservesPerTeam) ? ` · ${s.reserveCount}/${rules.reservesPerTeam} reserve` : '';
+  const squad = `${s.count} / ${rules.squadSize} players`;
+  const flag = o.leading ? '<span class="ax-purse-flag">Leading</span>' : '';
+  if (o.hidePurse) {
+    return `<div class="${cx('ax-purse', o.variant === 'card' && 'ax-purse-card', o.size === 'stage' && 'ax-purse-stage', o.leading && 'ax-purse-lead', o.mine && 'is-mine')}" style="${style}">`
+      + `<div class="ax-purse-top">${teamBadge(team, { showName: o.size !== 'stage' })}<span class="ax-purse-count">${s.count}/${rules.squadSize}</span></div>`
+      + `<div class="ax-purse-sub"><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span>${flag}</div></div>`;
+  }
   if (o.variant === 'card') {
     const roleMin = rules.roleMin || {};
+    const anyRoleMin = Object.values(roleMin).some((n) => Number(n));
     return `<section class="${cx('ax-purse', 'ax-purse-card', o.leading && 'ax-purse-lead')}" style="${style}">`
-      + `<div class="ax-purse-top">${teamBadge(team, { showName: true })}${o.leading ? '<span class="ax-purse-flag">Leading</span>' : `<span class="ax-purse-count">${s.count}/${rules.maxSquad}</span>`}</div>`
+      + `<div class="ax-purse-top">${teamBadge(team, { showName: true })}${o.leading ? flag : `<span class="ax-purse-count">${s.count}/${rules.squadSize}</span>`}</div>`
+      + '<div class="row" style="gap:var(--space-5);align-items:flex-end">'
       + `<div class="ax-kv"><span class="ax-k">Purse left</span>${price(s.remaining, rules, { size: 'lg' })}</div>`
+      + `<div class="ax-kv"><span class="ax-k">Max bid</span>${price(o.maxBid ?? s.maxBid, rules, { size: 'lg', tone: 'gold' })}</div>`
+      + '</div>'
       + meter
-      + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>Max bid <b style="color:var(--ink)">${esc(moneyText(o.maxBid ?? s.maxBid, rules))}</b></span></div>`
-      + `<div class="ax-slots">${Object.keys(ROLES).map((k) => {
+      + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span></div>`
+      + (anyRoleMin ? `<div class="ax-slots">${Object.keys(ROLES).filter((k) => Number(roleMin[k])).map((k) => {
         const have = s.byRole[k] || 0;
-        const need = Number(roleMin[k]) || null;
-        return `<span class="${need != null && have >= need ? 'is-met' : ''}">${ROLES[k].code} ${have}${need != null ? '/' + need : ''}</span>`;
-      }).join('')}${Number(rules.reservesPerTeam) ? `<span>RES ${s.reserveCount}/${rules.reservesPerTeam}</span>` : ''}</div>`
+        const need = Number(roleMin[k]);
+        return `<span class="${have >= need ? 'is-met' : ''}">${ROLES[k].code} ${have}/${need}</span>`;
+      }).join('')}</div>` : '')
       + '</section>';
   }
   return `<div class="${cx('ax-purse', o.size === 'stage' && 'ax-purse-stage', o.leading && 'ax-purse-lead', o.mine && 'is-mine')}" style="${style}">`
     + `<div class="ax-purse-top">${teamBadge(team, { showName: o.size !== 'stage' })}${price(s.remaining, rules)}</div>`
     + meter
-    + `<div class="ax-purse-sub"><span>${s.count} / ${rules.maxSquad} players${reserves}</span>${o.leading ? '<span class="ax-purse-flag">Leading</span>' : `<span>Max ${esc(moneyText(s.maxBid, rules))}</span>`}</div>`
+    + `<div class="ax-purse-sub"><span>${squad}</span>${o.leading ? flag : `<span>Max ${esc(moneyText(s.maxBid, rules))}</span>`}</div>`
     + '</div>';
 }
 

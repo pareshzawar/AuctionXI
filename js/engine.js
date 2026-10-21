@@ -1,37 +1,33 @@
 // Auction rules engine: pure functions over an auction snapshot.
 // An auction snapshot looks like:
 //   { meta, rules, teams: {id: team}, players: {id: player},
-//     sales: {playerId: {team, price, at, round, retained?, source?}}, unsold: {playerId: {round}},
+//     sales: {playerId: {team, price, at, round, allotted?, source?}}, unsold: {playerId: {round}},
 //     live: {playerId, status, bid: {amount, team, at, until}}, log: {...} }
 // Amounts are whole numbers in the base unit (virtual rupees, or points).
 
-const L = 100000; // one lakh
-
 export const DEFAULT_RULES = {
   currency: '₹',
-  purse: 100 * L, // ₹1 Cr virtual purse
-  minSquad: 11,
-  maxSquad: 15,
-  reservesPerTeam: 0,
-  reserveBasePrice: 0,
-  maxPlayerPrice: 0, // 0 = no cap
-  retainedPriceDefault: 0,
-  playersPerSide: 11,
+  purse: 1000,
+  playersPerSide: 8, // players in a match
+  squadSize: 10, // players each team MUST own, captain and vice-captain included (extra = reserves)
   overs: null,
+  // Who is allotted to each team before the auction, and at what price (taken from the purse).
+  leaders: 'captain_vc', // 'captain' | 'captain_vc'
+  captainPrice: 200,
+  vcPrice: 150,
+  // Who may bid from a phone for the team.
+  bidders: 'captain_vc', // 'captain' | 'captain_vc'
+  // Who sees each team's remaining purse and max bid.
+  purseVisibility: 'own', // 'own' | 'bidders' | 'everyone'
+  maxPlayerPrice: 0, // 0 = no cap
   // min/max: per-team limits for the category (0 = none)
-  categories: [
-    { id: 'A', label: 'Icon', base: 10 * L, min: 0, max: 0 },
-    { id: 'B', label: 'Gold', base: 5 * L, min: 0, max: 0 },
-    { id: 'C', label: 'Silver', base: 2 * L, min: 0, max: 0 },
-    { id: 'D', label: 'Bronze', base: 1 * L, min: 0, max: 0 },
-  ],
+  categories: [{ id: 'P', label: 'Player', base: 50, min: 0, max: 0 }],
   roleMin: { bat: 0, bowl: 0, ar: 0, wk: 0 },
   // While the current bid is below `upto`, the next bid goes up by `step`.
   // `upto: 0` means "and above".
   increments: [
-    { upto: 20 * L, step: 50000 },
-    { upto: 50 * L, step: 1 * L },
-    { upto: 0, step: 2 * L },
+    { upto: 200, step: 10 },
+    { upto: 0, step: 25 },
   ],
   bidTimer: 30,
   pickOrder: 'category-random',
@@ -47,6 +43,22 @@ export const ROLES = {
   bowl: { code: 'BOWL', name: 'Bowler' },
   ar: { code: 'AR', name: 'All-rounder' },
   wk: { code: 'WK', name: 'Wicket-keeper' },
+};
+
+export const LEADERS = {
+  captain: 'Captain only',
+  captain_vc: 'Captain and vice-captain',
+};
+
+export const BIDDERS = {
+  captain: 'Only the captain bids',
+  captain_vc: 'Captain and vice-captain can both bid',
+};
+
+export const PURSE_VISIBILITY = {
+  own: 'Each captain / vice-captain sees only their own team (admins see all)',
+  bidders: 'All captains and vice-captains see every team (admins see all)',
+  everyone: 'Everyone, including the audience and the stage screen',
 };
 
 export const PICK_ORDERS = {
@@ -76,6 +88,14 @@ export function withDefaults(rules) {
   const r = { ...DEFAULT_RULES, ...(rules || {}) };
   if (r.bidMode === 'phones') r.bidMode = 'both';
   if (rules && rules.captainBidding === false && !rules.bidMode) r.bidMode = 'room';
+  // Older auctions had a min/max squad; the squad size is now one exact number.
+  if (rules && rules.squadSize == null && rules.maxSquad != null) r.squadSize = rules.maxSquad;
+  r.squadSize = Number(r.squadSize) || 1;
+  r.minSquad = r.maxSquad = r.squadSize;
+  if (r.leaders !== 'captain') r.leaders = 'captain_vc';
+  if (r.bidders !== 'captain') r.bidders = 'captain_vc';
+  if (r.leaders === 'captain') r.bidders = 'captain'; // no vice-captain, so only the captain can bid
+  if (!PURSE_VISIBILITY[r.purseVisibility]) r.purseVisibility = 'own';
   r.roleMin = { ...DEFAULT_RULES.roleMin, ...(r.roleMin || {}) };
   r.categories = (r.categories || []).map((c) => ({ min: 0, max: 0, ...c }));
   r.houseRules = Array.isArray(r.houseRules) ? r.houseRules.filter((x) => x && x.a) : Object.values(r.houseRules || {});
@@ -83,6 +103,19 @@ export function withDefaults(rules) {
 }
 
 export const phoneBidding = (rules) => rules.bidMode !== 'room';
+export const hasVC = (rules) => rules.leaders === 'captain_vc';
+export const vcCanBid = (rules) => hasVC(rules) && rules.bidders === 'captain_vc';
+export const reserves = (rules) => Math.max(0, Number(rules.squadSize) - (Number(rules.playersPerSide) || Number(rules.squadSize)));
+
+// Can this viewer see `teamId`'s remaining purse and max bid?
+// viewer: { role: 'admin' | 'captain' | 'vc' | 'member' | 'audience' | 'screen', team }
+export function canSeePurse(rules, viewer, teamId) {
+  const role = viewer?.role;
+  if (role === 'admin' || rules.purseVisibility === 'everyone') return true;
+  const bidder = role === 'captain' || role === 'vc';
+  if (!bidder) return false;
+  return rules.purseVisibility === 'bidders' || viewer.team === teamId;
+}
 
 export function normalize(a) {
   if (!a) return null;
@@ -106,7 +139,7 @@ function trimNum(n, digits) {
   return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
 }
 
-// Same rules as the design system's formatPrice: ₹4.2 L, ₹1.25 Cr, ₹50,000 · 2,400 pts · $250 K
+// Same rules as the design system's formatPrice: ₹50, ₹4.2 L, ₹1.25 Cr · 2,400 pts · $250 K
 export function moneyParts(n, rules) {
   const c = (rules && rules.currency) ?? '₹';
   const a = Math.max(0, Number(n) || 0);
@@ -144,11 +177,19 @@ export function minBase(rules) {
   return bases.length ? Math.min(...bases) : 0;
 }
 
-export const isReserve = (p) => p?.pool === 'reserve';
+// Captain / vice-captain allotted to a team before the auction.
+export const isAllotted = (p) => !!(p && p.allottedTeam);
+export const leaderLabel = (as) => (as === 'C' ? 'Captain' : as === 'VC' ? 'Vice-captain' : 'Allotted');
+
+export function allottedPrice(p, rules) {
+  if (p.allottedPrice != null && p.allottedPrice !== '') return Number(p.allottedPrice);
+  if (p.allottedAs === 'C') return Number(rules.captainPrice) || 0;
+  if (p.allottedAs === 'VC') return Number(rules.vcPrice) || 0;
+  return 0;
+}
 
 export function basePrice(player, rules) {
   if (Number(player.basePrice)) return Number(player.basePrice);
-  if (isReserve(player) && Number(rules.reserveBasePrice)) return Number(rules.reserveBasePrice);
   return Number(category(rules, player.category)?.base) || minBase(rules);
 }
 
@@ -166,29 +207,28 @@ export function teamSummary(a, teamId) {
     .filter(([, s]) => s.team === teamId)
     .map(([pid, s]) => {
       const p = a.players[pid] || { name: '(removed)' };
-      return { ...p, id: pid, role: roleId(p.role), price: Number(s.price), retained: !!s.retained, reserve: isReserve(p) };
+      return { ...p, id: pid, role: roleId(p.role), price: Number(s.price), allotted: !!(s.allotted || s.retained), as: p.allottedAs || null };
     });
-  const main = players.filter((p) => !p.reserve);
   const spent = players.reduce((t, p) => t + p.price, 0);
-  const count = main.length;
-  const reserveCount = players.length - count;
+  const count = players.length;
   const remaining = Number(rules.purse) - spent;
   const byCat = {};
   const byRole = {};
-  for (const p of main) {
+  for (const p of players) {
     byCat[p.category] = (byCat[p.category] || 0) + 1;
     byRole[p.role] = (byRole[p.role] || 0) + 1;
   }
-  const s = { players, main, spent, count, reserveCount, remaining, slots: Number(rules.maxSquad) - count, byCat, byRole };
+  const toBuy = Math.max(0, Number(rules.squadSize) - count);
+  const s = { players, spent, count, toBuy, remaining, slots: toBuy, byCat, byRole };
   s.maxBid = looseMaxBid(s, rules);
   return s;
 }
 
-// Upper bound on any bid by this team, ignoring which player is up. Stored in the
-// database so the security rules can reject over-purse bids from phones.
+// max bid = purse left − (players still to buy − 1) × base price, never above the purse left.
+// Stored in the database so the security rules can reject over-purse bids from phones.
 function looseMaxBid(s, rules) {
-  const need = Math.max(0, Number(rules.minSquad) - s.count - 1);
-  let max = Math.max(0, s.remaining - need * minBase(rules));
+  if (s.toBuy <= 0) return 0;
+  let max = Math.max(0, Math.min(s.remaining, s.remaining - (s.toBuy - 1) * minBase(rules)));
   if (Number(rules.maxPlayerPrice)) max = Math.min(max, Number(rules.maxPlayerPrice));
   return max;
 }
@@ -196,22 +236,13 @@ function looseMaxBid(s, rules) {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // The most `teamId` may pay for `player`, and why it can't be more.
-// Applies squad size, reserve slots, category min/max, role minimums and the per-player cap.
+// Applies the squad size, category min/max, role minimums and the per-player cap.
 export function bidLimit(a, teamId, player) {
   const { rules } = a;
   const s = teamSummary(a, teamId);
   const cap = Number(rules.maxPlayerPrice) || Infinity;
-  const mainNeed = Math.max(0, Number(rules.minSquad) - s.count);
 
-  if (isReserve(player)) {
-    const slots = Number(rules.reservesPerTeam) || 0;
-    if (s.reserveCount >= slots) return { max: 0, why: slots ? `Reserve slots full (${s.reserveCount} of ${slots}).` : 'This tournament has no reserve slots.' };
-    const keep = mainNeed * minBase(rules);
-    const max = Math.max(0, Math.min(cap, s.remaining - keep));
-    return { max, why: keep ? `Keep ${money(keep, rules)} for ${plural(mainNeed, 'more player')}.` : '' };
-  }
-
-  if (s.slots <= 0) return { max: 0, why: `Squad full (${s.count} of ${rules.maxSquad}).` };
+  if (s.toBuy <= 0) return { max: 0, why: `Squad complete (${s.count} of ${rules.squadSize}).` };
   const cat = category(rules, player?.category);
   if (cat && Number(cat.max) && (s.byCat[cat.id] || 0) >= Number(cat.max)) {
     return { max: 0, why: `${cat.label} limit reached (${s.byCat[cat.id]} of ${cat.max}).` };
@@ -219,7 +250,7 @@ export function bidLimit(a, teamId, player) {
 
   // Slots and money still needed AFTER buying this player.
   const role = roleId(player?.role);
-  const slotsAfter = Number(rules.maxSquad) - s.count - 1;
+  const slotsAfter = s.toBuy - 1;
   const roleNeeds = Object.entries(rules.roleMin || {})
     .map(([r, min]) => [r, Math.max(0, Number(min) - (s.byRole[r] || 0) - (r === role ? 1 : 0))])
     .filter(([, n]) => n > 0);
@@ -232,14 +263,13 @@ export function bidLimit(a, teamId, player) {
     const list = [...roleNeeds.map(([r, n]) => `${n} ${ROLES[r].code}`), ...catNeeds.map(([c, n]) => `${n} ${c.label}`)].join(', ');
     return { max: 0, why: `Keep your last slots for ${list}.` };
   }
-  const general = Math.max(0, Number(rules.minSquad) - s.count - 1, roleNeed);
   const catMoney = catNeeds.reduce((t, [c, n]) => t + n * Number(c.base), 0);
-  const keep = Math.max(general * minBase(rules), catMoney + Math.max(0, general - catNeed) * minBase(rules));
-  const max = Math.max(0, Math.min(cap, s.remaining - keep));
+  const keep = Math.max(slotsAfter * minBase(rules), catMoney + Math.max(0, slotsAfter - catNeed) * minBase(rules));
+  const max = Math.max(0, Math.min(cap, s.remaining, s.remaining - keep));
   let why = '';
   if (max === cap && cap < s.remaining - keep) why = `Max ${money(cap, rules)} per player in this tournament.`;
-  else if (keep) why = `Keep ${money(keep, rules)} for ${plural(general, 'more player')}.`;
-  return { max, why };
+  else if (keep) why = `Keep ${money(keep, rules)} for ${plural(slotsAfter, 'more player')}.`;
+  return { max, why, keep, slotsAfter, remaining: s.remaining };
 }
 
 // Why a team can't bid `amount` right now, or null if it can.
@@ -255,20 +285,18 @@ export function bidBlocker(a, teamId, amount) {
 
 /* ---------------- running order ---------------- */
 
-// Players still to be auctioned in the current round.
+// Players still to be auctioned in the current round (allotted captains / VCs never come up).
 export function pool(a) {
   const round = Number(a.meta.round) || 1;
   return Object.entries(a.players)
-    .filter(([pid]) => !a.sales[pid] && !(a.unsold[pid] && Number(a.unsold[pid].round) >= round))
+    .filter(([pid, p]) => !isAllotted(p) && !a.sales[pid] && !(a.unsold[pid] && Number(a.unsold[pid].round) >= round))
     .map(([id, p]) => ({ ...p, id }));
 }
 
 export function pickNext(a) {
   const { rules } = a;
-  let candidates = pool(a);
+  const candidates = pool(a);
   if (!candidates.length || rules.pickOrder === 'manual') return null;
-  // Main players first; the reserve pool is auctioned last.
-  if (candidates.some((p) => !isReserve(p))) candidates = candidates.filter((p) => !isReserve(p));
   const rnd = (list) => list[Math.floor(Math.random() * list.length)];
   if (rules.pickOrder === 'random') return rnd(candidates);
   const order = (rules.categories || []).map((c) => c.id);
@@ -288,6 +316,15 @@ export function capsUpdate(a) {
     const t = teamSummary(a, id);
     out[`teams/${id}/spent`] = t.spent;
     out[`teams/${id}/maxBid`] = t.maxBid;
+  }
+  return out;
+}
+
+// Captain and vice-captain of each team, from the players list.
+export function leadersOf(a, teamId) {
+  const out = {};
+  for (const [id, p] of Object.entries(a.players)) {
+    if (p.allottedTeam === teamId && (p.allottedAs === 'C' || p.allottedAs === 'VC')) out[p.allottedAs] = { ...p, id };
   }
   return out;
 }
