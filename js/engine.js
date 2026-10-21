@@ -22,8 +22,13 @@ export const DEFAULT_RULES = {
   // Who sees each team's remaining purse and max bid.
   purseVisibility: 'own', // 'own' | 'bidders' | 'everyone'
   maxPlayerPrice: 0, // 0 = no cap
-  // min/max: per-team limits for the category (0 = none)
-  categories: [{ id: 'P', label: 'Player', base: 50, min: 0, max: 0 }],
+  // Pools (stored as `categories`): Pool A = the strongest players, then B, C... The admin puts
+  // each player in a pool. min/max: per-team limits for the pool (0 = none).
+  categories: [
+    { id: 'A', label: 'Pool A', base: 50, min: 0, max: 0 },
+    { id: 'B', label: 'Pool B', base: 50, min: 0, max: 0 },
+    { id: 'C', label: 'Pool C', base: 50, min: 0, max: 0 },
+  ],
   roleMin: { bat: 0, bowl: 0, ar: 0, wk: 0 },
   // While the current bid is below `upto`, the next bid goes up by `step`.
   // `upto: 0` means "and above".
@@ -63,11 +68,13 @@ export const PURSE_VISIBILITY = {
   everyone: 'Everyone, including the audience and the stage screen',
 };
 
+// How the next player is chosen. Random draws use the built-in logic below; 'manual' means chits
+// drawn in the hall and searched by name. The control room offers both whatever is set here.
 export const PICK_ORDERS = {
-  'category-random': 'Category by category, random within each',
-  'category-sequence': 'Category by category, in player ID order',
-  random: 'Fully random',
-  manual: 'Manual - auctioneer picks every player',
+  'category-random': 'Random draw, pool by pool (all of Pool A first, then B, C…)',
+  random: 'Random draw from all pools together',
+  'category-sequence': 'Pool by pool, in player ID order',
+  manual: 'Chits: draw a chit in the hall and search the player by name',
 };
 
 export const BID_MODES = {
@@ -305,12 +312,43 @@ export function pool(a) {
     .map(([id, p]) => ({ ...p, id }));
 }
 
-export function pickNext(a) {
+// Players left in the current round, grouped for the control room ("Pool A 3 · Pool B 10").
+export function poolCounts(a) {
+  const left = pool(a);
+  return (a.rules.categories || []).map((c) => ({ ...c, left: left.filter((p) => p.category === c.id).length }));
+}
+
+// Search the players left in this round by name or ID (for chits).
+export function searchPool(a, q, limit = 8) {
+  const s = String(q || '').trim().toLowerCase();
+  if (!s) return [];
+  const words = s.split(/\s+/);
+  return pool(a)
+    .map((p) => {
+      const name = String(p.name || '').toLowerCase();
+      const id = String(p.id).toLowerCase();
+      if (id === s || id.replace(/^p0*/, '') === s.replace(/^p0*/, '')) return [p, 0];
+      if (name.startsWith(s)) return [p, 1];
+      if (words.every((w) => name.split(/\s+/).some((n) => n.startsWith(w)))) return [p, 2];
+      if (name.includes(s)) return [p, 3];
+      return null;
+    })
+    .filter(Boolean)
+    .sort((x, y) => x[1] - y[1] || String(x[0].name).localeCompare(y[0].name))
+    .slice(0, limit)
+    .map(([p]) => p);
+}
+
+// Random draw. Without filters it follows the tournament's order (pool by pool, Pool A first);
+// `filter.pool` / `filter.role` draw at random from one pool and/or one role instead.
+export function pickNext(a, filter = {}) {
   const { rules } = a;
-  const candidates = pool(a);
-  if (!candidates.length || rules.pickOrder === 'manual') return null;
+  let candidates = pool(a);
+  if (filter.pool) candidates = candidates.filter((p) => p.category === filter.pool);
+  if (filter.role) candidates = candidates.filter((p) => roleId(p.role) === filter.role);
+  if (!candidates.length) return null;
   const rnd = (list) => list[Math.floor(Math.random() * list.length)];
-  if (rules.pickOrder === 'random') return rnd(candidates);
+  if (filter.pool || rules.pickOrder === 'random') return rnd(candidates);
   const order = (rules.categories || []).map((c) => c.id);
   const rank = (p) => { const i = order.indexOf(p.category); return i < 0 ? order.length : i; };
   const best = Math.min(...candidates.map(rank));

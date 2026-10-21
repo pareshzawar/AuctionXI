@@ -162,15 +162,18 @@ export async function recordRoomSale(aid, a, team, amount, force = false) {
   return null;
 }
 
-export async function startPlayer(aid, a, playerId) {
+// how: { drawn: 'random' | 'chit', pool } - shown on the stage ("Random draw · Pool A", "Chit").
+export async function startPlayer(aid, a, playerId, how = {}) {
   const p = a.players[playerId];
   if (!p) throw new Error('Unknown player');
-  if (a.sales[playerId]) throw new Error('Player already sold');
+  if (a.sales[playerId]) throw new Error(`${p.name} is already in a team`);
+  if (a.live?.status === 'bidding') throw new Error('Finish the player on the block first (mark sold or unsold)');
   await db.set(`auctions/${aid}/live`, {
     playerId, status: 'bidding', round: a.meta.round || 1, startedAt: db.now(),
+    drawn: how.drawn || null, drawnPool: how.pool || null,
     bid: { amount: basePrice(p, a.rules), team: null, at: db.now(), until: null },
   });
-  await log(aid, { type: 'up', playerId, amount: basePrice(p, a.rules) });
+  await log(aid, { type: 'up', playerId, amount: basePrice(p, a.rules), drawn: how.drawn || null });
 }
 
 export async function sell(aid, a) {

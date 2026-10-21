@@ -76,3 +76,24 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   ok(nt.remaining === 800 && nt.toBuy === 2 && nt.maxBid === 750, `next season: ₹800 budget, 2 to buy → max bid 800 − 1 × 50 = ₹750 (got ${nt.remaining}, ${nt.toBuy}, ${nt.maxBid})`);
   ok(E.teamSummary(n, 'T2').purse === 1000 && E.variedBudgets(n), 'other teams keep the standard purse; budgets marked as varied');
 }
+
+// pools, random draw, chit search
+{
+  const r = E.withDefaults({});
+  const imp = csv.importPlayers([
+    { name: 'A One', pool: 'A' }, { name: 'B Two', pool: 'Pool B' }, { name: 'C Three', category: 'c' }, { name: 'D Four', pool: 'Z' },
+  ], r);
+  const pools = Object.values(imp.players).map((p) => p.category).join('');
+  ok(pools === 'ABCC' && imp.warnings.length === 1, `pool column accepts A / "Pool B" / old category column; unknown pool warns (got ${pools})`);
+  const q = csv.importSetup([{ key: 'category_1_id', answer: 'A' }, { key: 'category_1_name', answer: 'Pool A' }, { key: 'category_1_base_price', answer: '100' }], {}, {});
+  ok(q.rules.categories.length === 1 && q.rules.categories[0].base === 100, 'old category_N keys in a questionnaire still import as pools');
+  const p2 = E.normalize({ meta: { round: 1 }, rules: s.rules, teams, players, sales: {} });
+  const firstDraws = new Set(Array.from({ length: 40 }, () => E.pickNext(p2).category));
+  ok(firstDraws.size === 1 && firstDraws.has('A'), 'auto draw takes Pool A first');
+  const fromB = Array.from({ length: 40 }, () => E.pickNext(p2, { pool: 'B', role: 'bowl' }));
+  ok(fromB.every((p) => p.category === 'B' && E.roleId(p.role) === 'bowl'), 'draw from one pool and role');
+  const someone = Object.values(players).find((p) => !p.allottedTeam);
+  ok(E.searchPool(p2, someone.name.split(' ')[0].slice(0, 3)).some((p) => p.name === someone.name), 'chit search finds a player by the start of the name');
+  const cap = Object.values(players).find((p) => p.allottedAs === 'C');
+  ok(!E.searchPool(p2, cap.name).some((p) => p.name === cap.name), 'chit search never offers an allotted captain');
+}

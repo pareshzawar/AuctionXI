@@ -17,7 +17,11 @@ const rules = {
   purse: 1000, playersPerSide: 8, squadSize: 10, overs: 8,
   leaders: 'captain_vc', captainPrice: 200, vcPrice: 150, bidders: 'captain_vc', purseVisibility: 'own',
   maxPlayerPrice: 0, bidMode: 'both', bidTimer: 30, unsoldRounds: 1,
-  categories: [{ id: 'P', label: 'Player', base: 50, min: 0, max: 0 }],
+  categories: [
+    { id: 'A', label: 'Pool A', base: 50, min: 0, max: 0 },
+    { id: 'B', label: 'Pool B', base: 50, min: 0, max: 0 },
+    { id: 'C', label: 'Pool C', base: 50, min: 0, max: 0 },
+  ],
   roleMin: { bat: 0, bowl: 0, ar: 0, wk: 1 },
   increments: [{ upto: 200, step: 10 }, { upto: 0, step: 25 }],
   houseRules: [
@@ -53,19 +57,19 @@ const leaders = [
   ['Imran Shaikh', 'Wicket-keeper', 'T4', 'C'], ['Suresh Kale', 'Batter', 'T4', 'VC'],
 ];
 const used = new Set(leaders.map((x) => x[0]));
-const row = (i, name, role, team = '', as = '') => {
+const row = (i, name, role, team = '', as = '', pool = 'C') => {
   const bowls = role === 'Bowler' || role === 'All-rounder';
-  return [`P${String(i).padStart(3, '0')}`, name, role, 'P', '', r() < 0.75 ? 'Right-hand bat' : 'Left-hand bat',
+  return [`P${String(i).padStart(3, '0')}`, name, role, pool, '', r() < 0.75 ? 'Right-hand bat' : 'Left-hand bat',
     bowls ? ['Right-arm medium', 'Right-arm fast', 'Off-spin', 'Left-arm spin', 'Leg-spin'][Math.floor(r() * 5)] : '', 16 + Math.floor(r() * 32),
     `${'ABCD'[Math.floor(r() * 4)]}-${100 + Math.floor(r() * 800)}`, '', Math.floor(r() * 15), role === 'Bowler' ? Math.floor(r() * 80) : Math.floor(r() * 450),
     bowls ? Math.floor(r() * 20) : 0, '', team, as];
 };
-const rows = leaders.map(([name, role, team, as], i) => row(i + 1, name, role, team, as));
+const rows = leaders.map(([name, role, team, as], i) => row(i + 1, name, role, team, as, as === 'C' ? 'A' : 'B'));
 for (let i = 9; i <= 44; i++) {
   const role = i % 7 === 0 ? 'Wicket-keeper' : roles[Math.floor(r() * 3)];
   let name;
   do { name = `${first[Math.floor(r() * first.length)]} ${last[Math.floor(r() * last.length)]}`; } while (used.has(name));
   used.add(name);
-  rows.push(row(i, name, role));
+  rows.push(row(i, name, role, '', '', i <= 16 ? 'A' : i <= 30 ? 'B' : 'C')); // Pool A = strongest
 }
 w('sample_players.csv', csv.toCSV(csv.PLAYER_COLUMNS, rows));

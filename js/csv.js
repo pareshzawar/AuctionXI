@@ -6,18 +6,18 @@ import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILI
 // allotted_team + allotted_as (C or VC): the captain / vice-captain given to a team before
 // the auction, at the captain / vice-captain price from the setup. Everyone else is auctioned.
 export const PLAYER_COLUMNS = [
-  'id', 'name', 'role', 'category', 'base_price', 'batting_style', 'bowling_style', 'age',
+  'id', 'name', 'role', 'pool', 'base_price', 'batting_style', 'bowling_style', 'age',
   'locality', 'photo_url', 'matches', 'runs', 'wickets', 'notes', 'allotted_team', 'allotted_as',
 ];
 
 export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'owner', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
-  ['P001', 'Vikram Rao', 'All-rounder', 'P', '', 'Right-hand bat', 'Left-arm spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
-  ['P002', 'Amit Shah', 'Wicket-keeper', 'P', '', 'Left-hand bat', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
-  ['P003', 'Sanjay Mehta', 'Batter', 'P', '', 'Right-hand bat', '', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
-  ['P004', 'Rohan Patil', 'Bowler', 'P', '', 'Right-hand bat', 'Right-arm medium', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
-  ['P005', 'Nikhil Joshi', 'Batter', 'P', '', 'Right-hand bat', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
+  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right-hand bat', 'Left-arm spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
+  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left-hand bat', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
+  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right-hand bat', '', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
+  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right-hand bat', 'Right-arm medium', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
+  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Right-hand bat', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
 ];
 
 const TEAM_EXAMPLE = [
@@ -94,11 +94,14 @@ export function importPlayers(rows, rules, existingIds = []) {
       do { id = 'P' + String(++n).padStart(3, '0'); } while (used.has(id));
     }
     used.add(id);
-    let cat = String(r.category || '').trim();
-    const byLabel = (rules.categories || []).find((c) => c.label.toLowerCase() === cat.toLowerCase());
+    // `pool` (A, B, Pool A…); older templates called it `category`.
+    let cat = String(r.pool || r.category || '').trim();
+    const short = cat.replace(/^pool\s*/i, '');
+    const byLabel = (rules.categories || []).find((c) => c.label.toLowerCase() === cat.toLowerCase())
+      || (rules.categories || []).find((c) => c.id.toLowerCase() === short.toLowerCase());
     if (byLabel) cat = byLabel.id;
     if (!catIds.includes(cat)) {
-      if (cat) warnings.push(`Row ${line}: unknown category "${cat}" for ${r.name}, set to ${catIds.at(-1)}`);
+      if (cat) warnings.push(`Row ${line}: unknown pool "${cat}" for ${r.name}, put in ${(rules.categories || []).at(-1)?.label}`);
       cat = catIds.at(-1) || '';
     }
     if (r.base_price && num(r.base_price) == null) warnings.push(`Row ${line}: base_price "${r.base_price}" is not a number, ignored`);
@@ -165,7 +168,7 @@ export function playersToCSV(players) {
 /* ---------------- tournament setup questionnaire ---------------- */
 
 export const SETUP_COLUMNS = ['section', 'key', 'question', 'answer', 'help'];
-const MAX_CATEGORIES = 6;
+const MAX_CATEGORIES = 6; // pools
 const MAX_INCREMENTS = 4;
 
 // House-rule questions every organiser should answer. Answers are shown to everyone
@@ -173,7 +176,7 @@ const MAX_INCREMENTS = 4;
 export const HOUSE_RULE_QUESTIONS = [
   ['hr_eligibility', 'Who can register to play?', 'e.g. Residents of the society only, age 16+, max 2 guest players per team'],
   ['hr_captains', 'How are captains and vice-captains chosen?', 'e.g. Chosen by the sports committee. Their prices are set above; mark them in the players CSV (allotted_team, allotted_as)'],
-  ['hr_special_players', 'Any players every team must have?', 'e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a category min_per_team'],
+  ['hr_special_players', 'Any players every team must have?', 'e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a pool min_per_team'],
   ['hr_locality', 'Any limit on players from the same wing / tower / family?', 'e.g. Max 4 players from the same wing per team (checked by the auctioneer)'],
   ['hr_reserves', 'How are the reserve players (squad beyond the playing side) used?', 'e.g. Any squad player may play; the playing 8 is told to the umpire before the toss'],
   ['hr_unsold_end', 'What happens to players still unsold at the end?', 'e.g. Lottery to teams short of players, at base price'],
@@ -231,15 +234,15 @@ function setupFields() {
     const c = (r) => r.categories[i - 1] || {};
     const ensure = (r) => (r.categories[i - 1] ||= { id: '', label: '', base: 0, min: 0, max: 0 });
     const ex = DEFAULT_RULES.categories[i - 1];
-    f.push(['Categories', `category_${i}_id`, `Category ${i}: short ID used in the players CSV`, i === 1 ? 'e.g. P. One category is enough when every player has the same base price. Categories come up in this order' : 'Optional, e.g. A for icon players',
+    f.push(['Pools', `pool_${i}_id`, `Pool ${i}: short ID used in the players CSV`, i === 1 ? 'e.g. A. Pool A = the strongest players, then B, C… Pools come up in this order. Leave a whole pool blank if not needed' : ex ? `e.g. ${ex.id}` : 'Optional, e.g. D',
       (m, r) => c(r).id ?? '', (m, r, v) => { if (v) ensure(r).id = v.replace(/[.#$/[\]\s]/g, ''); }]);
-    f.push(['Categories', `category_${i}_name`, `Category ${i}: name`, ex ? `e.g. ${ex.label}` : 'e.g. Icon, Junior',
+    f.push(['Pools', `pool_${i}_name`, `Pool ${i}: name`, ex ? `e.g. ${ex.label}` : 'e.g. Pool D, Juniors',
       (m, r) => c(r).label ?? '', (m, r, v) => { if (v) ensure(r).label = v; }]);
-    f.push(['Categories', `category_${i}_base_price`, `Category ${i}: base (starting) price`, ex ? `e.g. ${ex.base}` : 'e.g. 100',
-      (m, r) => c(r).base ?? '', (m, r, v, warn) => { if (v) { const n = num(v); if (n == null) warn(`category_${i}_base_price: "${v}" is not a number`); else ensure(r).base = n; } }]);
-    f.push(['Categories', `category_${i}_min_per_team`, `Category ${i}: each team must buy at least (blank = no rule)`, 'e.g. 1 junior per team', (m, r) => c(r).min || '',
+    f.push(['Pools', `pool_${i}_base_price`, `Pool ${i}: base (starting) price`, ex ? `e.g. ${ex.base}` : 'e.g. 100',
+      (m, r) => c(r).base ?? '', (m, r, v, warn) => { if (v) { const n = num(v); if (n == null) warn(`pool_${i}_base_price: "${v}" is not a number`); else ensure(r).base = n; } }]);
+    f.push(['Pools', `pool_${i}_min_per_team`, `Pool ${i}: each team must have at least (blank = no rule)`, 'e.g. at least 1 Pool A player per team', (m, r) => c(r).min || '',
       (m, r, v) => { if (v) ensure(r).min = num(v) || 0; }]);
-    f.push(['Categories', `category_${i}_max_per_team`, `Category ${i}: each team may buy at most (blank = no limit)`, 'e.g. max 2 icon players per team', (m, r) => c(r).max || '',
+    f.push(['Pools', `pool_${i}_max_per_team`, `Pool ${i}: each team may have at most (blank = no limit)`, 'e.g. at most 3 Pool A players per team', (m, r) => c(r).max || '',
       (m, r, v) => { if (v) ensure(r).max = num(v) || 0; }]);
   }
 
@@ -260,7 +263,7 @@ function setupFields() {
   f.push(['Bidding', 'bid_mode', 'How do captains bid? (phones / room)', 'phones = captains tap BID on their phones, auctioneer can still enter room bids. room = paddles only, auctioneer enters the final amount',
     (m, r) => (r.bidMode === 'room' ? 'room' : 'phones'), (m, r, v) => { r.bidMode = /room|paddle/i.test(v) ? 'room' : 'both'; }]);
   number('Bidding', 'bid_timer_seconds', 'Countdown after each bid, in seconds (0 = off)', 'e.g. 30', 'bidTimer');
-  f.push(['Bidding', 'pick_order', `Order players come up (${Object.keys(PICK_ORDERS).join(' / ')})`, 'category-random is most common',
+  f.push(['Bidding', 'pick_order', `Order players come up (${Object.keys(PICK_ORDERS).join(' / ')})`, 'category-random = random draw, Pool A first. The control room can always also draw from one pool or bring up a chit',
     (m, r) => r.pickOrder, (m, r, v, warn) => { if (PICK_ORDERS[v]) r.pickOrder = v; else if (v) warn(`pick_order: "${v}" not recognised, kept ${r.pickOrder}`); }]);
   number('Bidding', 'unsold_rounds', 'How many times unsold players come back for another round', 'e.g. 1', 'unsoldRounds');
 
@@ -286,11 +289,12 @@ export function importSetup(rows, meta, rules) {
   const warn = (w) => warnings.push(w);
   const m = { ...(meta || {}) };
   const r = withDefaults(JSON.parse(JSON.stringify(rules || {})));
-  const answers = new Map(rows.filter((x) => x.key).map((x) => [x.key.trim(), (x.answer ?? '').trim()]));
+  // Older questionnaires called pools `category_N_…`.
+  const answers = new Map(rows.filter((x) => x.key).map((x) => [x.key.trim().replace(/^category_(\d+)_/, 'pool_$1_'), (x.answer ?? '').trim()]));
   if (!answers.size) throw new Error('No answers found. Keep the header row: section,key,question,answer,help');
   const known = new Set();
   // Categories and increments are rebuilt from the file when it has them.
-  if ([...answers.keys()].some((k) => /^category_\d+_/.test(k))) r.categories = [];
+  if ([...answers.keys()].some((k) => /^pool_\d+_/.test(k))) r.categories = [];
   if ([...answers.keys()].some((k) => /^increment_\d+_/.test(k))) r.increments = [];
   for (const [, key, , , , set] of setupFields()) {
     known.add(key);
@@ -299,13 +303,13 @@ export function importSetup(rows, meta, rules) {
   for (const k of answers.keys()) if (!known.has(k)) warn(`Unknown key "${k}" ignored`);
 
   r.categories = r.categories.filter((c) => c && c.id).map((c) => ({ ...c, label: c.label || c.id, base: c.base || 0 }));
-  if (!r.categories.length) { warn('No categories given - kept the defaults'); r.categories = withDefaults(rules).categories; }
+  if (!r.categories.length) { warn('No pools given - kept the defaults'); r.categories = withDefaults(rules).categories; }
   r.increments = r.increments.filter((s) => s && s.step > 0).sort((x, y) => (x.upto || Infinity) - (y.upto || Infinity));
   if (!r.increments.length) { warn('No bid increments given - kept the defaults'); r.increments = withDefaults(rules).increments; }
   if (Number(r.playersPerSide) > Number(r.squadSize)) warn(`squad_size (${r.squadSize}) is smaller than players_per_side (${r.playersPerSide})`);
   const catMin = r.categories.reduce((t, c) => t + (Number(c.min) || 0), 0);
   const roleMin = Object.values(r.roleMin).reduce((t, n) => t + (Number(n) || 0), 0);
-  if (Math.max(catMin, roleMin) > r.squadSize) warn('Category or role minimums add up to more than squad_size');
+  if (Math.max(catMin, roleMin) > r.squadSize) warn('Pool or role minimums add up to more than squad_size');
   const toBuy = Number(r.squadSize) - (r.leaders === 'captain_vc' ? 2 : 1);
   const need = toBuy * Math.min(...r.categories.map((c) => Number(c.base) || 0));
   if (need > Number(r.purse)) warn(`The purse (${r.purse}) cannot buy ${toBuy} players even at base price (${need})`);

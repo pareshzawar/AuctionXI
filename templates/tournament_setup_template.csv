@@ -16,36 +16,36 @@ Captain and vice-captain,captain_price,Captain value (not taken from the purse),
 Captain and vice-captain,vc_price,Vice-captain value (not taken from the purse),150,e.g. 150. Same as above for the vice-captain. Ignored with captain only
 Captain and vice-captain,bidders,Who bids for the team (captain / captain_vc),captain_vc,"captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code"
 Captain and vice-captain,purse_visibility,Who sees remaining purse and max bid (own / bidders / everyone),own,own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all
-Categories,category_1_id,Category 1: short ID used in the players CSV,P,e.g. P. One category is enough when every player has the same base price. Categories come up in this order
-Categories,category_1_name,Category 1: name,Player,e.g. Player
-Categories,category_1_base_price,Category 1: base (starting) price,50,e.g. 50
-Categories,category_1_min_per_team,Category 1: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_1_max_per_team,Category 1: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
-Categories,category_2_id,Category 2: short ID used in the players CSV,,"Optional, e.g. A for icon players"
-Categories,category_2_name,Category 2: name,,"e.g. Icon, Junior"
-Categories,category_2_base_price,Category 2: base (starting) price,,e.g. 100
-Categories,category_2_min_per_team,Category 2: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_2_max_per_team,Category 2: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
-Categories,category_3_id,Category 3: short ID used in the players CSV,,"Optional, e.g. A for icon players"
-Categories,category_3_name,Category 3: name,,"e.g. Icon, Junior"
-Categories,category_3_base_price,Category 3: base (starting) price,,e.g. 100
-Categories,category_3_min_per_team,Category 3: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_3_max_per_team,Category 3: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
-Categories,category_4_id,Category 4: short ID used in the players CSV,,"Optional, e.g. A for icon players"
-Categories,category_4_name,Category 4: name,,"e.g. Icon, Junior"
-Categories,category_4_base_price,Category 4: base (starting) price,,e.g. 100
-Categories,category_4_min_per_team,Category 4: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_4_max_per_team,Category 4: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
-Categories,category_5_id,Category 5: short ID used in the players CSV,,"Optional, e.g. A for icon players"
-Categories,category_5_name,Category 5: name,,"e.g. Icon, Junior"
-Categories,category_5_base_price,Category 5: base (starting) price,,e.g. 100
-Categories,category_5_min_per_team,Category 5: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_5_max_per_team,Category 5: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
-Categories,category_6_id,Category 6: short ID used in the players CSV,,"Optional, e.g. A for icon players"
-Categories,category_6_name,Category 6: name,,"e.g. Icon, Junior"
-Categories,category_6_base_price,Category 6: base (starting) price,,e.g. 100
-Categories,category_6_min_per_team,Category 6: each team must buy at least (blank = no rule),,e.g. 1 junior per team
-Categories,category_6_max_per_team,Category 6: each team may buy at most (blank = no limit),,e.g. max 2 icon players per team
+Pools,pool_1_id,Pool 1: short ID used in the players CSV,A,"e.g. A. Pool A = the strongest players, then B, C… Pools come up in this order. Leave a whole pool blank if not needed"
+Pools,pool_1_name,Pool 1: name,Pool A,e.g. Pool A
+Pools,pool_1_base_price,Pool 1: base (starting) price,50,e.g. 50
+Pools,pool_1_min_per_team,Pool 1: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_1_max_per_team,Pool 1: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
+Pools,pool_2_id,Pool 2: short ID used in the players CSV,B,e.g. B
+Pools,pool_2_name,Pool 2: name,Pool B,e.g. Pool B
+Pools,pool_2_base_price,Pool 2: base (starting) price,50,e.g. 50
+Pools,pool_2_min_per_team,Pool 2: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_2_max_per_team,Pool 2: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
+Pools,pool_3_id,Pool 3: short ID used in the players CSV,C,e.g. C
+Pools,pool_3_name,Pool 3: name,Pool C,e.g. Pool C
+Pools,pool_3_base_price,Pool 3: base (starting) price,50,e.g. 50
+Pools,pool_3_min_per_team,Pool 3: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_3_max_per_team,Pool 3: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
+Pools,pool_4_id,Pool 4: short ID used in the players CSV,,"Optional, e.g. D"
+Pools,pool_4_name,Pool 4: name,,"e.g. Pool D, Juniors"
+Pools,pool_4_base_price,Pool 4: base (starting) price,,e.g. 100
+Pools,pool_4_min_per_team,Pool 4: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_4_max_per_team,Pool 4: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
+Pools,pool_5_id,Pool 5: short ID used in the players CSV,,"Optional, e.g. D"
+Pools,pool_5_name,Pool 5: name,,"e.g. Pool D, Juniors"
+Pools,pool_5_base_price,Pool 5: base (starting) price,,e.g. 100
+Pools,pool_5_min_per_team,Pool 5: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_5_max_per_team,Pool 5: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
+Pools,pool_6_id,Pool 6: short ID used in the players CSV,,"Optional, e.g. D"
+Pools,pool_6_name,Pool 6: name,,"e.g. Pool D, Juniors"
+Pools,pool_6_base_price,Pool 6: base (starting) price,,e.g. 100
+Pools,pool_6_min_per_team,Pool 6: each team must have at least (blank = no rule),,e.g. at least 1 Pool A player per team
+Pools,pool_6_max_per_team,Pool 6: each team may have at most (blank = no limit),,e.g. at most 3 Pool A players per team
 Roles,min_batters,Each team must have at least this many batters (blank = no rule),,
 Roles,min_bowlers,Each team must have at least this many bowlers (blank = no rule),,
 Roles,min_allrounders,Each team must have at least this many all-rounders (blank = no rule),,
@@ -60,11 +60,11 @@ Bid increments,increment_4_below,Slab 4: while the bid is below,,
 Bid increments,increment_4_raise_by,Slab 4: raise each bid by,,
 Bidding,bid_mode,How do captains bid? (phones / room),phones,"phones = captains tap BID on their phones, auctioneer can still enter room bids. room = paddles only, auctioneer enters the final amount"
 Bidding,bid_timer_seconds,"Countdown after each bid, in seconds (0 = off)",30,e.g. 30
-Bidding,pick_order,Order players come up (category-random / category-sequence / random / manual),category-random,category-random is most common
+Bidding,pick_order,Order players come up (category-random / random / category-sequence / manual),category-random,"category-random = random draw, Pool A first. The control room can always also draw from one pool or bring up a chit"
 Bidding,unsold_rounds,How many times unsold players come back for another round,1,e.g. 1
 House rules,hr_eligibility,Who can register to play?,,"e.g. Residents of the society only, age 16+, max 2 guest players per team"
 House rules,hr_captains,How are captains and vice-captains chosen?,,"e.g. Chosen by the sports committee. Their prices are set above; mark them in the players CSV (allotted_team, allotted_as)"
-House rules,hr_special_players,Any players every team must have?,,e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a category min_per_team
+House rules,hr_special_players,Any players every team must have?,,e.g. At least 1 junior (under 16) and 1 senior (45+). Enforce with a pool min_per_team
 House rules,hr_locality,Any limit on players from the same wing / tower / family?,,e.g. Max 4 players from the same wing per team (checked by the auctioneer)
 House rules,hr_reserves,How are the reserve players (squad beyond the playing side) used?,,e.g. Any squad player may play; the playing 8 is told to the umpire before the toss
 House rules,hr_unsold_end,What happens to players still unsold at the end?,,"e.g. Lottery to teams short of players, at base price"
