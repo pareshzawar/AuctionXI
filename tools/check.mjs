@@ -151,3 +151,33 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   ok(await V.decryptJSON(box, wrong).then(() => false, () => true), 'workbook: a wrong PIN cannot read it');
   ok(V.calc('650 - 7*50') === 300 && V.calc('1.5L + 50,000') === 200000 && V.calc('alert(1)') === null, 'scratch pad: 650 - 7*50, 1.5L + 50,000, rejects code');
 }
+
+// teams template captains / vice-captains → players
+{
+  const rules = E.withDefaults({});
+  const a = E.normalize({ meta: {}, rules, teams: { T1: { name: 'Wing A', captainName: 'Ravi Kumar', vcName: 'Kiran' }, T2: { name: 'Wing B', captainName: 'Sunil Joshi' } },
+    players: { P001: { name: 'Kiran Patil', role: 'bat', category: 'C' }, P002: { name: 'Old Captain', role: 'ar', category: 'A', allottedTeam: 'T2', allottedAs: 'C' } } });
+  const { updates, warnings } = E.linkLeaders(a);
+  const added = Object.entries(updates).filter(([k, v]) => /^players\/P\d+$/.test(k) && v);
+  ok(added.length === 2 && added.every(([, p]) => p.autoLeader) && added.some(([, p]) => p.name === 'Ravi Kumar' && p.allottedTeam === 'T1' && p.allottedAs === 'C'), 'teams template: captains not in the player list are added');
+  ok(updates['players/P001/allottedTeam'] === 'T1' && updates['players/P001/allottedAs'] === 'VC' && warnings.some((w) => /matched to Kiran Patil/.test(w)), 'teams template: "Kiran" matches Kiran Patil, with a note');
+  ok(updates['players/P002/allottedTeam'] === null, 'teams template: the replaced captain goes back into the pool');
+}
+
+// batting hand, bowling arm and type
+{
+  const rows = csv.parseCSV('name,batting_hand,bowling_arm,bowling_type\nA,Right,Left,spin\nB,LHB,,\nC,R,RIGHT,RM\nD,left,none,\n');
+  const { players: ps } = csv.importPlayers(rows, R, []);
+  const v = Object.values(ps);
+  ok(E.battingLabel(v[0]) === 'Right-hand bat' && E.bowlingLabel(v[0]) === 'Left-arm spin' && E.battingLabel(v[1]) === 'Left-hand bat' && !E.bowlingLabel(v[1]) && E.bowlingLabel(v[2]) === 'Right-arm medium' && !E.bowlingLabel(v[3]), 'players: batting hand, bowling arm and type');
+  const old = csv.importPlayers(csv.parseCSV('name,batting_style,bowling_style\nE,Left-hand bat,Right-arm off-spin\n'), R, []);
+  ok(E.bowlingLabel(Object.values(old.players)[0]) === 'Right-arm off-spin' && E.battingLabel(Object.values(old.players)[0]) === 'Left-hand bat', 'players: older batting_style / bowling_style still read');
+}
+
+// CPL point chart: 50 → +10 to 150, +15 to 300, +20 to 500, +25 to 700, +50 above
+{
+  const cpl = csv.importSetup(csv.parseCSV(fs.readFileSync(`${root}/tournaments/cpl/cpl_season3_setup.csv`, 'utf8')), {}, {});
+  const r = cpl.rules;
+  const steps = [50, 140, 150, 290, 300, 490, 500, 690, 700, 1000].map((x) => E.increment(x, r));
+  ok(JSON.stringify(steps) === JSON.stringify([10, 10, 15, 15, 20, 20, 25, 25, 50, 50]) && r.currency === 'pts' && cpl.meta.season === '3', 'CPL setup: point chart increments, points, season 3');
+}

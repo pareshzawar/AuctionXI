@@ -1,6 +1,6 @@
-﻿id,name,role,pool,base_price,batting_style,bowling_style,age,locality,photo_url,matches,runs,wickets,notes,allotted_team,allotted_as
-P001,Vikram Rao,All-rounder,A,,Right-hand bat,Left-arm spin,32,Wing A - 410,,12,340,9,,T1,C
-P002,Amit Shah,Wicket-keeper,B,,Left-hand bat,,34,Wing A - 105,,8,150,0,,T1,VC
-P003,Sanjay Mehta,Batter,A,,Right-hand bat,,29,Wing B - 202,,10,410,1,,T2,C
-P004,Rohan Patil,Bowler,B,,Right-hand bat,Right-arm medium,28,Wing B - 302,,12,90,14,Opening bowler,,
-P005,Nikhil Joshi,Batter,C,,Right-hand bat,,41,Wing D - 201,,,,,Available on weekends only,,
+﻿id,name,role,pool,base_price,batting_hand,bowling_arm,bowling_type,age,locality,photo_url,matches,runs,wickets,notes,allotted_team,allotted_as
+P001,Vikram Rao,All-rounder,A,,Right,Left,Spin,32,Wing A - 410,,12,340,9,,T1,C
+P002,Amit Shah,Wicket-keeper,B,,Left,,,34,Wing A - 105,,8,150,0,,T1,VC
+P003,Sanjay Mehta,Batter,A,,Right,Right,Off-spin,29,Wing B - 202,,10,410,1,,T2,C
+P004,Rohan Patil,Bowler,B,,Right,Right,Fast,28,Wing B - 302,,12,90,14,Opening bowler,,
+P005,Nikhil Joshi,Batter,C,,Left,,,41,Wing D - 201,,,,,Available on weekends only,,

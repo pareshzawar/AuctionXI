@@ -22,7 +22,7 @@ export async function createAuction({ name, tournament, season, venue, date, org
   const teams = {};
   const codes = { teamCodes: {}, vcCodes: {} };
   for (const [id, t] of Object.entries(copyFrom?.teams || {})) {
-    const { purse, spent, maxBid, carriedOver, releasedValue, ...rest } = t;
+    const { purse, spent, maxBid, carriedOver, releasedValue, captainName, vcName, ...rest } = t; // new season, new captains
     teams[id] = rest;
     codes.teamCodes[id] = randomCode(6);
     codes.vcCodes[id] = randomCode(6);
@@ -57,7 +57,7 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
   const codes = { teamCodes: {}, vcCodes: {} };
   for (const [id, t] of Object.entries(a.teams)) {
     const mb = miniBudget(a, id, keep[id] || new Set());
-    const { spent, maxBid, ...rest } = t;
+    const { spent, maxBid, captainName, vcName, ...rest } = t; // leaders come from the kept players
     teams[id] = { ...rest, purse: mb.budget, carriedOver: mb.remaining, releasedValue: mb.releasedValue };
     for (const p of mb.kept) {
       players[p.id] = { ...own(a.players[p.id]), allottedTeam: id, allottedAs: p.as === 'C' || p.as === 'VC' ? p.as : 'R', allottedPrice: p.price };
@@ -89,6 +89,52 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
   const photos = Object.fromEntries(Object.keys(players).filter((pid) => m.players?.[pid]).map((pid) => [pid, m.players[pid]]));
   if (m.logo || m.banner || Object.keys(photos).length) await db.set(`media/${aid}`, { logo: m.logo || null, banner: m.banner || null, players: photos });
   return { aid, adminCode };
+}
+
+// A practice copy of an auction: the same setup, teams, players and pictures, new codes, nothing
+// sold. Run it end to end with the captains to check everything works, reset it, run it again.
+// The real auction is never touched.
+export async function createMockAuction(fromAid, a) {
+  const aid = await newAuctionId('mock', 'mock');
+  const { ownerUid, createdAt, startedAt, completedAt, status, round, mock, mockOf, mockOfName, ...meta } = a.meta;
+  const teams = {};
+  const codes = { teamCodes: {}, vcCodes: {} };
+  for (const [id, t] of Object.entries(a.teams)) {
+    const { spent, maxBid, ...rest } = t;
+    teams[id] = rest;
+    codes.teamCodes[id] = randomCode(6);
+    codes.vcCodes[id] = randomCode(6);
+  }
+  const players = Object.fromEntries(Object.entries(a.players).map(([id, { photoData, ...p }]) => [id, p]));
+  const adminCode = randomCode(8);
+  await db.set(`auctions/${aid}`, {
+    meta: { ...meta, name: `${a.meta.name} (mock)`, mock: true, mockOf: fromAid, mockOfName: a.meta.name, ownerUid: db.uid(), createdAt: db.now(), status: 'setup', round: 1, locked: !!a.meta.locked },
+    rules: a.rules,
+    teams,
+    players,
+  });
+  await db.set(`secrets/${aid}`, { adminCode, ...codes });
+  await db.update(`auctions/${aid}`, capsUpdate(normalize(await db.get(`auctions/${aid}`))));
+  const m = a.media || {};
+  if (m.logo || m.banner || m.players) await db.set(`media/${aid}`, { logo: m.logo || null, banner: m.banner || null, players: m.players || null });
+  return { aid, adminCode };
+}
+
+// Back to "not started" with nothing sold. Mock auctions only.
+export async function resetAuction(aid, a) {
+  if (!a.meta.mock) throw new Error('Only a mock auction can be reset');
+  await db.update(`auctions/${aid}`, {
+    sales: null, unsold: null, live: null, log: null,
+    'meta/status': 'setup', 'meta/round': 1, 'meta/startedAt': null, 'meta/completedAt': null,
+  });
+  await db.update(`auctions/${aid}`, capsUpdate(normalize(await db.get(`auctions/${aid}`))));
+}
+
+// Remove an auction and everything that belongs to it. The auction itself goes last, because the
+// database rules check its owner for the other parts.
+export async function deleteAuction(aid) {
+  for (const part of ['secrets', 'media', 'captains', 'coadmins']) await db.set(`${part}/${aid}`, null).catch(() => {});
+  await db.set(`auctions/${aid}`, null);
 }
 
 export async function isAdmin(aid, meta) {

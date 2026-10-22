@@ -14,7 +14,7 @@ Tip: collect registrations with a Google Form → the responses go to a Google S
 ## A day before
 
 - [ ] Upload the setup questionnaire, then teams and players. Check every name and that every team has its captain (and vice-captain), then **lock** the list
-- [ ] Do a mock auction with 2–3 players, then **create a fresh auction** for the real one (or undo the mock sales)
+- [ ] **Mock auction**: Control room → *Create mock auction*. Run a few players with the captains on their phones (they join with the mock codes), check the stage, voice and results. *Reset mock* to run it again; *Delete mock* when done. The real auction is never touched
 - [ ] Send each captain and vice-captain their own code ("Copy message" buttons in Access and sharing)
 - [ ] Ask captains to join on their phones and check they appear as "Signed in"
 - [ ] Give the co-admin the admin code

@@ -1,10 +1,11 @@
 ﻿section,key,question,answer,help
 Tournament,auction_name,Auction name,,Shown on every screen
 Tournament,tournament_name,Tournament name,,e.g. Society Premier League
+Tournament,season,Season,,e.g. 2026 or 3. Auctions of the same tournament are grouped by season
 Tournament,venue,Venue,,e.g. Clubhouse hall
 Tournament,date,Auction date (YYYY-MM-DD),,e.g. 2026-11-15
+Tournament,time,Auction time,,e.g. 6 PM - 9 PM
 Tournament,organiser,Organiser,,e.g. Sports committee
-Tournament,players_per_side,Players per side in a match,8,"e.g. 11, 8 or 6 (box cricket)"
 Tournament,overs,Overs per innings,,Information only
 Money,currency,Currency,₹,"₹ for virtual rupees (₹50, ₹5 L, ₹1.2 Cr), or pts for points"
 Money,purse_per_team,Purse per team,1000,"e.g. 1000. Amounts can also be written 1L, 1Cr or 1,00,000"
@@ -58,9 +59,15 @@ Bid increments,increment_3_below,Slab 3: while the bid is below,,
 Bid increments,increment_3_raise_by,Slab 3: raise each bid by,,
 Bid increments,increment_4_below,Slab 4: while the bid is below,,
 Bid increments,increment_4_raise_by,Slab 4: raise each bid by,,
+Bid increments,increment_5_below,Slab 5: while the bid is below,,
+Bid increments,increment_5_raise_by,Slab 5: raise each bid by,,
+Bid increments,increment_6_below,Slab 6: while the bid is below,,
+Bid increments,increment_6_raise_by,Slab 6: raise each bid by,,
 Bidding,bid_mode,How do captains bid? (phones / room),phones,"phones = captains tap BID on their phones, auctioneer can still enter room bids. room = paddles only, auctioneer enters the final amount"
 Bidding,bid_timer_seconds,"Countdown after each bid, in seconds (0 = off)",30,e.g. 30
 Bidding,pick_order,Order players come up (category-random / random / category-sequence / manual),category-random,"category-random = random draw, Pool A first. The control room can always also draw from one pool or bring up a chit"
+Bidding,live_commentary,Show live commentary on the stage and phones? (yes / no),yes,Generated from the auction itself; it can also be read aloud on any device
+Bidding,commentary_language,Commentary language (english / hinglish / marathi),english,Each phone can still switch for itself
 Bidding,unsold_rounds,How many times unsold players come back for another round,1,e.g. 1
 House rules,hr_eligibility,Who can register to play?,,"e.g. Residents of the society only, age 16+, max 2 guest players per team"
 House rules,hr_captains,How are captains and vice-captains chosen?,,"e.g. Chosen by the sports committee. Their prices are set above; mark them in the players CSV (allotted_team, allotted_as)"

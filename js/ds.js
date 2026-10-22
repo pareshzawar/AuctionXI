@@ -4,7 +4,7 @@
 // React or a build step.
 
 import { esc } from './ui.js';
-import { moneyParts, ROLES, roleId, initials, teamCode, photoUrl } from './engine.js';
+import { moneyParts, ROLES, roleId, initials, teamCode, photoUrl, battingLabel, bowlingLabel } from './engine.js';
 
 const cx = (...c) => c.filter(Boolean).join(' ');
 
@@ -56,7 +56,7 @@ function photo(p, cls) {
   return `<div class="${cls}">${url ? `<img src="${esc(url)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc(initials(p.name))}'))">` : esc(initials(p.name))}</div>`;
 }
 
-const metaLine = (p) => [p.age ? `Age ${p.age}` : null, p.battingStyle, p.bowlingStyle, p.locality].filter(Boolean).join(' · ');
+const metaLine = (p) => [p.age ? `Age ${p.age}` : null, battingLabel(p), bowlingLabel(p), p.locality].filter(Boolean).join(' · ');
 const dash = (v) => (v == null || v === '' ? '—' : String(v));
 
 export function playerStats(p) {

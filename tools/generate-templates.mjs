@@ -39,11 +39,12 @@ const rules = {
 };
 w('sample_tournament_setup.csv', csv.setupToCSV({ name: 'Society Premier League 2026 player auction', tournament: 'Society Premier League', venue: 'Clubhouse hall', date: '2026-11-15', organiser: 'Sports committee' }, rules));
 
+// Captains are marked in the sample players file, so the team captain columns stay blank here.
 w('sample_teams.csv', csv.toCSV(csv.TEAM_COLUMNS, [
-  ['T1', 'Sunrise Strikers', 'SUN', csv.TEAM_COLORS[0], 'Mr. Kulkarni', ''],
-  ['T2', 'Royal Warriors', 'ROY', csv.TEAM_COLORS[1], 'Mrs. Desai', ''],
-  ['T3', 'Thunder Kings', 'THU', csv.TEAM_COLORS[2], 'Mr. Iyer', ''],
-  ['T4', 'Green Giants', 'GRN', csv.TEAM_COLORS[3], 'Mr. Khan', ''],
+  ['T1', 'Sunrise Strikers', 'SUN', csv.TEAM_COLORS[0], '', '', 'Mr. Kulkarni', ''],
+  ['T2', 'Royal Warriors', 'ROY', csv.TEAM_COLORS[1], '', '', 'Mrs. Desai', ''],
+  ['T3', 'Thunder Kings', 'THU', csv.TEAM_COLORS[2], '', '', 'Mr. Iyer', ''],
+  ['T4', 'Green Giants', 'GRN', csv.TEAM_COLORS[3], '', '', 'Mr. Khan', ''],
 ]));
 
 const first = ['Aarav', 'Vivaan', 'Aditya', 'Kabir', 'Ishaan', 'Reyansh', 'Arnav', 'Dhruv', 'Kunal', 'Nikhil', 'Pranav', 'Rahul', 'Siddharth', 'Tanmay', 'Varun', 'Yash', 'Harsh', 'Manish', 'Omkar', 'Pratik', 'Rohit', 'Saurabh', 'Tushar', 'Vedant', 'Akash', 'Chirag', 'Gaurav', 'Jay', 'Neel', 'Parth', 'Sahil', 'Atharva'];
@@ -59,8 +60,8 @@ const leaders = [
 const used = new Set(leaders.map((x) => x[0]));
 const row = (i, name, role, team = '', as = '', pool = 'C') => {
   const bowls = role === 'Bowler' || role === 'All-rounder';
-  return [`P${String(i).padStart(3, '0')}`, name, role, pool, '', r() < 0.75 ? 'Right-hand bat' : 'Left-hand bat',
-    bowls ? ['Right-arm medium', 'Right-arm fast', 'Off-spin', 'Left-arm spin', 'Leg-spin'][Math.floor(r() * 5)] : '', 16 + Math.floor(r() * 32),
+  const bowl = bowls ? [['Right', 'Medium'], ['Right', 'Fast'], ['Right', 'Off-spin'], ['Left', 'Spin'], ['Right', 'Leg-spin'], ['Left', 'Medium-fast']][Math.floor(r() * 6)] : ['', ''];
+  return [`P${String(i).padStart(3, '0')}`, name, role, pool, '', r() < 0.75 ? 'Right' : 'Left', ...bowl, 16 + Math.floor(r() * 32),
     `${'ABCD'[Math.floor(r() * 4)]}-${100 + Math.floor(r() * 800)}`, '', Math.floor(r() * 15), role === 'Bowler' ? Math.floor(r() * 80) : Math.floor(r() * 450),
     bowls ? Math.floor(r() * 20) : 0, '', team, as];
 };

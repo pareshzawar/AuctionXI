@@ -1,45 +1,45 @@
-﻿id,name,role,pool,base_price,batting_style,bowling_style,age,locality,photo_url,matches,runs,wickets,notes,allotted_team,allotted_as
-P001,Rohan Patil,All-rounder,A,,Right-hand bat,Off-spin,19,A-454,,7,35,17,,T1,C
-P002,Amit Shah,Wicket-keeper,B,,Right-hand bat,,29,B-725,,9,34,0,,T1,VC
-P003,Sanjay Mehta,Batter,A,,Right-hand bat,,23,C-226,,8,219,0,,T2,C
-P004,Kiran Bhosale,Bowler,B,,Right-hand bat,Right-arm medium,46,D-196,,6,76,3,,T2,VC
-P005,Arjun Nair,Bowler,A,,Right-hand bat,Off-spin,37,B-236,,14,35,4,,T3,C
-P006,Deepak Rane,All-rounder,B,,Right-hand bat,Right-arm fast,20,D-381,,5,35,18,,T3,VC
-P007,Imran Shaikh,Wicket-keeper,A,,Right-hand bat,,44,B-288,,9,180,0,,T4,C
-P008,Suresh Kale,Batter,B,,Left-hand bat,,36,A-279,,6,40,0,,T4,VC
-P009,Tanmay Chavan,Batter,A,,Right-hand bat,,46,B-450,,7,197,0,,,
-P010,Varun Reddy,All-rounder,A,,Right-hand bat,Right-arm fast,39,A-316,,11,386,19,,,
-P011,Jay Naik,All-rounder,A,,Right-hand bat,Off-spin,16,B-385,,3,177,13,,,
-P012,Kunal Jadhav,All-rounder,A,,Right-hand bat,Right-arm fast,34,B-171,,14,205,17,,,
-P013,Yash Kulkarni,Bowler,A,,Left-hand bat,Leg-spin,24,A-223,,10,55,13,,,
-P014,Jay Deshmukh,Wicket-keeper,A,,Left-hand bat,,21,A-165,,0,241,0,,,
-P015,Gaurav Kulkarni,All-rounder,A,,Right-hand bat,Right-arm medium,24,B-151,,5,103,5,,,
-P016,Ishaan Kulkarni,All-rounder,A,,Right-hand bat,Left-arm spin,18,B-187,,7,186,0,,,
-P017,Varun Naik,All-rounder,B,,Right-hand bat,Leg-spin,38,C-314,,5,34,17,,,
-P018,Aditya Deshmukh,Batter,B,,Right-hand bat,,16,C-451,,5,242,0,,,
-P019,Harsh Reddy,All-rounder,B,,Right-hand bat,Leg-spin,37,B-825,,10,206,19,,,
-P020,Tanmay Singh,All-rounder,B,,Right-hand bat,Left-arm spin,45,C-891,,9,373,8,,,
-P021,Aditya Jadhav,Wicket-keeper,B,,Right-hand bat,,36,B-700,,11,226,0,,,
-P022,Neel Naik,Bowler,B,,Right-hand bat,Right-arm fast,30,D-627,,2,54,3,,,
-P023,Harsh Gupta,Batter,B,,Right-hand bat,,46,C-128,,5,82,0,,,
-P024,Dhruv Naik,Bowler,B,,Right-hand bat,Leg-spin,35,B-764,,2,27,8,,,
-P025,Omkar Joshi,All-rounder,B,,Right-hand bat,Off-spin,24,B-507,,4,12,1,,,
-P026,Varun Verma,All-rounder,B,,Left-hand bat,Right-arm medium,28,A-412,,0,57,14,,,
-P027,Aarav Verma,All-rounder,B,,Right-hand bat,Right-arm fast,23,C-493,,3,282,17,,,
-P028,Sahil Menon,Wicket-keeper,B,,Left-hand bat,,41,B-168,,3,60,0,,,
-P029,Omkar Jadhav,All-rounder,B,,Right-hand bat,Right-arm fast,26,A-836,,9,355,14,,,
-P030,Omkar Kulkarni,Batter,B,,Right-hand bat,,46,C-366,,5,250,0,,,
-P031,Kabir Menon,Bowler,C,,Left-hand bat,Left-arm spin,32,C-588,,5,6,2,,,
-P032,Parth Naik,Bowler,C,,Left-hand bat,Off-spin,43,B-168,,13,27,4,,,
-P033,Vivaan Gupta,Batter,C,,Right-hand bat,,47,D-591,,8,23,0,,,
-P034,Reyansh Singh,Bowler,C,,Right-hand bat,Right-arm fast,32,C-272,,8,52,9,,,
-P035,Aditya Sharma,Wicket-keeper,C,,Right-hand bat,,30,A-595,,1,39,0,,,
-P036,Sahil Shinde,Batter,C,,Right-hand bat,,16,D-895,,12,337,0,,,
-P037,Parth Sharma,Bowler,C,,Right-hand bat,Left-arm spin,18,C-396,,4,75,11,,,
-P038,Saurabh Naik,Batter,C,,Right-hand bat,,23,A-360,,0,115,0,,,
-P039,Manish Singh,Bowler,C,,Left-hand bat,Right-arm medium,27,A-215,,2,26,2,,,
-P040,Kabir Reddy,Batter,C,,Right-hand bat,,42,B-513,,13,302,0,,,
-P041,Vedant Reddy,Bowler,C,,Right-hand bat,Left-arm spin,24,C-445,,6,69,2,,,
-P042,Yash Reddy,Wicket-keeper,C,,Right-hand bat,,40,C-261,,10,46,0,,,
-P043,Akash Joshi,Bowler,C,,Right-hand bat,Right-arm fast,16,B-679,,4,2,9,,,
-P044,Manish Sharma,Bowler,C,,Left-hand bat,Off-spin,38,D-166,,14,63,18,,,
+﻿id,name,role,pool,base_price,batting_hand,bowling_arm,bowling_type,age,locality,photo_url,matches,runs,wickets,notes,allotted_team,allotted_as
+P001,Rohan Patil,All-rounder,A,,Right,Right,Off-spin,19,A-454,,7,35,17,,T1,C
+P002,Amit Shah,Wicket-keeper,B,,Right,,,29,B-725,,9,34,0,,T1,VC
+P003,Sanjay Mehta,Batter,A,,Right,,,23,C-226,,8,219,0,,T2,C
+P004,Kiran Bhosale,Bowler,B,,Right,Right,Fast,46,D-196,,6,76,3,,T2,VC
+P005,Arjun Nair,Bowler,A,,Right,Right,Off-spin,37,B-236,,14,35,4,,T3,C
+P006,Deepak Rane,All-rounder,B,,Right,Left,Spin,20,D-381,,5,35,18,,T3,VC
+P007,Imran Shaikh,Wicket-keeper,A,,Right,,,44,B-288,,9,180,0,,T4,C
+P008,Suresh Kale,Batter,B,,Left,,,36,A-279,,6,40,0,,T4,VC
+P009,Tanmay Chavan,Batter,A,,Right,,,46,B-450,,7,197,0,,,
+P010,Varun Reddy,All-rounder,A,,Right,Right,Fast,39,A-316,,11,386,19,,,
+P011,Jay Naik,All-rounder,A,,Right,Left,Spin,16,B-385,,3,177,13,,,
+P012,Kunal Jadhav,All-rounder,A,,Right,Right,Medium,34,B-171,,14,205,17,,,
+P013,Yash Kulkarni,Bowler,A,,Left,Right,Leg-spin,24,A-223,,10,55,13,,,
+P014,Jay Deshmukh,Wicket-keeper,A,,Left,,,21,A-165,,0,241,0,,,
+P015,Gaurav Kulkarni,All-rounder,A,,Right,Right,Off-spin,24,B-151,,5,103,5,,,
+P016,Ishaan Kulkarni,All-rounder,A,,Right,Right,Medium,18,B-187,,7,186,0,,,
+P017,Varun Naik,All-rounder,B,,Left,Right,Off-spin,38,C-314,,5,34,17,,,
+P018,Aditya Deshmukh,Batter,B,,Right,,,16,C-451,,5,242,0,,,
+P019,Harsh Reddy,All-rounder,B,,Left,Right,Medium,37,B-825,,10,206,19,,,
+P020,Tanmay Singh,All-rounder,B,,Left,Right,Leg-spin,45,C-891,,9,373,8,,,
+P021,Aditya Jadhav,Wicket-keeper,B,,Right,,,36,B-700,,11,226,0,,,
+P022,Neel Naik,Bowler,B,,Right,Right,Medium,30,D-627,,2,54,3,,,
+P023,Harsh Gupta,Batter,B,,Right,,,46,C-128,,5,82,0,,,
+P024,Dhruv Naik,Bowler,B,,Left,Right,Fast,35,B-764,,2,27,8,,,
+P025,Omkar Joshi,All-rounder,B,,Right,Right,Medium,24,B-507,,4,12,1,,,
+P026,Varun Verma,All-rounder,B,,Right,Left,Medium-fast,28,A-412,,0,57,14,,,
+P027,Aarav Verma,All-rounder,B,,Right,Right,Fast,23,C-493,,3,282,17,,,
+P028,Sahil Menon,Wicket-keeper,B,,Left,,,41,B-168,,3,60,0,,,
+P029,Omkar Jadhav,All-rounder,B,,Right,Right,Fast,26,A-836,,9,355,14,,,
+P030,Omkar Kulkarni,Batter,B,,Right,,,46,C-366,,5,250,0,,,
+P031,Kabir Menon,Bowler,C,,Right,Right,Leg-spin,32,C-588,,5,6,2,,,
+P032,Parth Naik,Bowler,C,,Right,Left,Medium-fast,43,B-168,,13,27,4,,,
+P033,Vivaan Gupta,Batter,C,,Right,,,47,D-591,,8,23,0,,,
+P034,Reyansh Singh,Bowler,C,,Right,Right,Fast,32,C-272,,8,52,9,,,
+P035,Aditya Sharma,Wicket-keeper,C,,Right,,,30,A-595,,1,39,0,,,
+P036,Sahil Shinde,Batter,C,,Right,,,16,D-895,,12,337,0,,,
+P037,Parth Sharma,Bowler,C,,Right,Right,Fast,18,C-396,,4,75,11,,,
+P038,Saurabh Naik,Batter,C,,Right,,,23,A-360,,0,115,0,,,
+P039,Manish Singh,Bowler,C,,Right,Left,Medium-fast,27,A-215,,2,26,2,,,
+P040,Kabir Reddy,Batter,C,,Right,,,42,B-513,,13,302,0,,,
+P041,Vedant Reddy,Bowler,C,,Left,Right,Fast,24,C-445,,6,69,2,,,
+P042,Yash Reddy,Wicket-keeper,C,,Right,,,40,C-261,,10,46,0,,,
+P043,Akash Joshi,Bowler,C,,Right,Right,Off-spin,16,B-679,,4,2,9,,,
+P044,Manish Sharma,Bowler,C,,Right,Right,Leg-spin,38,D-166,,14,63,18,,,

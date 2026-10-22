@@ -1,5 +1,5 @@
-﻿id,name,short_name,color,owner,logo_url
-T1,Sunrise Strikers,SUN,#4f9dff,Mr. Kulkarni,
-T2,Royal Warriors,ROY,#ff8a3d,Mrs. Desai,
-T3,Thunder Kings,THU,#2ec4a6,Mr. Iyer,
-T4,Green Giants,GRN,#ee6aa0,Mr. Khan,
+﻿id,name,short_name,color,captain,vice_captain,owner,logo_url
+T1,Sunrise Strikers,SUN,#4f9dff,,,Mr. Kulkarni,
+T2,Royal Warriors,ROY,#ff8a3d,,,Mrs. Desai,
+T3,Thunder Kings,THU,#2ec4a6,,,Mr. Iyer,
+T4,Green Giants,GRN,#ee6aa0,,,Mr. Khan,

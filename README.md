@@ -22,7 +22,8 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
 | 🎲 **Pools, random draw or chits** | Players are grouped by role (BAT / BOWL / AR / WK) and pool (Pool A = strongest, B, C…). Next player by a built-in random draw (pool by pool, or from one pool or role), or draw a chit in the hall and search the name |
 | 🎙️ **Live commentary** | In English, Hinglish or Marathi, written from the auction itself: player intros with pool, role and stats, opening bids, bidding wars, record prices, sales and squad progress. On the stage, phones and console; any device can read it aloud with the browser's own voice (free, no AI service). Keeps purses private |
-| 🖼️ **Photos, logo and banner** | Upload each player's photo from a phone or laptop (one at a time, or many at once named `P001.jpg` / `Rohan Patil.jpg`), plus the league's logo and a wide banner. They appear on the stage, phones, player cards and results. Pictures are shrunk on the device (about 8 KB a photo) and kept in the free database, so no paid storage is needed. A `photo_url` column still works |
+| 🧪 **Mock auction** | One click in the control room makes a practice copy (same rules, teams, players, photos, its own codes). Run it end to end with the captains, reset it, run it again; the real auction is never touched |
+| 🖼️ **Photos, logo and banner** | Upload each player's photo from a phone or laptop (one at a time, or many at once named `P001.jpg` / `Rohan Patil.jpg`), plus the league's logo and a banner or poster of any shape (never cropped). They appear on the stage, phones, player cards and results. Pictures are shrunk on the device (about 8 KB a photo) and kept in the free database, so no paid storage is needed. A `photo_url` column still works |
 | 📓 **Captain's workbook** | Each captain and vice-captain gets a private **My workbook** tab: every player still available, a favourites list, *their own* max bid and note per player, a manual record of what other teams buy (with estimated purse left and max bid), and a scratch pad with a calculator. The BID button warns when the price passes their limit. Encrypted on the phone with their own PIN, so not even the admin can read it |
 | 🎥 **Zoom / Google Meet** | Share the stage screen, with commentary and voice, in a video call for people who can't come. Step-by-step under *Access and sharing* |
 | 🔁 **Mini auction next season** | Tick who each team keeps; budget = remaining purse + value of released players (C/VC value or price paid). Kept players start in their team; released and new players go into the pool |
@@ -89,7 +90,7 @@ All in [`templates/`](templates), also downloadable from the home page and admin
 |---|---|
 | `tournament_setup_template.csv` | **The setup questionnaire**: tournament details, players per side and squad size, purse, captain/VC values, who bids, who sees purses, base price, role minimums, bid increments, bid mode, timer, and house-rule questions. Fill in the `answer` column. Guide: **[docs/RULES.md](docs/RULES.md)** |
 | `sample_tournament_setup.csv` | A filled example: 8-a-side, squads of 10, purse ₹1,000, C value ₹200, VC value ₹150, base ₹50, house rules |
-| `teams_template.csv` | `id, name, short_name, color, owner, logo_url` |
+| `teams_template.csv` | `id, name, short_name, color, captain, vice_captain, owner, logo_url`. Only `name` is required. Captain and vice-captain names are matched to the players list; anyone not in it is added and allotted to the team |
 | `players_template.csv` | One row per player (columns below) |
 | `sample_*.csv` | Demo data used by *Load sample data* |
 
@@ -102,9 +103,12 @@ Players columns:
 | `role` | no | `Batter`, `Bowler`, `All-rounder`, `Wicket-keeper` (also accepts `bat`, `bowl`, `ar`, `wk`) |
 | `pool` | no | The player's pool: `A`, `B`, `C`… or `Pool A`. Pool A = the strongest players; the admin decides. Defaults to the last pool (older files with a `category` column still work) |
 | `base_price` | no | Overrides the category base price |
-| `batting_style`, `bowling_style`, `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
+| `batting_hand` | no | `Right` or `Left` (also `R`, `L`, `RHB`, `LHB`) |
+| `bowling_arm` | no | `Right` or `Left`; blank if the player doesn't bowl |
+| `bowling_type` | no | `Fast`, `Medium-fast`, `Medium`, `Off-spin`, `Leg-spin` or `Spin` (shorthands like `RM`, `LS` work). Shown as e.g. *Right-arm medium* |
+| `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link"). Easier: leave it blank and upload photos in *Players → Player photos* |
-| `allotted_team`, `allotted_as` | no | For each team's captain and vice-captain: the team ID and `C` or `VC`. They join that team when the auction starts, with the captain / vice-captain value (not taken from the purse), and are never auctioned |
+| `allotted_team`, `allotted_as` | no | Another way to set captains (the teams template is easier): the team ID and `C` or `VC`. They join that team when the auction starts, with the captain / vice-captain value (not taken from the purse), and are never auctioned |
 
 > ⚠️ Auction data is publicly readable by anyone with the auction code. **Do not put phone numbers or other private data in the CSV.**
 
@@ -138,6 +142,7 @@ fonts/            Barlow, Barlow Condensed, Teko (SIL OFL)
 design/           the design-system source: tokens.json and notes
 templates/        setup questionnaire, player & team templates, sample data
 archive/          permanently archived auctions
+tournaments/      filled templates for real tournaments (e.g. tournaments/cpl)
 docs/             setup, rules guide, auction-day checklist
 ```
 

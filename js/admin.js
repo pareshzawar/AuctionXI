@@ -2,11 +2,12 @@ import { db, isLocal } from './db.js';
 import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
-  leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase,
+  leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
+  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
-  startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction,
+  startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
@@ -84,7 +85,9 @@ async function boot() {
     const st = A.meta.status;
     $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
       + ` ${badge(A.meta.kind === 'mini' ? 'retained' : 'upcoming', { text: A.meta.kind === 'mini' ? 'Mini auction' : 'Major auction' })}`
+      + (A.meta.mock ? ` ${badge('unsold', { text: 'Mock' })}` : '')
       + ` <small>${esc([A.meta.tournament, A.meta.season && `season ${A.meta.season}`, A.meta.kind === 'mini' && `based on ${A.meta.parentName || A.meta.parent}`].filter(Boolean).join(' · '))}</small>`;
+    mockBar();
     render();
   });
 
@@ -135,6 +138,8 @@ function setup(el) {
         <div class="grid grid-2" style="gap:var(--space-3)">
           ${field('Venue', `<input id="s-venue" value="${esc(meta.venue || '')}">`)}
           ${field('Date', `<input id="s-date" type="date" value="${esc(meta.date || '')}">`)}
+          ${field('Season', `<input id="s-season" value="${esc(meta.season || '')}" placeholder="e.g. 2026 or 3">`)}
+          ${field('Time', `<input id="s-time" value="${esc(meta.time || '')}" placeholder="e.g. 6 PM - 9 PM">`)}
           ${field('Players per side', numIn('r-side', rules.playersPerSide))}
           ${field('Overs', numIn('r-overs', rules.overs))}
         </div>
@@ -272,6 +277,8 @@ async function saveSetup() {
     tournament: $('#s-tournament').value.trim() || null,
     venue: $('#s-venue').value.trim() || null,
     date: $('#s-date').value || null,
+    season: $('#s-season').value.trim() || null,
+    time: $('#s-time').value.trim() || null,
     organiser: $('#s-organiser').value.trim() || null,
   }, rules);
   toast('Setup saved', 'ok');
@@ -285,6 +292,8 @@ async function saveRules(meta, rules) {
     'meta/tournament': meta.tournament || null,
     'meta/venue': meta.venue || null,
     'meta/date': meta.date || null,
+    'meta/season': meta.season || null,
+    'meta/time': meta.time || null,
     'meta/organiser': meta.organiser || null,
     rules,
     ...capsUpdate({ ...A, rules: withDefaults(rules) }),
@@ -304,21 +313,24 @@ function teams(el) {
         <button class="btn-sm btn-primary" id="t-add">Add team</button>
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Owner</th><th>Budget</th><th>Captain / VC</th><th>Players</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Captain</th>${hasVC(A.rules) ? '<th>Vice-captain</th>' : ''}<th>Owner</th><th>Budget</th><th>Players</th><th></th></tr></thead>
         <tbody>${entries.map(([id, t]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
             <td><input data-f="name" value="${esc(t.name)}"></td>
             <td><input data-f="short" value="${esc(t.short || '')}" maxlength="4" style="width:70px;min-width:70px"></td>
             <td><input data-f="color" type="color" value="${esc(t.color || '#888888')}"></td>
-            <td><input data-f="owner" value="${esc(t.owner || '')}"></td>
+            <td><input data-f="captainName" value="${esc(leadersOf(A, id).C?.name || t.captainName || '')}" placeholder="Optional" list="player-names"></td>
+            ${hasVC(A.rules) ? `<td><input data-f="vcName" value="${esc(leadersOf(A, id).VC?.name || t.vcName || '')}" placeholder="Optional" list="player-names"></td>` : ''}
+            <td><input data-f="owner" value="${esc(t.owner || '')}" placeholder="Optional"></td>
             <td><input data-f="purse" inputmode="numeric" value="${esc(t.purse ?? '')}" placeholder="${esc(money(A.rules.purse, A.rules))}" style="width:100px" title="Blank = the standard purse. A mini auction fills in each team's carried-over budget"></td>
-            <td>${(() => { const l = leadersOf(A, id); return [l.C && `C ${esc(l.C.name)}`, hasVC(A.rules) && l.VC && `VC ${esc(l.VC.name)}`].filter(Boolean).join('<br>') || '<span class="muted">Set in Players</span>'; })()}</td>
             <td>${teamSummary(A, id).count}</td>
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
           </tr>`).join('') || '<tr><td colspan="9" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
-      <span class="hint">Three-letter codes appear on the stage and phones. Captains and vice-captains are set in the Players tab. Each team gets secret codes under Access and sharing.</span>
+      <datalist id="player-names">${Object.values(A.players).map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
+      <span class="hint">Only the name is required. Three-letter codes appear on the stage and phones. Type the captain${hasVC(A.rules) ? ' and vice-captain' : ''} here or in the teams CSV:
+        they are matched to the player list, and anyone not in it yet is added, allotted to the team and never auctioned. Each team gets secret codes under Access and sharing.</span>
     </div>`;
 
   $('#t-template').onclick = () => download('teams_template.csv', teamTemplate());
@@ -335,9 +347,11 @@ function teams(el) {
     if (!Object.keys(parsed).length) throw new Error('No teams found in the file');
     const replace = Object.keys(A.teams).length && confirm('Replace existing teams?\nOK = replace, Cancel = add to existing');
     if (replace && Object.keys(A.sales).length) throw new Error('Teams cannot be replaced after players have been sold');
+    if (A.meta.locked && Object.values(parsed).some((t) => t.captainName || t.vcName)) throw new Error('The player list is locked. Unlock it (Players tab) before uploading teams with captains.');
     if (replace) await db.update(P, Object.fromEntries(Object.keys(A.teams).map((id) => [`teams/${id}`, null])));
     await addTeams(parsed);
-    toast(`Imported ${Object.keys(parsed).length} teams${warnings.length ? ` with ${warnings.length} warnings` : ''}`, 'ok');
+    warnings.push(...await syncLeaders());
+    toast(`Imported ${Object.keys(parsed).length} teams${warnings.length ? ` with ${warnings.length} notes` : ''}`, 'ok');
     if (warnings.length) alert(warnings.join('\n'));
   });
   el.onchange = run(async (e) => {
@@ -345,6 +359,13 @@ function teams(el) {
     if (!tr || !e.target.dataset.f) return;
     let v = e.target.value.trim() || null;
     if (e.target.dataset.f === 'short' && v) v = v.toUpperCase();
+    if (e.target.dataset.f === 'captainName' || e.target.dataset.f === 'vcName') {
+      if (A.meta.locked) { render(true); throw new Error('The player list is locked. Unlock it (Players tab) to change captains or vice-captains.'); }
+      await db.set(`${P}/teams/${tr.dataset.id}/${e.target.dataset.f}`, v);
+      const notes = await syncLeaders();
+      if (notes.length) alert(notes.join('\n'));
+      return;
+    }
     if (e.target.dataset.f === 'purse') {
       if (v != null && num(v) == null) throw new Error(`"${v}" is not an amount`);
       await db.update(P, { [`teams/${tr.dataset.id}/purse`]: v == null ? null : num(v) });
@@ -361,6 +382,26 @@ function teams(el) {
     await db.update(P, { [`teams/${id}`]: null });
     await db.set(`secrets/${aid}/teamCodes/${id}`, null);
   });
+}
+
+// Apply team captain / vice-captain names to the player list (link), then write the names of
+// whoever is allotted back onto the teams. Returns notes for the admin.
+async function syncLeaders({ link = true } = {}) {
+  let a = normalize(await db.get(P));
+  const notes = [];
+  if (link) {
+    const { updates, warnings } = linkLeaders(a);
+    notes.push(...warnings);
+    if (Object.keys(updates).length) {
+      if (a.meta.locked) throw new Error('The player list is locked. Unlock it (Players tab) to change captains or vice-captains.');
+      await db.update(P, updates);
+      a = normalize(await db.get(P));
+    }
+  }
+  const names = leaderNamesUpdate(a);
+  if (Object.keys(names).length) await db.update(P, names);
+  await db.update(P, capsUpdate(normalize(await db.get(P))));
+  return notes;
 }
 
 async function addTeams(map) {
@@ -386,6 +427,7 @@ function players(el) {
   const asOpts = (v) => `<option value="">—</option><option value="C" ${v === 'C' ? 'selected' : ''}>Captain</option>${hasVC(A.rules) || v === 'VC' ? `<option value="VC" ${v === 'VC' ? 'selected' : ''}>Vice-captain</option>` : ''}${A.meta.kind === 'mini' || v === 'R' ? `<option value="R" ${v === 'R' ? 'selected' : ''}>Retained</option>` : ''}`;
   const teamOpts = (v) => `<option value="">—</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}" ${id === v ? 'selected' : ''}>${esc(t.short || t.name)}</option>`).join('')}`;
   const dis = locked ? 'disabled' : '';
+  const handOpts = (v, right, left, none = '—') => `<option value="">${none}</option><option value="R" ${v === 'R' ? 'selected' : ''}>${right}</option><option value="L" ${v === 'L' ? 'selected' : ''}>${left}</option>`;
   const allotted = list.filter(([, p]) => isAllotted(p)).length;
   const counts = [`${list.length - allotted} to auction`, `${allotted} captains / vice-captains allotted`].join(' · ');
 
@@ -405,20 +447,23 @@ function players(el) {
           <button class="btn-sm btn-primary" id="p-lock">Lock player list</button>`}
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Pool</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Pool</th><th>Bats</th><th>Bowls</th><th>Bowling</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
         <tbody>${list.map(([id, p]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
             <td><input data-f="name" value="${esc(p.name)}" ${dis} style="min-width:150px"></td>
             <td><select data-f="role" ${dis}>${roleOpts(p.role)}</select></td>
             <td><select data-f="category" ${dis}>${catOpts(p.category)}</select></td>
+            <td><select data-f="battingHand" ${dis}>${handOpts(battingHandOf(p), 'Right', 'Left')}</select></td>
+            <td><select data-f="bowlingArm" ${dis}>${handOpts(bowlingArmOf(p), 'Right-arm', 'Left-arm', 'Doesn\'t bowl')}</select></td>
+            <td><select data-f="bowlingType" ${dis}><option value="">—</option>${[...new Set([...BOWLING_TYPES, bowlingTypeOf(p)].filter(Boolean))].map((t) => `<option ${t === bowlingTypeOf(p) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></td>
             <td><input data-f="basePrice" inputmode="numeric" value="${p.basePrice ?? ''}" placeholder="${esc(money(basePrice(p, A.rules), A.rules))}" ${dis} style="width:100px"></td>
             <td><input data-f="locality" value="${esc(p.locality || '')}" ${dis}></td>
             <td><input data-f="photoUrl" value="${esc(p.photoUrl || '')}" ${dis}></td>
             <td><select data-f="allottedTeam" ${dis}>${teamOpts(p.allottedTeam)}</select></td>
             <td><select data-f="allottedAs" ${dis}>${asOpts(p.allottedAs)}</select>${isAllotted(p) ? `<span class="hint">${esc(money(allottedPrice(p, A.rules), A.rules))}</span>` : ''}</td>
             <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
-          </tr>`).join('') || '<tr><td colspan="10" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
+          </tr>`).join('') || '<tr><td colspan="13" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
       <span class="hint">Base blank = the pool's base price. "Allotted to" + "As" make a player that team's captain or vice-captain:
         they join the team at the captain / vice-captain price when the auction starts and are never auctioned.
@@ -475,22 +520,34 @@ function players(el) {
       const taken = leadersOf(A, v)[as];
       if (taken && taken.id !== tr.dataset.id) throw new Error(`${A.teams[v].name} already has a ${leaderLabel(as).toLowerCase()}: ${taken.name}`);
       await db.update(`${P}/players/${tr.dataset.id}`, { allottedTeam: v, allottedAs: as });
+      await syncLeaders({ link: false });
       return;
     }
-    if (f === 'allottedTeam' && !v) { await db.update(`${P}/players/${tr.dataset.id}`, { allottedTeam: null, allottedAs: null }); return; }
+    if (f === 'allottedTeam' && !v) { await db.update(`${P}/players/${tr.dataset.id}`, { allottedTeam: null, allottedAs: null }); await syncLeaders({ link: false }); return; }
     if (f === 'allottedAs' && v) {
       const team = A.players[tr.dataset.id].allottedTeam;
       if (!team) throw new Error('Choose the team first');
       const taken = leadersOf(A, team)[v];
       if (taken && taken.id !== tr.dataset.id) throw new Error(`${A.teams[team].name} already has a ${leaderLabel(v).toLowerCase()}: ${taken.name}`);
     }
+    if (['battingHand', 'bowlingArm', 'bowlingType'].includes(f)) {
+      // Move older free-text styles into the new fields so nothing is lost.
+      const p = A.players[tr.dataset.id];
+      await db.update(`${P}/players/${tr.dataset.id}`, {
+        battingHand: battingHandOf(p) || null, bowlingArm: bowlingArmOf(p) || null, bowlingType: bowlingTypeOf(p) || null,
+        battingStyle: null, bowlingStyle: null, [f]: v || null,
+      });
+      return;
+    }
     await db.set(`${P}/players/${tr.dataset.id}/${f}`, v === '' ? null : v);
+    if (f === 'allottedAs' || f === 'name') await syncLeaders({ link: false });
   });
   el.onclick = run(async (e) => {
     if (!e.target.matches('[data-del]')) return;
     const id = e.target.closest('tr').dataset.id;
     if (!confirm(`Remove ${A.players[id].name}?`)) return;
     await db.set(`${P}/players/${id}`, null);
+    await syncLeaders({ link: false });
   });
 }
 
@@ -513,9 +570,9 @@ function brandingCard() {
       </div>
       <div>
         <label>Banner</label>
-        <div class="brand-preview" style="aspect-ratio:4/1;width:100%">${m.banner ? `<img src="${esc(m.banner)}" alt="League banner">` : '<span class="muted">No banner</span>'}</div>
+        <div class="brand-preview" style="height:180px;width:100%">${m.banner ? `<img src="${esc(m.banner)}" alt="League banner">` : '<span class="muted">No banner</span>'}</div>
         <p class="row" style="margin:var(--space-2) 0 0">${fileButton(m.banner ? 'Change banner' : 'Upload banner', 'id="b-banner"')}${m.banner ? '<button class="btn-sm btn-ghost" data-brand-del="banner">Remove</button>' : ''}</p>
-        <span class="hint">Wide picture, cropped to 4 : 1 (${BANNER.w} × ${BANNER.h}). Sponsor names, the season, the ground.</span>
+        <span class="hint">Any shape, never cropped: a wide banner or your auction poster. Shrunk to ${BANNER.max} px on the longest side.</span>
       </div>
     </div>
   </div>`;
@@ -585,6 +642,7 @@ async function importPlayerRows(rows, replaceAll = false) {
   if (!count) throw new Error('No players found in the file. Keep the template header row.');
   if (replace) await db.set(`${P}/players`, parsed);
   else await db.update(`${P}/players`, parsed);
+  warnings.push(...await syncLeaders());
   toast(`Imported ${count} players${warnings.length ? ` with ${warnings.length} warnings` : ''}`, 'ok');
   if (warnings.length) alert(`Imported with warnings:\n\n${warnings.join('\n')}`);
 }
@@ -762,6 +820,48 @@ function control(el) {
   });
 }
 
+// On a mock auction: a strip above the tabs to reset it, delete it, or go back to the real one.
+function mockBar() {
+  let bar = $('#mockbar');
+  if (!A.meta.mock) { bar?.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'mockbar'; $('#panel').before(bar); }
+  bar.innerHTML = `<div class="notice notice-warn row" style="margin-bottom:var(--space-4)">
+    <span style="flex:1;min-width:240px"><b>Mock auction.</b> A practice copy of <b>${esc(A.meta.mockOfName || A.meta.mockOf)}</b>: same rules, teams and players, its own codes.
+      Nothing here changes the real auction. Run it with the captains, then reset it and run it again.</span>
+    <button class="btn-sm" id="mock-reset">Reset mock</button>
+    <button class="btn-sm btn-ghost" id="mock-delete">Delete mock</button>
+    ${A.meta.mockOf ? `<a class="btn btn-sm" href="${pageUrl('admin.html', { a: A.meta.mockOf })}">Back to the real auction</a>` : ''}
+  </div>`;
+  $('#mock-reset').onclick = run(async () => {
+    if (!confirm('Reset the mock auction? Every sale and bid is cleared and it goes back to "not started". Captains stay signed in.')) return;
+    await resetAuction(aid, A);
+    toast('Mock auction reset', 'ok');
+  });
+  $('#mock-delete').onclick = run(async () => {
+    if (!confirm('Delete this mock auction for good?')) return;
+    const back = A.meta.mockOf;
+    await deleteAuction(aid);
+    location.href = back ? pageUrl('admin.html', { a: back }) : 'index.html';
+  });
+}
+
+function mockCard() {
+  if (A.meta.mock) return '';
+  return `<div class="card" style="max-width:760px;margin-top:var(--space-4)">
+    <h2>Rehearse first: mock auction</h2>
+    <p>Make a practice copy with the same rules, teams, players and photos, and run it end to end: captains join with their own mock codes, bid, buy, and you check the stage, phones, commentary and results.
+      Nothing in this auction changes, and you can reset the mock and run it again as often as you like.</p>
+    <button class="btn" id="c-mock">Create mock auction</button>
+  </div>`;
+}
+
+async function openMock() {
+  const fresh = normalize(await db.get(P));
+  const { aid: mid } = await createMockAuction(aid, applyMedia(fresh, media));
+  rememberAuction(mid, `${A.meta.name} (mock)`, 'admin');
+  location.href = pageUrl('admin.html', { a: mid, created: 1 });
+}
+
 function controlStart(el) {
   const { meta, rules } = A;
   const teamIds = Object.keys(A.teams);
@@ -785,8 +885,10 @@ function controlStart(el) {
         ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>
       <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team (value ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, not taken from the purse), and opens bidding.</p>
-      <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && toAuction ? '' : 'disabled'}>Start auction</button>
-    </div>`;
+      <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && toAuction ? '' : 'disabled'}>Start ${meta.mock ? 'mock ' : ''}auction</button>
+    </div>
+    ${mockCard()}`;
+  if ($('#c-mock')) $('#c-mock').onclick = run(openMock);
   $('#c-start').onclick = run(async () => {
     if (missing.length && !confirm(`${missing.length} team(s) have no ${hasVC(rules) ? 'captain or vice-captain' : 'captain'} set. Start anyway?`)) return;
     if (!missing.length && !confirm('Start the auction now?')) return;
@@ -933,7 +1035,7 @@ function results(el) {
         <p>GitHub Pages then serves it at <code>results.html?archive=${esc(slug(A.meta.name))}</code>, even if the live database is cleaned up.</p>
       </div>
     </div>
-    ${miniBuilder()}`;
+    ${A.meta.mock ? "" : miniBuilder()}`;
   wireMiniBuilder(el);
   $('#r-csv').onclick = () => {
     const rows = Object.entries(A.sales).map(([pid, s]) => {
