@@ -63,11 +63,13 @@ export function pageUrl(page, params) {
 }
 
 export function modeBadge() {
-  const el = document.createElement('span');
+  // In demo mode the badge links to the guide for connecting the free database.
+  const el = document.createElement(isLocal ? 'a' : 'span');
+  if (isLocal) { el.href = 'https://github.com/pareshzawar/AuctionXI/blob/main/docs/SETUP.md'; el.target = '_blank'; el.rel = 'noopener'; }
   el.className = `mode-badge ${isLocal ? 'mode-demo' : 'mode-live'}`;
   el.textContent = isLocal ? 'Demo mode' : 'Connected';
   el.title = isLocal
-    ? 'No Firebase config: data stays in this browser only. See docs/SETUP.md to let phones join.'
+    ? 'No database connected yet: data stays in this browser only. Click for the 10-minute setup that lets phones join.'
     : 'Connected to Firebase Realtime Database';
   return el;
 }
