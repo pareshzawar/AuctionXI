@@ -24,6 +24,7 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🎙️ **Live commentary** | In English, Hinglish or Marathi, written from the auction itself: player intros with pool, role and stats, opening bids, bidding wars, record prices, sales and squad progress. On the stage, phones and console; any device can read it aloud with the browser's own voice (free, no AI service). Keeps purses private |
 | 🔐 **Private until you open it** | New auctions are private: only admins can see them while you set up. Then open them to anyone with the link, or list them on the home page so attendees tap to watch. Enforced by the database rules, not just hidden |
 | 📊 **Offline Excel tracker** | One click downloads an Excel workbook with the teams, captains, purses and players. Type each sale and it recalculates purse left, still to buy and max bid by the tournament's rules, and flags wrong entries (below base, over max bid, not a valid bid step, squad full). Works with no app and no internet, in Excel or Google Sheets |
+| 🎞️ **Offline slides** | One click downloads a PowerPoint of the auction: cover with your banner and logo, rules, bid steps, house rules, teams with captains, a clickable players list (jump to whoever the chit names) and one slide per player with photo, stats, base price and the next bids. Squad slides are added once players are sold. Present it in manual mode with no app or internet |
 | 🧪 **Mock auction** | One click in the control room makes a practice copy (same rules, teams, players, photos, its own codes). Run it end to end with the captains, reset it, run it again; the real auction is never touched |
 | 🖼️ **Photos, logo and banner** | Upload each player's photo from a phone or laptop (one at a time, or many at once named `P001.jpg` / `Rohan Patil.jpg`), plus the league's logo and a banner or poster of any shape (never cropped). They appear on the stage, phones, player cards and results. Pictures are shrunk on the device (about 8 KB a photo) and kept in the free database, so no paid storage is needed. A `photo_url` column still works |
 | 📓 **Captain's workbook** | Each captain and vice-captain gets a private **My workbook** tab: every player still available, a favourites list, *their own* max bid and note per player, a manual record of what other teams buy (with estimated purse left and max bid), and a scratch pad with a calculator. The BID button warns when the price passes their limit. Encrypted on the phone with their own PIN, so not even the admin can read it |
@@ -137,6 +138,7 @@ js/actions.js     database writes (bid, sell, undo, rounds…)
 js/commentary.js  live commentary (English, Hinglish, Marathi) and voice
 js/workbook.js    the captain's private workbook; js/vault.js encrypts it
 js/tracker.js     the offline Excel tracker (vendor/exceljs.min.js builds it in the browser)
+js/deck.js        the offline PowerPoint (vendor/pptxgen.bundle.js)
 js/media.js       player photos, league logo and banner (shrunk on the device, stored at media/)
 database.rules.json  Firebase security rules (who can write what)
 css/tokens.css    design tokens (generated from design/tokens.json)

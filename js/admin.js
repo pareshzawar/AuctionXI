@@ -19,6 +19,7 @@ import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { downloadTracker } from './tracker.js';
+import { downloadDeck } from './deck.js';
 import { watchMedia, applyMedia, setPlayerPhoto, setBrand, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
@@ -443,6 +444,7 @@ function players(el) {
       <div class="section-title">
         <h2>Players (${list.length})</h2><small>${esc(counts)}</small><span class="spacer"></span>
         <button class="btn-sm" id="p-template">Download players template</button>
+        <button class="btn-sm" id="p-deck" title="PowerPoint to present the auction by hand: rules, bid steps, teams, a clickable players list and one slide per player">Slides (PowerPoint)</button>
         <button class="btn-sm" id="p-tracker" title="Excel workbook to run or follow the auction by hand: teams, captains, purses, players and a tracker that applies the rules">Offline tracker (Excel)</button>
         <button class="btn-sm" id="p-export">Export current list</button>
         ${locked ? '' : `
@@ -480,6 +482,7 @@ function players(el) {
   $('#p-template').onclick = () => download('players_template.csv', playerTemplate());
   $('#p-export').onclick = () => download(`${aid}_players.csv`, playersToCSV(A.players));
   $('#p-tracker').onclick = run(saveTracker);
+  $('#p-deck').onclick = run(saveDeck);
   if (locked) {
     $('#p-unlock') && ($('#p-unlock').onclick = run(() => db.set(`${P}/meta/locked`, false)));
     return;
@@ -561,6 +564,12 @@ function players(el) {
 async function saveTracker() {
   toast('Preparing the Excel tracker…');
   await downloadTracker(A, `${slug(A.meta.name) || aid}_tracker.xlsx`);
+}
+
+// The offline slides: this auction as a PowerPoint to present by hand (squads too, once sold).
+async function saveDeck() {
+  toast('Preparing the slides…');
+  await downloadDeck(A, `${slug(A.meta.name) || aid}_slides.pptx`);
 }
 
 /* Pictures: league logo and banner (Setup tab), player photos (Players tab) */
@@ -1074,6 +1083,7 @@ function results(el) {
           <button id="r-csv">Download squads CSV</button>
           <button id="r-json">Download full auction JSON</button>
           <button id="r-tracker">Offline tracker (Excel)</button>
+          <button id="r-deck">Slides with squads (PowerPoint)</button>
         </div>
       </div>
       <div class="card">
@@ -1100,6 +1110,7 @@ function results(el) {
     download(`${aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'category', 'price', 'how'], [...rows, ...unsold]));
   };
   $('#r-tracker').onclick = run(saveTracker);
+  $('#r-deck').onclick = run(saveDeck);
   $('#r-json').onclick = () => download(`${slug(A.meta.name) || aid}.auction.json`, JSON.stringify(exportSnapshot(A), null, 2), 'application/json');
 }
 
