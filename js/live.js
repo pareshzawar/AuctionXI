@@ -3,7 +3,7 @@
 
 import { db } from './db.js';
 import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
-import { placeBid, myBidderSeat } from './actions.js';
+import { placeBid, myBidderSeat, viewGate, waitUntilOpen } from './actions.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
@@ -45,6 +45,9 @@ if (stage) {
 }
 
 async function boot() {
+  const gate = await viewGate(aid);
+  if (!gate.meta) { $('#app').innerHTML = '<div class="card"><h2>Auction not found</h2><p><a href="index.html">Back to home</a></p></div>'; return; }
+  if (!gate.ok) { waitUntilOpen(aid, gate.meta, $('#app')); return; }
   if (isBidder()) {
     const seat = await myBidderSeat(aid);
     if (!seat) {

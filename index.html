@@ -32,7 +32,9 @@
           <input id="join-code" class="code-input" placeholder="SPL-7K2Q" autocomplete="off" required style="flex:1;min-width:0;letter-spacing:.15em">
           <button class="btn-primary btn-lg">Find auction</button>
         </form>
+        <div id="open-now" class="hidden" style="margin-top:var(--space-4)"></div>
         <div id="join-step" class="hidden">
+          <p id="join-private" class="notice notice-warn hidden" style="margin-top:var(--space-4)">This auction is not open yet. The organisers will share the link when it opens. Organisers can join with the admin code.</p>
           <p style="margin-top:var(--space-4)"><b id="join-name"></b> <span id="join-status"></span></p>
           <label for="join-role">I am joining as</label>
           <select id="join-role">

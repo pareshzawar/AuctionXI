@@ -465,6 +465,17 @@ export function leaderNamesUpdate(a) {
   return updates;
 }
 
+/* ---------------- who can see an auction ---------------- */
+
+// private: only admins (while setting up); link: anyone with the link or code;
+// listed: also shown on the home page. Older auctions have no setting and are "link".
+export const VISIBILITY = {
+  private: 'Private: only admins (setting up)',
+  link: 'Anyone with the link or code',
+  listed: 'Listed on the home page',
+};
+export const visibilityOf = (meta) => (VISIBILITY[meta?.visibility] ? meta.visibility : 'link');
+
 /* ---------------- batting and bowling ---------------- */
 
 export const BOWLING_TYPES = ['Fast', 'Medium-fast', 'Medium', 'Off-spin', 'Leg-spin', 'Spin'];

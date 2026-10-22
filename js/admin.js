@@ -3,11 +3,12 @@ import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
-  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf,
+  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
   startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
+  setVisibility, syncDirectory, directoryEntry,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
@@ -17,6 +18,7 @@ import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, set
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
+import { downloadTracker } from './tracker.js';
 import { watchMedia, applyMedia, setPlayerPhoto, setBrand, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
@@ -86,8 +88,10 @@ async function boot() {
     $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
       + ` ${badge(A.meta.kind === 'mini' ? 'retained' : 'upcoming', { text: A.meta.kind === 'mini' ? 'Mini auction' : 'Major auction' })}`
       + (A.meta.mock ? ` ${badge('unsold', { text: 'Mock' })}` : '')
+      + (visibilityOf(A.meta) === 'private' ? ` ${badge('unsold', { text: 'Private' })}` : '')
       + ` <small>${esc([A.meta.tournament, A.meta.season && `season ${A.meta.season}`, A.meta.kind === 'mini' && `based on ${A.meta.parentName || A.meta.parent}`].filter(Boolean).join(' · '))}</small>`;
     mockBar();
+    keepDirectory();
     render();
   });
 
@@ -439,6 +443,7 @@ function players(el) {
       <div class="section-title">
         <h2>Players (${list.length})</h2><small>${esc(counts)}</small><span class="spacer"></span>
         <button class="btn-sm" id="p-template">Download players template</button>
+        <button class="btn-sm" id="p-tracker" title="Excel workbook to run or follow the auction by hand: teams, captains, purses, players and a tracker that applies the rules">Offline tracker (Excel)</button>
         <button class="btn-sm" id="p-export">Export current list</button>
         ${locked ? '' : `
           <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Upload players CSV<input type="file" accept=".csv,text/csv" id="p-upload" hidden></label>
@@ -474,6 +479,7 @@ function players(el) {
 
   $('#p-template').onclick = () => download('players_template.csv', playerTemplate());
   $('#p-export').onclick = () => download(`${aid}_players.csv`, playersToCSV(A.players));
+  $('#p-tracker').onclick = run(saveTracker);
   if (locked) {
     $('#p-unlock') && ($('#p-unlock').onclick = run(() => db.set(`${P}/meta/locked`, false)));
     return;
@@ -549,6 +555,12 @@ function players(el) {
     await db.set(`${P}/players/${id}`, null);
     await syncLeaders({ link: false });
   });
+}
+
+// The offline Excel tracker: this auction's teams, captains, purses and players, with the rules as formulas.
+async function saveTracker() {
+  toast('Preparing the Excel tracker…');
+  await downloadTracker(A, `${slug(A.meta.name) || aid}_tracker.xlsx`);
 }
 
 /* Pictures: league logo and banner (Setup tab), player photos (Players tab) */
@@ -656,6 +668,7 @@ function access(el) {
   const caps = Object.entries(captains);
   el.innerHTML = `
     <div class="grid grid-2">
+      ${visibilityCard()}
       <div class="card">
         <h2>Share with everyone</h2>
         <p>Auction code <span class="secret">${aid}</span></p>
@@ -711,6 +724,12 @@ function access(el) {
     </div>`;
 
   if (window.QRCode) new window.QRCode($('#qr'), { text: joinUrl, width: 150, height: 150 });
+  $$('[data-vis]', el).forEach((b) => (b.onclick = run(async () => {
+    if (b.dataset.vis === 'listed' && !confirm('List this auction on the AuctionXI home page? Anyone who opens the site can watch it (purses and codes stay private).')) return;
+    await setVisibility(aid, A.meta, b.dataset.vis);
+    directoryKey = null;
+    toast(VISIBILITY[b.dataset.vis], 'ok');
+  })));
   el.onclick = run(async (e) => {
     const d = e.target.dataset;
     if (d.kick) await db.set(`captains/${aid}/${d.kick}`, null);
@@ -820,6 +839,32 @@ function control(el) {
   });
 }
 
+// A listed auction's home-page entry follows its name, date and status.
+let directoryKey = null;
+function keepDirectory() {
+  if (visibilityOf(A.meta) !== 'listed') return;
+  const key = JSON.stringify(directoryEntry(A.meta));
+  if (key === directoryKey) return;
+  directoryKey = key;
+  syncDirectory(aid, A.meta).catch((e) => console.warn('directory', e));
+}
+
+function visibilityCard() {
+  const v = visibilityOf(A.meta);
+  return `<div class="card" style="grid-column:1/-1">
+    <h2>Who can see this auction</h2>
+    <div class="ax-seg" role="group" aria-label="Who can see this auction" style="margin-bottom:var(--space-3)">
+      ${Object.entries(VISIBILITY).map(([k, label]) => `<button type="button" data-vis="${k}" aria-pressed="${v === k}">${esc(label)}</button>`).join('')}
+    </div>
+    <p class="muted" style="margin:0">${v === 'private'
+      ? '<b>Private.</b> Only you and co-admins can open it, so you can set it up in peace. Captains, members, the audience and the stage screen on another device see "not open yet". Open it before you share codes.'
+      : v === 'link'
+        ? '<b>Open to anyone with the link or auction code.</b> It is not listed anywhere: share the link or QR code with the attendees.'
+        : '<b>Listed.</b> Anyone opening the AuctionXI site sees it under "Auctions open now" and can watch with one tap. Captains still need their own code to bid.'}
+      Purse privacy, captain codes and workbooks stay protected in every setting.</p>
+  </div>`;
+}
+
 // On a mock auction: a strip above the tabs to reset it, delete it, or go back to the real one.
 function mockBar() {
   let bar = $('#mockbar');
@@ -882,6 +927,7 @@ function controlStart(el) {
         ${check(toAuction >= needed, `Enough players to auction for every team to reach ${rules.squadSize} (teams need ${needed}; you have ${toAuction})`)}
         ${check(!short.length, short.length ? `Budget too small to fill the squad at base price: ${short.map((id) => esc(A.teams[id].name)).join(', ')}` : 'Every budget covers the players still to buy at base price')}
         ${check(meta.locked, 'Player list locked')}
+        ${check(visibilityOf(meta) !== 'private', visibilityOf(meta) === 'private' ? 'Open the auction to viewers (Access and sharing). It is private now' : 'Open to viewers')}
         ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>
       <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team (value ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, not taken from the purse), and opens bidding.</p>
@@ -892,6 +938,10 @@ function controlStart(el) {
   $('#c-start').onclick = run(async () => {
     if (missing.length && !confirm(`${missing.length} team(s) have no ${hasVC(rules) ? 'captain or vice-captain' : 'captain'} set. Start anyway?`)) return;
     if (!missing.length && !confirm('Start the auction now?')) return;
+    if (visibilityOf(meta) === 'private') {
+      if (!confirm('This auction is private: captains and the audience cannot see it. Open it to anyone with the link and start?')) return;
+      await setVisibility(aid, meta, 'link');
+    }
     await startAuction(aid, A);
   });
 }
@@ -1023,6 +1073,7 @@ function results(el) {
         <div class="row">
           <button id="r-csv">Download squads CSV</button>
           <button id="r-json">Download full auction JSON</button>
+          <button id="r-tracker">Offline tracker (Excel)</button>
         </div>
       </div>
       <div class="card">
@@ -1048,6 +1099,7 @@ function results(el) {
     });
     download(`${aid}_results.csv`, toCSV(['team', 'player_id', 'name', 'role', 'category', 'price', 'how'], [...rows, ...unsold]));
   };
+  $('#r-tracker').onclick = run(saveTracker);
   $('#r-json').onclick = () => download(`${slug(A.meta.name) || aid}.auction.json`, JSON.stringify(exportSnapshot(A), null, 2), 'application/json');
 }
 
