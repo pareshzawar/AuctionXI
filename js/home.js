@@ -1,5 +1,5 @@
 import { db, isLocal } from './db.js';
-import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate } from './actions.js';
+import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction } from './actions.js';
 import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
 import { vcCanBid, withDefaults, normalize, visibilityOf } from './engine.js';
@@ -222,3 +222,20 @@ if (!isLocal) {
     $$('[data-join]').forEach((b) => (b.onclick = () => find(b.dataset.join)));
   });
 }
+
+// A past auction kept as a record (an AuctionXI auction.json, e.g. from Results → Full auction JSON).
+$('#c-record').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const snap = JSON.parse(await file.text());
+    const n = Object.keys(snap.sales || {}).length;
+    if (!confirm(`Add "${snap.meta?.name || file.name}" as a finished auction record (${n} sales)? It stays private to you.`)) return;
+    const { aid } = await importAuction(snap);
+    rememberAuction(aid, snap.meta.name, 'admin');
+    location.href = pageUrl('admin.html', { a: aid, tab: 'results' });
+  } catch (err) {
+    toast(err instanceof SyntaxError ? 'That file is not valid JSON' : err.message, 'error');
+  }
+});
