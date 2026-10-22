@@ -244,6 +244,7 @@ export function createCommentator({ onLine = () => {}, lang = 'en' } = {}) {
 
 const VOICE_LANGS = { en: ['en-IN', 'en'], hi: ['en-IN', 'hi-IN', 'en'], mr: ['mr-IN', 'hi-IN'] };
 const RUPEES = { en: 'rupees', hi: 'rupaye', mr: 'रुपये' };
+const POINTS = { en: 'points', hi: 'points', mr: 'पॉइंट्स' };
 const LAKH = { en: ['lakh', 'crore'], hi: ['lakh', 'crore'], mr: ['लाख', 'कोटी'] };
 
 // Reads lines aloud with the browser's own speech (free, on the device). A new bid cuts off an
@@ -255,7 +256,8 @@ export function createVoice() {
   const spoken = (t, lg) => t
     .replace(/₹\s?([\d.,]+)\s?Cr\b/g, `$1 ${LAKH[lg][1]} ${RUPEES[lg]}`)
     .replace(/₹\s?([\d.,]+)\s?L\b/g, `$1 ${LAKH[lg][0]} ${RUPEES[lg]}`)
-    .replace(/₹\s?([\d,]+)/g, `$1 ${RUPEES[lg]}`);
+    .replace(/₹\s?([\d,]+)/g, `$1 ${RUPEES[lg]}`)
+    .replace(/([\d,]+) pts\b/g, `$1 ${POINTS[lg]}`);
   const voiceFor = (lg) => {
     const voices = synth.getVoices();
     for (const want of VOICE_LANGS[lg] || VOICE_LANGS.en) {

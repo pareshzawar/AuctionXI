@@ -394,6 +394,125 @@ export function leadersOf(a, teamId) {
   return out;
 }
 
+// Captain and vice-captain names typed in the teams template (team.captainName / team.vcName)
+// make those players the team's leaders. A name matches a player exactly, or uniquely by all its
+// words ("Kiran" → "Kiran Patil"). A name with no player adds one (autoLeader), so captains need
+// not be in the players file. Whoever held the seat before goes back into the auction pool.
+// Returns { updates, warnings }: paths under the auction for db.update.
+export function linkLeaders(a) {
+  const warnings = [];
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const words = (s) => norm(s).split(' ').filter(Boolean);
+  const players = Object.fromEntries(Object.entries(a.players).map(([id, p]) => [id, { ...p }]));
+  const removed = new Set();
+  const lastPool = a.rules.categories.at(-1)?.id || null;
+  const seated = new Map(); // pid -> "team/as" given in this pass
+  let n = Object.keys(players).length;
+  const newId = () => { let id; do { n++; id = 'P' + String(n).padStart(3, '0'); } while (players[id]); return id; };
+  for (const [tid, t] of Object.entries(a.teams)) {
+    for (const [as, name] of [['C', t.captainName], ['VC', t.vcName]]) {
+      if (!name || !String(name).trim()) continue;
+      const label = `${t.name}: ${as === 'C' ? 'captain' : 'vice-captain'} ${name}`;
+      if (as === 'VC' && a.rules.leaders === 'captain') { warnings.push(`${label} ignored: this tournament has captains only`); continue; }
+      const live = Object.entries(players).filter(([id]) => !removed.has(id));
+      let found = live.filter(([, p]) => norm(p.name) === norm(name));
+      if (!found.length) {
+        const want = words(name);
+        found = live.filter(([, p]) => want.every((w) => words(p.name).includes(w)));
+        if (found.length === 1) warnings.push(`${label}: matched to ${found[0][1].name}`);
+        if (found.length > 1) { warnings.push(`${label}: several players match (${found.map(([, p]) => p.name).join(', ')}); write the full name`); continue; }
+      }
+      // Prefer a real player over a placeholder made earlier; drop duplicate placeholders.
+      found.sort(([, x], [, y]) => Number(!!x.autoLeader) - Number(!!y.autoLeader));
+      let pid = found[0]?.[0];
+      for (const [id, p] of found.slice(1)) if (p.autoLeader) removed.add(id);
+      if (!pid) {
+        pid = newId();
+        players[pid] = { name: String(name).trim(), role: 'ar', category: lastPool, autoLeader: true };
+      }
+      const p = players[pid];
+      if (seated.has(pid)) { warnings.push(`${label}: ${p.name} is already ${seated.get(pid)}`); continue; }
+      if (p.allottedTeam && (p.allottedTeam !== tid || p.allottedAs !== as) && !p.autoLeader) warnings.push(`${label}: moved from ${a.teams[p.allottedTeam]?.name || p.allottedTeam} ${p.allottedAs}`);
+      // Anyone else in this seat goes back into the pool (a placeholder is removed).
+      for (const [id, q] of Object.entries(players)) {
+        if (id !== pid && q.allottedTeam === tid && q.allottedAs === as) {
+          if (q.autoLeader) removed.add(id); else { q.allottedTeam = null; q.allottedAs = null; }
+        }
+      }
+      p.allottedTeam = tid; p.allottedAs = as;
+      seated.set(pid, `${t.name} ${as}`);
+    }
+  }
+  const updates = {};
+  for (const [id, p] of Object.entries(players)) {
+    if (removed.has(id)) { if (a.players[id]) updates[`players/${id}`] = null; continue; }
+    const old = a.players[id];
+    if (!old) { updates[`players/${id}`] = p; continue; }
+    if ((old.allottedTeam || null) !== (p.allottedTeam || null)) updates[`players/${id}/allottedTeam`] = p.allottedTeam || null;
+    if ((old.allottedAs || null) !== (p.allottedAs || null)) updates[`players/${id}/allottedAs`] = p.allottedAs || null;
+  }
+  return { updates, warnings };
+}
+
+// Keep each team's captain / vice-captain names in step with who is actually allotted.
+export function leaderNamesUpdate(a) {
+  const updates = {};
+  for (const [tid, t] of Object.entries(a.teams)) {
+    const l = leadersOf(a, tid);
+    if ((t.captainName || null) !== (l.C?.name || null)) updates[`teams/${tid}/captainName`] = l.C?.name || null;
+    if ((t.vcName || null) !== (l.VC?.name || null)) updates[`teams/${tid}/vcName`] = l.VC?.name || null;
+  }
+  return updates;
+}
+
+/* ---------------- batting and bowling ---------------- */
+
+export const BOWLING_TYPES = ['Fast', 'Medium-fast', 'Medium', 'Off-spin', 'Leg-spin', 'Spin'];
+
+// "Right", "R", "RHB", "Right-hand bat", "Left-arm spin"… → 'R' / 'L'
+export function parseHand(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return null;
+  if (/^(l|lh|lhb|la|lf|lm|ls)$/.test(s) || /\bleft/.test(s)) return 'L';
+  if (/^(r|rh|rhb|ra|rf|rm)$/.test(s) || /\bright/.test(s)) return 'R';
+  return null;
+}
+
+// "fast", "RM", "off spin", "leg-spin", "chinaman"… → one of BOWLING_TYPES (other text kept as written)
+export function parseBowlingType(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s || /^(none|no|nil|-|na|n\/a|does ?n.?t bowl)$/.test(s)) return null;
+  if (/^(rf|lf)$/.test(s)) return 'Fast';
+  if (/^(rm|lm)$/.test(s)) return 'Medium';
+  if (/^(ls)$/.test(s)) return 'Spin';
+  if (/medium[- ]?fast|fast[- ]?medium/.test(s)) return 'Medium-fast';
+  if (/fast|pace|quick/.test(s)) return 'Fast';
+  if (/medium/.test(s)) return 'Medium';
+  if (/off/.test(s)) return 'Off-spin';
+  if (/leg|wrist|chinaman/.test(s)) return 'Leg-spin';
+  if (/spin|slow|orthodox/.test(s)) return 'Spin';
+  if (/^(right|left|r|l)([- ]arm)?$/.test(s)) return null; // only the arm was written
+  return String(v).trim();
+}
+
+// Older player lists had free-text batting_style / bowling_style; read those too.
+export const battingHandOf = (p) => p.battingHand || parseHand(p.battingStyle);
+export const bowlingArmOf = (p) => p.bowlingArm || (p.bowlingStyle && /\b(left|right)/i.test(p.bowlingStyle) ? parseHand(p.bowlingStyle) : null);
+export const bowlingTypeOf = (p) => p.bowlingType || parseBowlingType(p.bowlingStyle);
+
+export function battingLabel(p) {
+  const h = battingHandOf(p);
+  return h ? `${h === 'L' ? 'Left' : 'Right'}-hand bat` : '';
+}
+
+export function bowlingLabel(p) {
+  const arm = bowlingArmOf(p);
+  const type = bowlingTypeOf(p);
+  const side = arm ? `${arm === 'L' ? 'Left' : 'Right'}-arm` : '';
+  if (side && type) return `${side} ${type.toLowerCase()}`;
+  return type || (side ? `${side} bowler` : '');
+}
+
 /* ---------------- misc ---------------- */
 
 export function initials(name) {

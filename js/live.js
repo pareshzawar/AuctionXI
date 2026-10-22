@@ -101,7 +101,7 @@ function renderStage() {
       <header class="stage-top">
         ${logoImg(A, { size: 112, cls: 'stage-logo' })}
         <div class="stage-brand">
-          <span class="stage-label">AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}${hasLot && live.status === 'bidding' && live.drawn ? ` · ${live.drawn === 'chit' ? 'Chit' : `Random draw${live.drawnPool ? ` from ${esc(category(rules, live.drawnPool)?.label || live.drawnPool)}` : ''}`}` : ''}</span>
+          <span class="stage-label">${meta.mock ? '<span style="color:var(--gold)">Mock auction</span> · ' : ''}AuctionXI${total && lot ? ` · Lot ${lot} of ${total}` : ''}${hasLot && live.status === 'bidding' && live.drawn ? ` · ${live.drawn === 'chit' ? 'Chit' : `Random draw${live.drawnPool ? ` from ${esc(category(rules, live.drawnPool)?.label || live.drawnPool)}` : ''}`}` : ''}</span>
           <h1 class="stage-title">${esc(meta.name)}</h1>
         </div>
         <div class="stage-tally">
@@ -112,8 +112,8 @@ function renderStage() {
       </header>
       <div class="stage-main">
         ${hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
-          : `<div class="stage-wait" style="grid-column:1/-1"><div>${bannerImg(A, { cls: 'stage-banner' })}<h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
-             <p>${esc([meta.tournament, meta.venue, meta.date].filter(Boolean).join(' · '))}</p>
+          : `<div class="stage-wait ${A.media?.banner ? 'has-banner' : ''}" style="grid-column:1/-1">${bannerImg(A, { cls: 'stage-banner' })}<div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
+             <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
       ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm"><span class="stage-label">Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
@@ -156,8 +156,9 @@ function renderPhone() {
       <div class="brand-row">
         ${logoImg(A, { size: 56 })}
         <div style="min-width:0"><h1 style="margin:0">${esc(meta.name)}</h1>
-        <small>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date].filter(Boolean).join(' · '))}</small></div>
+        <small>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</small></div>
       </div>
+      ${meta.mock ? badge('unsold', { text: 'Mock auction' }) : ''}
       ${badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? `Live · Round ${meta.round || 1}` : meta.status === 'completed' ? 'Completed' : 'Not started' })}
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>
     </div>

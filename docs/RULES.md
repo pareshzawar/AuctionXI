@@ -22,7 +22,7 @@ Amounts can be written however people type them: `50`, `200`, `5,00,000`, `5L`, 
 | `purse_visibility` | `own` | Who sees remaining purse and max bid (below) |
 | Base price | ₹50 | Starting price of every auctioned player (one category). Add more categories if some players start higher |
 
-In the players CSV, mark each team's captain and vice-captain with `allotted_team` (the team ID) and `allotted_as` (`C` or `VC`). Everyone else is auctioned.
+Name each team's captain and vice-captain in the teams template (`captain`, `vice_captain` columns) or in the Teams tab. They are matched to the players list by name, and added to it if they aren't there. (The players CSV's `allotted_team` + `allotted_as` columns still work too.) Everyone else is auctioned.
 
 ## Pools and choosing the next player
 

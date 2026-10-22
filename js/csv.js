@@ -1,28 +1,32 @@
 // CSV parsing / writing, the player + team templates, and the tournament setup
 // questionnaire (rules + house rules as a fill-in CSV).
 
-import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILITY } from './engine.js';
+import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILITY, parseHand, parseBowlingType, battingHandOf, bowlingArmOf, bowlingTypeOf } from './engine.js';
 
 // allotted_team + allotted_as (C or VC): the captain / vice-captain given to a team before
 // the auction, at the captain / vice-captain price from the setup. Everyone else is auctioned.
+// batting_hand: Right / Left. bowling_arm: Right / Left (blank = does not bowl).
+// bowling_type: Fast, Medium-fast, Medium, Off-spin, Leg-spin or Spin.
 export const PLAYER_COLUMNS = [
-  'id', 'name', 'role', 'pool', 'base_price', 'batting_style', 'bowling_style', 'age',
+  'id', 'name', 'role', 'pool', 'base_price', 'batting_hand', 'bowling_arm', 'bowling_type', 'age',
   'locality', 'photo_url', 'matches', 'runs', 'wickets', 'notes', 'allotted_team', 'allotted_as',
 ];
 
-export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'owner', 'logo_url'];
+// Only `name` is required. captain / vice_captain: player names; they become the team's leaders
+// (added to the player list if they are not in the players file).
+export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'captain', 'vice_captain', 'owner', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
-  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right-hand bat', 'Left-arm spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
-  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left-hand bat', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
-  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right-hand bat', '', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
-  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right-hand bat', 'Right-arm medium', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
-  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Right-hand bat', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
+  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
+  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left', '', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
+  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right', 'Right', 'Off-spin', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
+  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right', 'Right', 'Fast', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
+  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Left', '', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
 ];
 
 const TEAM_EXAMPLE = [
-  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Mr. Kulkarni', ''],
-  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Mrs. Desai', ''],
+  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Vikram Rao', 'Amit Shah', 'Mr. Kulkarni', ''],
+  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Sanjay Mehta', '', '', ''],
 ];
 
 // Design-system default team colours (team-1 … team-8, night theme).
@@ -118,13 +122,22 @@ export function importPlayers(rows, rules, existingIds = []) {
       leaders[team][as] = r.name;
       if (as === 'VC' && rules.leaders === 'captain') warnings.push(`Row ${line}: ${r.name} is vice-captain, but this tournament has captains only`);
     }
+    // Batting hand and bowling arm / type (older files: batting_style, bowling_style).
+    const batIn = r.batting_hand ?? r.batting ?? r.batting_style ?? '';
+    const hand = parseHand(batIn);
+    if (batIn && !hand) warnings.push(`Row ${line}: batting_hand "${batIn}" should be Right or Left`);
+    const armIn = r.bowling_arm ?? (r.bowling_style && /\b(left|right)/i.test(r.bowling_style) ? r.bowling_style : '');
+    const btype = parseBowlingType(r.bowling_type ?? r.bowling_style ?? '');
+    const arm = btype || r.bowling_arm ? parseHand(armIn) : null;
+    if (r.bowling_arm && !parseHand(r.bowling_arm) && !/^(none|no|-)$/i.test(r.bowling_arm)) warnings.push(`Row ${line}: bowling_arm "${r.bowling_arm}" should be Right or Left`);
     players[id] = {
       name: r.name,
       role: roleId(r.role),
       category: cat,
       basePrice: num(r.base_price),
-      battingStyle: r.batting_style || null,
-      bowlingStyle: r.bowling_style || null,
+      battingHand: hand,
+      bowlingArm: arm,
+      bowlingType: btype,
       age: num(r.age),
       locality: r.locality || null,
       photoUrl: r.photo_url || null,
@@ -153,6 +166,8 @@ export function importTeams(rows) {
       color: /^#[0-9a-f]{3,8}$/i.test(r.color) ? r.color : TEAM_COLORS[Object.keys(teams).length % TEAM_COLORS.length],
       owner: r.owner || null,
       logoUrl: r.logo_url || null,
+      captainName: (r.captain || r.captain_name || '').trim() || null,
+      vcName: (r.vice_captain || r['vice-captain'] || r.vc || r.vicecaptain || '').trim() || null,
     };
   });
   return { teams, warnings };
@@ -160,7 +175,8 @@ export function importTeams(rows) {
 
 export function playersToCSV(players) {
   return toCSV(PLAYER_COLUMNS, Object.entries(players).map(([id, p]) => [
-    id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice, p.battingStyle, p.bowlingStyle,
+    id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice,
+    { R: 'Right', L: 'Left' }[battingHandOf(p)] || '', { R: 'Right', L: 'Left' }[bowlingArmOf(p)] || '', bowlingTypeOf(p) || '',
     p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.notes, p.allottedTeam, p.allottedAs,
   ]));
 }
@@ -169,7 +185,7 @@ export function playersToCSV(players) {
 
 export const SETUP_COLUMNS = ['section', 'key', 'question', 'answer', 'help'];
 const MAX_CATEGORIES = 6; // pools
-const MAX_INCREMENTS = 4;
+const MAX_INCREMENTS = 6;
 
 // House-rule questions every organiser should answer. Answers are shown to everyone
 // on the live page; where the app can enforce a rule, the help text says which setting does it.
@@ -200,7 +216,7 @@ function setupFields() {
   const number = (section, key, q, help, prop, { required = false } = {}) => f.push([section, key, q, help,
     (m, r) => r[prop] ?? '',
     (m, r, v, warn) => {
-      if (v === '') { if (!required) r[prop] = 0; return; }
+      if (v === '') { if (required) warn(`${key} is blank: kept ${r[prop]}. Fill it in`); else r[prop] = 0; return; }
       const n = num(v);
       if (n == null || n < 0) warn(`${key}: "${v}" is not a number, kept ${r[prop]}`);
       else r[prop] = n;
@@ -208,10 +224,11 @@ function setupFields() {
 
   text('Tournament', 'auction_name', 'Auction name', 'Shown on every screen', ['meta', 'name']);
   text('Tournament', 'tournament_name', 'Tournament name', 'e.g. Society Premier League', ['meta', 'tournament']);
+  text('Tournament', 'season', 'Season', 'e.g. 2026 or 3. Auctions of the same tournament are grouped by season', ['meta', 'season']);
   text('Tournament', 'venue', 'Venue', 'e.g. Clubhouse hall', ['meta', 'venue']);
   text('Tournament', 'date', 'Auction date (YYYY-MM-DD)', 'e.g. 2026-11-15', ['meta', 'date']);
+  text('Tournament', 'time', 'Auction time', 'e.g. 6 PM - 9 PM', ['meta', 'time']);
   text('Tournament', 'organiser', 'Organiser', 'e.g. Sports committee', ['meta', 'organiser']);
-  number('Tournament', 'players_per_side', 'Players per side in a match', 'e.g. 11, 8 or 6 (box cricket)', 'playersPerSide');
   number('Tournament', 'overs', 'Overs per innings', 'Information only', 'overs');
 
   f.push(['Money', 'currency', 'Currency', '₹ for virtual rupees (₹50, ₹5 L, ₹1.2 Cr), or pts for points', (m, r) => r.currency, (m, r, v) => { r.currency = v || '₹'; }]);

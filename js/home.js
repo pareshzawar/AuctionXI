@@ -19,7 +19,7 @@ async function loadKnown() {
     .sort((x, y) => String(y.meta.season || '').localeCompare(String(x.meta.season || ''), undefined, { numeric: true }) || (y.meta.createdAt || 0) - (x.meta.createdAt || 0));
 }
 
-const kindBadge = (m) => badge(m.kind === 'mini' ? 'retained' : 'upcoming', { text: m.kind === 'mini' ? 'Mini' : 'Major' });
+const kindBadge = (m) => (m.mock ? badge('unsold', { text: 'Mock' }) : badge(m.kind === 'mini' ? 'retained' : 'upcoming', { text: m.kind === 'mini' ? 'Mini' : 'Major' }));
 const statusText = (m) => (m.status === 'live' ? 'live' : m.status === 'completed' ? 'completed' : 'in setup');
 const label = (x) => `${x.meta.season ? `${x.meta.season} · ` : ''}${x.meta.kind === 'mini' ? 'Mini' : 'Major'} · ${x.meta.name} (${x.id})`;
 
@@ -50,7 +50,8 @@ function renderCreateOptions() {
   const names = [...new Set(known.map((x) => x.meta.tournament).filter(Boolean))];
   $('#c-tournaments').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
   // Same tournament first; all others after, so a renamed tournament still works.
-  const ordered = [...known.filter((x) => (x.meta.tournament || '').toLowerCase() === tournament), ...known.filter((x) => (x.meta.tournament || '').toLowerCase() !== tournament)];
+  const real = known.filter((x) => !x.meta.mock); // a mock auction is never copied or followed
+  const ordered = [...real.filter((x) => (x.meta.tournament || '').toLowerCase() === tournament), ...real.filter((x) => (x.meta.tournament || '').toLowerCase() !== tournament)];
   const keepCopy = $('#c-copy').value;
   const keepParent = $('#c-parent').value;
   $('#c-copy').innerHTML = '<option value="">Nothing: start from the setup questionnaire</option>'

@@ -21,7 +21,7 @@ function render(A) {
   $('#title').textContent = meta.name;
   $('#brand').innerHTML = bannerImg(A, { cls: 'phone-banner' });
   $('#logo').innerHTML = logoImg(A, { size: 64 });
-  $('#subtitle').textContent = [meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.venue, meta.date, meta.status === 'completed' ? 'Completed' : meta.status === 'live' ? 'In progress' : null].filter(Boolean).join(' · ');
+  $('#subtitle').textContent = [meta.tournament, meta.season && `Season ${meta.season}`, meta.kind === 'mini' ? 'Mini auction' : null, meta.mock ? 'Mock auction (practice)' : null, meta.venue, meta.date, meta.time, meta.status === 'completed' ? 'Completed' : meta.status === 'live' ? 'In progress' : null].filter(Boolean).join(' · ');
 
   const sales = Object.entries(A.sales).filter(([, s]) => !s.allotted && !s.retained);
   const top = [...sales].sort((x, y) => y[1].price - x[1].price)[0];

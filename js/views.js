@@ -2,7 +2,7 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel } from './engine.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
@@ -104,7 +104,7 @@ export function squadRows(a, teamId) {
   return teamSummary(a, teamId).players.sort((x, y) => Number(y.allotted) - Number(x.allotted) || y.price - x.price).map((p) => ({
     id: p.id,
     name: p.name,
-    sub: [p.allotted ? leaderLabel(p.as) : null, p.battingStyle, p.bowlingStyle].filter(Boolean).join(' · '),
+    sub: [p.allotted ? leaderLabel(p.as) : null, battingLabel(p), bowlingLabel(p)].filter(Boolean).join(' · '),
     role: p.role,
     category: category(a.rules, p.category)?.label,
     status: p.allotted ? 'retained' : 'sold',
