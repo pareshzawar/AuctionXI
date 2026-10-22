@@ -257,3 +257,5 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
   .ax-card, .ax-purse, .ax-bidpanel, .ax-table-wrap { break-inside: avoid; box-shadow: none; }
   .ax-ticker, .ax-bid, .ax-seg { display: none; }
 }
+.ax-profile-link { align-self: flex-start; font-size: 13px; font-weight: 600; color: var(--gold); text-decoration: none; }
+.ax-profile-link:hover { text-decoration: underline; }

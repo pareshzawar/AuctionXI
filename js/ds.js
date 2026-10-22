@@ -59,10 +59,16 @@ function photo(p, cls) {
 const metaLine = (p) => [p.age ? `Age ${p.age}` : null, battingLabel(p), bowlingLabel(p), p.locality].filter(Boolean).join(' · ');
 const dash = (v) => (v == null || v === '' ? '—' : String(v));
 
+// Batting first (matches, runs, strike rate, highest), then bowling (wickets, economy).
 export function playerStats(p) {
-  return [['Matches', p.matches], ['Runs', p.runs], ['Wickets', p.wickets]]
+  const sr = p.strikeRate != null && p.strikeRate !== '' ? Math.round(Number(p.strikeRate)) : null;
+  const eco = p.economy != null && p.economy !== '' ? Number(p.economy).toFixed(1) : null;
+  return [['Matches', p.matches], ['Runs', p.runs], ['Strike rate', sr], ['Highest', p.highest], ['Wickets', p.wickets], ['Economy', eco]]
     .filter(([, v]) => v != null && v !== '').map(([label, v]) => ({ label, value: dash(v) }));
 }
+
+const profileLink = (p) => (/^https:\/\//.test(p.cricheroesUrl || '')
+  ? `<a class="ax-profile-link" href="${esc(p.cricheroesUrl)}" target="_blank" rel="noopener noreferrer">CricHeroes profile</a>` : '');
 
 // variant 'stage' = the projector lot card; 'tile' = pools, phones, console.
 // opts: { status, category: {label, featured}, lot, base, rules, currentBid, soldTo, soldPrice }
@@ -97,6 +103,7 @@ export function playerCard(p, o) {
     + `<div class="ax-chips">${roleChip(p.role)}</div>`
     + (o.showNotes === false ? '' : notes)
     + statGrid(playerStats(p), { columns: 3 })
+    + profileLink(p)
     + `<div class="ax-card-foot"><div class="ax-kv"><span class="ax-k">Base price</span>${price(o.base, o.rules, { tone: status === 'unsold' ? 'muted' : '' })}</div>${right}</div>`
     + '</article>';
 }

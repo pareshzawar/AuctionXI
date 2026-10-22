@@ -219,14 +219,21 @@ export function buildDeck(PptxGenJS, auction) {
     s.addText(p.name, { x, y: 1.0, w, h: 1.0, fontFace: FONT, fontSize: 44, bold: true, color: C.ink, fit: 'shrink' });
     s.addText(ROLES[roleId(p.role)].name, { x, y: 2.0, w: 3.0, h: 0.45, fontFace: FONT, fontSize: 16, bold: true, color: C.bg, fill: { color: C.gold }, align: 'center', valign: 'middle' });
     s.addText([p.age ? `Age ${p.age}` : null, battingLabel(p), bowlingLabel(p), p.locality].filter(Boolean).join('  ·  '), { x, y: 2.6, w, h: 0.45, fontFace: FONT, fontSize: 16, color: C.muted });
-    const stats = [['Matches', p.matches], ['Runs', p.runs], ['Wickets', p.wickets]].filter(([, v]) => v != null && v !== '');
+    // Up to six numbers, three to a row: batting, then bowling.
+    const sr = p.strikeRate != null && p.strikeRate !== '' ? Math.round(Number(p.strikeRate)) : null;
+    const eco = p.economy != null && p.economy !== '' ? Number(p.economy).toFixed(1) : null;
+    const stats = [['Matches', p.matches], ['Runs', p.runs], ['Strike rate', sr], ['Highest', p.highest], ['Wickets', p.wickets], ['Economy', eco]]
+      .filter(([, v]) => v != null && v !== '');
     stats.forEach(([k, v], i) => {
-      const sx = x + i * 2.25;
-      card(s, sx, 3.25, 2.05, 1.15);
-      s.addText([{ text: k.toUpperCase(), options: { fontSize: 11, color: C.muted, bold: true, charSpacing: 2, breakLine: true } }, { text: String(v), options: { fontSize: 30, bold: true, color: C.ink } }],
-        { x: sx + 0.15, y: 3.3, w: 1.85, h: 1.05, fontFace: FONT, valign: 'middle' });
+      const sx = x + (i % 3) * 2.45;
+      const sy = 3.1 + Math.floor(i / 3) * 0.95;
+      card(s, sx, sy, 2.3, 0.85);
+      s.addText([{ text: k.toUpperCase(), options: { fontSize: 10, color: C.muted, bold: true, charSpacing: 2, breakLine: true } }, { text: String(v), options: { fontSize: 24, bold: true, color: C.ink } }],
+        { x: sx + 0.15, y: sy + 0.02, w: 2.05, h: 0.8, fontFace: FONT, valign: 'middle' });
     });
-    if (p.notes) s.addText(p.notes, { x, y: stats.length ? 4.55 : 3.3, w, h: 0.7, fontFace: FONT, fontSize: 15, italic: true, color: C.ink, valign: 'top' });
+    const statRows = Math.ceil(stats.length / 3);
+    if (p.notes) s.addText(p.notes, { x, y: 3.1 + statRows * 0.95, w, h: 5.25 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
+    if (p.cricheroesUrl) s.addText('CricHeroes profile', { x: W - 4.3, y: 0.15, w: 1.8, h: 0.3, fontFace: FONT, fontSize: 10, color: C.gold, align: 'right', hyperlink: { url: p.cricheroesUrl } });
     card(s, x, 5.35, w, 0.95, C.raised);
     const ladder = [base];
     while (ladder.length < 9) ladder.push(ladder.at(-1) + increment(ladder.at(-1), r));
@@ -237,7 +244,7 @@ export function buildDeck(PptxGenJS, auction) {
     ], { x: x + 0.25, y: 5.35, w: w - 0.4, h: 0.95, fontFace: FONT, valign: 'middle' });
     s.addText('Players list', { x: W - 2.3, y: 0.15, w: 1.7, h: 0.3, fontFace: FONT, fontSize: 10, color: C.muted, align: 'right', hyperlink: { slide: indexAt, tooltip: 'Back to the players list' } });
     s.addNotes([`${p.name} (${id})`, `${ROLES[roleId(p.role)].name}, ${c?.label || ''}`, battingLabel(p), bowlingLabel(p),
-      stats.map(([k, v]) => `${k} ${v}`).join(', '), p.notes, `Base price ${amt(base)}. Bids: ${ladder.map(amt).join(', ')}`].filter(Boolean).join('\n'));
+      stats.map(([k, v]) => `${k} ${v}`).join(', '), p.notes, p.cricheroesUrl, `Base price ${amt(base)}. Bids: ${ladder.map(amt).join(', ')}`].filter(Boolean).join('\n'));
   };
   for (const c of pools) {
     const s = slide();

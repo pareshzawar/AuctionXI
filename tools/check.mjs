@@ -181,3 +181,13 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   const steps = [50, 140, 150, 290, 300, 490, 500, 690, 700, 1000].map((x) => E.increment(x, r));
   ok(JSON.stringify(steps) === JSON.stringify([10, 10, 15, 15, 20, 20, 25, 25, 50, 50]) && r.currency === 'pts' && cpl.meta.season === '3', 'CPL setup: point chart increments, points, season 3');
 }
+
+// unsold rounds bring players back in the order they first came up
+{
+  const a = E.normalize({ meta: { round: 2 }, rules: {}, teams: {}, sales: {},
+    players: { P1: { name: 'A', category: 'A' }, P2: { name: 'B', category: 'A' }, P3: { name: 'C', category: 'A' } },
+    unsold: { P2: { round: 1, at: 100 }, P3: { round: 1, at: 50 }, P1: { round: 1, at: 300, first: 10 } } });
+  const order = [];
+  for (let i = 0; i < 3; i++) { const p = E.pickNext(a); order.push(p.id); a.unsold[p.id] = { ...a.unsold[p.id], round: 2 }; }
+  ok(order.join() === 'P1,P3,P2', `unsold round: original order (${order.join()})`);
+}

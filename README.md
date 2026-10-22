@@ -110,6 +110,8 @@ Players columns:
 | `bowling_arm` | no | `Right` or `Left`; blank if the player doesn't bowl |
 | `bowling_type` | no | `Fast`, `Medium-fast`, `Medium`, `Off-spin`, `Leg-spin` or `Spin` (shorthands like `RM`, `LS` work). Shown as e.g. *Right-arm medium* |
 | `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
+| `strike_rate`, `highest_score`, `economy` | no | Shown with matches, runs and wickets (e.g. from CricHeroes). `highest_score` may be `82*` |
+| `cricheroes_url` | no | Link to the player's CricHeroes profile, shown on phones and the slides |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link"). Easier: leave it blank and upload photos in *Players → Player photos* |
 | `allotted_team`, `allotted_as` | no | Another way to set captains (the teams template is easier): the team ID and `C` or `VC`. They join that team when the auction starts, with the captain / vice-captain value (not taken from the purse), and are never auctioned |
 

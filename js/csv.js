@@ -9,7 +9,8 @@ import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILI
 // bowling_type: Fast, Medium-fast, Medium, Off-spin, Leg-spin or Spin.
 export const PLAYER_COLUMNS = [
   'id', 'name', 'role', 'pool', 'base_price', 'batting_hand', 'bowling_arm', 'bowling_type', 'age',
-  'locality', 'photo_url', 'matches', 'runs', 'wickets', 'notes', 'allotted_team', 'allotted_as',
+  'locality', 'photo_url', 'matches', 'runs', 'wickets', 'strike_rate', 'highest_score', 'economy', 'notes', 'cricheroes_url',
+  'allotted_team', 'allotted_as',
 ];
 
 // Only `name` is required. captain / vice_captain: player names; they become the team's leaders
@@ -17,11 +18,11 @@ export const PLAYER_COLUMNS = [
 export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'captain', 'vice_captain', 'owner', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
-  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '', 'T1', 'C'],
-  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left', '', '', '34', 'Wing A - 105', '', '8', '150', '0', '', 'T1', 'VC'],
-  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right', 'Right', 'Off-spin', '29', 'Wing B - 202', '', '10', '410', '1', '', 'T2', 'C'],
-  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right', 'Right', 'Fast', '28', 'Wing B - 302', '', '12', '90', '14', 'Opening bowler', '', ''],
-  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Left', '', '', '41', 'Wing D - 201', '', '', '', '', 'Available on weekends only', '', ''],
+  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '142.5', '58*', '9.2', '', 'https://cricheroes.com/player-profile/123/vikram-rao', 'T1', 'C'],
+  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left', '', '', '34', 'Wing A - 105', '', '8', '150', '0', '118', '33', '', '', '', 'T1', 'VC'],
+  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right', 'Right', 'Off-spin', '29', 'Wing B - 202', '', '10', '410', '1', '165.3', '71', '12', '', '', 'T2', 'C'],
+  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right', 'Right', 'Fast', '28', 'Wing B - 302', '', '12', '90', '14', '', '', '8.4', 'Opening bowler', '', '', ''],
+  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Left', '', '', '41', 'Wing D - 201', '', '', '', '', '', '', '', 'Available on weekends only', '', '', ''],
 ];
 
 const TEAM_EXAMPLE = [
@@ -72,6 +73,12 @@ export const playerTemplate = () => toCSV(PLAYER_COLUMNS, PLAYER_EXAMPLE);
 export const teamTemplate = () => toCSV(TEAM_COLUMNS, TEAM_EXAMPLE);
 
 // Numbers may be written as 500000, 5,00,000, 5L, 5 lakh, 1.5Cr, 2k.
+// Decimals as written: strike rate 135.12, economy 8.8.
+export function dec(v) {
+  const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 export function num(v) {
   if (v === '' || v == null) return null;
   const s = String(v).toLowerCase().replace(/[₹,\s]/g, '').replace(/rs\.?|inr/g, '');
@@ -144,7 +151,11 @@ export function importPlayers(rows, rules, existingIds = []) {
       matches: num(r.matches),
       runs: num(r.runs),
       wickets: num(r.wickets),
+      strikeRate: dec(r.strike_rate),
+      highest: (r.highest_score || r.highest || '').trim() || null, // may be "82*" (not out)
+      economy: dec(r.economy),
       notes: r.notes || null,
+      cricheroesUrl: /^https:\/\/(www\.)?cricheroes\.(com|in)\//i.test(r.cricheroes_url || '') ? r.cricheroes_url.trim() : null,
       allottedTeam: team,
       allottedAs: team ? as : null,
       allottedPrice: team && r.retained_price ? num(r.retained_price) : null,
@@ -177,7 +188,7 @@ export function playersToCSV(players) {
   return toCSV(PLAYER_COLUMNS, Object.entries(players).map(([id, p]) => [
     id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice,
     { R: 'Right', L: 'Left' }[battingHandOf(p)] || '', { R: 'Right', L: 'Left' }[bowlingArmOf(p)] || '', bowlingTypeOf(p) || '',
-    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.notes, p.allottedTeam, p.allottedAs,
+    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.strikeRate, p.highest, p.economy, p.notes, p.cricheroesUrl, p.allottedTeam, p.allottedAs,
   ]));
 }
 
