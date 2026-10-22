@@ -11,13 +11,14 @@
 // The Firebase web config is NOT a secret - it is safe to commit. Security comes
 // from database.rules.json, which you publish in the Firebase console.
 
-export const firebaseConfig = null;
-
-// Example:
-// export const firebaseConfig = {
-//   apiKey: "AIza...",
-//   authDomain: "my-auction.firebaseapp.com",
-//   databaseURL: "https://my-auction-default-rtdb.asia-southeast1.firebasedatabase.app",
-//   projectId: "my-auction",
-//   appId: "1:1234567890:web:abcdef",
-// };
+// Forking AuctionXI for your own tournaments? Replace this with your own project's config,
+// or set it to null for demo mode.
+export const firebaseConfig = {
+  apiKey: "AIzaSyAtigXPtofDeYLk6n0aRyjaRsAUetctN4Q",
+  authDomain: "auctionxi-1a2b.firebaseapp.com",
+  databaseURL: "https://auctionxi-1a2b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "auctionxi-1a2b",
+  storageBucket: "auctionxi-1a2b.firebasestorage.app",
+  messagingSenderId: "508983348632",
+  appId: "1:508983348632:web:0399e99b81a9d37af76fed",
+};
