@@ -297,7 +297,8 @@ export async function markUnsold(aid, a) {
   const live = a.live;
   if (!live || live.status !== 'bidding') throw new Error('No player under the hammer');
   await db.update(`auctions/${aid}`, {
-    [`unsold/${live.playerId}`]: { round: a.meta.round || 1, at: db.now() },
+    // `first`: when the player first went unsold, so unsold rounds keep the original order.
+    [`unsold/${live.playerId}`]: { round: a.meta.round || 1, at: db.now(), first: a.unsold[live.playerId]?.first ?? a.unsold[live.playerId]?.at ?? db.now() },
     'live/status': 'unsold',
   });
   await log(aid, { type: 'unsold', playerId: live.playerId });

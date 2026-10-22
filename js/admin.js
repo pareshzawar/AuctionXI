@@ -968,7 +968,7 @@ function nextPlayerPanel(bidding, remaining) {
   drawMode ||= rules.pickOrder === 'manual' ? 'chit' : 'random';
   const closed = bidding || meta.status !== 'live';
   const counts = poolCounts(A);
-  const autoLabel = rules.pickOrder === 'random' ? 'Auto: any pool' : rules.pickOrder === 'category-sequence' ? `Auto: ${counts.map((c) => c.id).join(' → ')} in ID order` : `Auto: ${counts.map((c) => c.label).join(' → ')}`;
+  const autoLabel = (Number(A.meta.round) || 1) > 1 ? 'Auto: unsold players, in the order they first came up' : rules.pickOrder === 'random' ? 'Auto: any pool' : rules.pickOrder === 'category-sequence' ? `Auto: ${counts.map((c) => c.id).join(' → ')} in ID order` : `Auto: ${counts.map((c) => c.label).join(' → ')}`;
   return `
     <div class="card" style="margin-bottom:var(--space-4)">
       <div class="section-title">

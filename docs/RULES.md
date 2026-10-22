@@ -35,7 +35,7 @@ The control room's **Next player** panel always offers both ways:
 | **Random draw** | The built-in logic picks a random player from the strongest pool still in play: all of Pool A first, then B, then C. Choose a pool and/or a role to draw only from that group instead, e.g. "a random Pool B bowler". Key `N` |
 | **Chit (search)** | Draw a chit in the hall. Type the name or player number into the search box; matching players not yet auctioned this round appear. Press Enter or *Bring up* and the player is on the stage for bidding. `N` jumps to the search box |
 
-The stage shows how each player came up ("Random draw from Pool B", "Chit"). Captains and vice-captains are never offered, and neither are players already sold. Unsold players come back in the next round. `pick_order` in the questionnaire sets the default (`category-random` = random, pool by pool; `manual` = chits); you can switch at any moment.
+The stage shows how each player came up ("Random draw from Pool B", "Chit"). Captains and vice-captains are never offered, and neither are players already sold. Unsold players come back in the next round, in the order they first came up (a pool or role filter, or a chit, can still bring up anyone). `pick_order` in the questionnaire sets the default (`category-random` = random, pool by pool; `manual` = chits); you can switch at any moment.
 
 ## Live commentary
 

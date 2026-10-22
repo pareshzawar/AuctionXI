@@ -119,7 +119,8 @@ const teamName = (a, id) => a.teams[id]?.name || id;
 
 function intro(a, p, lang) {
   const L = PHRASES[lang];
-  const pool = category(a.rules, p.category)?.label;
+  // With a single pool its name says nothing about the player, so leave it out.
+  const pool = (a.rules.categories || []).length > 1 ? category(a.rules, p.category)?.label : null;
   const role = ROLE_WORDS[lang][roleId(p.role)];
   const runs = Number(p.runs) || 0;
   const wkts = Number(p.wickets) || 0;

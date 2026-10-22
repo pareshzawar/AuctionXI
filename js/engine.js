@@ -349,6 +349,12 @@ export function pickNext(a, filter = {}) {
   if (filter.pool) candidates = candidates.filter((p) => p.category === filter.pool);
   if (filter.role) candidates = candidates.filter((p) => roleId(p.role) === filter.role);
   if (!candidates.length) return null;
+  // Unsold rounds: the unsold players come back in the order they first came up.
+  if ((Number(a.meta.round) || 1) > 1 && !filter.pool && !filter.role) {
+    const firstAt = (p) => Number(a.unsold[p.id]?.first ?? a.unsold[p.id]?.at) || 0;
+    const back = candidates.filter((p) => a.unsold[p.id]).sort((x, y) => firstAt(x) - firstAt(y));
+    if (back.length) return back[0];
+  }
   const rnd = (list) => list[Math.floor(Math.random() * list.length)];
   if (filter.pool || rules.pickOrder === 'random') return rnd(candidates);
   const order = (rules.categories || []).map((c) => c.id);

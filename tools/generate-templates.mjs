@@ -63,7 +63,7 @@ const row = (i, name, role, team = '', as = '', pool = 'C') => {
   const bowl = bowls ? [['Right', 'Medium'], ['Right', 'Fast'], ['Right', 'Off-spin'], ['Left', 'Spin'], ['Right', 'Leg-spin'], ['Left', 'Medium-fast']][Math.floor(r() * 6)] : ['', ''];
   return [`P${String(i).padStart(3, '0')}`, name, role, pool, '', r() < 0.75 ? 'Right' : 'Left', ...bowl, 16 + Math.floor(r() * 32),
     `${'ABCD'[Math.floor(r() * 4)]}-${100 + Math.floor(r() * 800)}`, '', Math.floor(r() * 15), role === 'Bowler' ? Math.floor(r() * 80) : Math.floor(r() * 450),
-    bowls ? Math.floor(r() * 20) : 0, '', team, as];
+    bowls ? Math.floor(r() * 20) : 0, (95 + r() * 90).toFixed(1), String(10 + Math.floor(r() * 60)), bowls ? (7 + r() * 6).toFixed(1) : '', '', '', team, as];
 };
 const rows = leaders.map(([name, role, team, as], i) => row(i + 1, name, role, team, as, as === 'C' ? 'A' : 'B'));
 for (let i = 9; i <= 44; i++) {
