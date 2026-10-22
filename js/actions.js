@@ -5,7 +5,8 @@
 //   coadmins/{aid}/{uid}      {code, name}        - a device that proved the admin code
 
 import { db, isLocal } from './db.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget } from './engine.js';
+import { esc } from './ui.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget, visibilityOf } from './engine.js';
 
 async function newAuctionId(name, tournament) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
@@ -33,6 +34,7 @@ export async function createAuction({ name, tournament, season, venue, date, org
       venue: venue || null, date: date || null, organiser: organiser || null,
       copiedFrom: copyFrom ? copyFrom.id : null, copiedFromName: copyFrom ? copyFrom.meta.name : null,
       ownerUid: db.uid(), createdAt: db.now(), status: 'setup', locked: false, round: 1,
+      visibility: 'private', // hidden until the admin opens it
     },
     rules: copyFrom ? copyFrom.rules : DEFAULT_RULES,
     teams,
@@ -76,7 +78,7 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
     meta: {
       name, tournament: a.meta.tournament || null, season: season || a.meta.season || null, organiser: a.meta.organiser || null, venue: null, date: null,
       ownerUid: db.uid(), createdAt: db.now(), status: 'setup', locked: false, round: 1,
-      kind: 'mini', parent: prevAid, parentName: a.meta.name,
+      kind: 'mini', parent: prevAid, parentName: a.meta.name, visibility: 'private',
     },
     rules: a.rules,
     teams,
@@ -96,7 +98,7 @@ export async function createMiniAuction(prevAid, a, { name, season, keep, addToP
 // The real auction is never touched.
 export async function createMockAuction(fromAid, a) {
   const aid = await newAuctionId('mock', 'mock');
-  const { ownerUid, createdAt, startedAt, completedAt, status, round, mock, mockOf, mockOfName, ...meta } = a.meta;
+  const { ownerUid, createdAt, startedAt, completedAt, status, round, mock, mockOf, mockOfName, visibility, ...meta } = a.meta;
   const teams = {};
   const codes = { teamCodes: {}, vcCodes: {} };
   for (const [id, t] of Object.entries(a.teams)) {
@@ -108,7 +110,7 @@ export async function createMockAuction(fromAid, a) {
   const players = Object.fromEntries(Object.entries(a.players).map(([id, { photoData, ...p }]) => [id, p]));
   const adminCode = randomCode(8);
   await db.set(`auctions/${aid}`, {
-    meta: { ...meta, name: `${a.meta.name} (mock)`, mock: true, mockOf: fromAid, mockOfName: a.meta.name, ownerUid: db.uid(), createdAt: db.now(), status: 'setup', round: 1, locked: !!a.meta.locked },
+    meta: { ...meta, name: `${a.meta.name} (mock)`, mock: true, mockOf: fromAid, mockOfName: a.meta.name, visibility: 'link', ownerUid: db.uid(), createdAt: db.now(), status: 'setup', round: 1, locked: !!a.meta.locked },
     rules: a.rules,
     teams,
     players,
@@ -133,8 +135,42 @@ export async function resetAuction(aid, a) {
 // Remove an auction and everything that belongs to it. The auction itself goes last, because the
 // database rules check its owner for the other parts.
 export async function deleteAuction(aid) {
-  for (const part of ['secrets', 'media', 'captains', 'coadmins']) await db.set(`${part}/${aid}`, null).catch(() => {});
+  for (const part of ['directory', 'secrets', 'media', 'captains', 'coadmins']) await db.set(`${part}/${aid}`, null).catch(() => {});
   await db.set(`auctions/${aid}`, null);
+}
+
+// Who can see the auction (see VISIBILITY in engine.js). A listed auction also gets an entry in
+// directory/, the public list on the home page.
+export async function setVisibility(aid, meta, visibility) {
+  await db.update(`auctions/${aid}`, { 'meta/visibility': visibility });
+  await syncDirectory(aid, { ...meta, visibility });
+}
+
+export const directoryEntry = (m) => ({
+  name: m.name, tournament: m.tournament || null, season: m.season || null, status: m.status || 'setup',
+  date: m.date || null, time: m.time || null, venue: m.venue || null, mock: !!m.mock,
+});
+
+export async function syncDirectory(aid, meta) {
+  if (isLocal) return;
+  if (meta.visibility === 'listed') await db.set(`directory/${aid}`, directoryEntry(meta));
+  else await db.set(`directory/${aid}`, null).catch(() => {});
+}
+
+// Can this device open the auction? { meta, ok }. meta is null when there is no such auction.
+export async function viewGate(aid) {
+  const meta = await db.get(`auctions/${aid}/meta`).catch(() => null);
+  if (!meta) return { meta: null, ok: false };
+  if (visibilityOf(meta) !== 'private') return { meta, ok: true };
+  return { meta, ok: await isAdmin(aid, meta) };
+}
+
+// A private auction: show "not open yet" and reload by itself the moment the admin opens it.
+export function waitUntilOpen(aid, meta, el) {
+  el.innerHTML = `<div class="card" style="max-width:640px;margin:var(--space-8) auto;text-align:center">
+    <h2>${esc(meta.name)}</h2>
+    <p>The organisers are still setting this auction up. This page opens by itself as soon as they open it.</p></div>`;
+  db.on(`auctions/${aid}/meta/visibility`, (v) => { if (v !== 'private') location.reload(); });
 }
 
 export async function isAdmin(aid, meta) {

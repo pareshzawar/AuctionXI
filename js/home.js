@@ -1,8 +1,8 @@
 import { db, isLocal } from './db.js';
-import { createAuction, claimCaptain, claimCoadmin, isAdmin } from './actions.js';
-import { $, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
+import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate } from './actions.js';
+import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
-import { vcCanBid, withDefaults, normalize } from './engine.js';
+import { vcCanBid, withDefaults, normalize, visibilityOf } from './engine.js';
 
 mountHeader();
 
@@ -97,9 +97,14 @@ function updateJoinFields() {
 
 async function find(code) {
   const aid = code.trim().toUpperCase();
-  const [meta, teams, rules] = await Promise.all([db.get(`auctions/${aid}/meta`), db.get(`auctions/${aid}/teams`), db.get(`auctions/${aid}/rules`)]);
+  const { meta, ok } = await viewGate(aid);
   if (!meta) { toast('No auction with that code. Check it with the organiser.', 'error'); return; }
+  // A private auction: only organisers (admin code) can get in until it is opened.
+  const [teams, rules] = ok ? await Promise.all([db.get(`auctions/${aid}/teams`), db.get(`auctions/${aid}/rules`)]) : [{}, {}];
   found = { aid, meta, teams: teams || {} };
+  $('#join-private').classList.toggle('hidden', ok || visibilityOf(meta) !== 'private');
+  $$('#join-role option').forEach((o) => { o.disabled = !ok && o.value !== 'admin'; });
+  if (!ok) $('#join-role').value = 'admin';
   $('#join-code').value = aid;
   $('#join-name').textContent = meta.name;
   $('#join-status').innerHTML = badge(meta.status === 'live' ? 'live' : meta.status === 'completed' ? 'sold' : 'upcoming', { text: meta.status === 'live' ? 'Live' : meta.status === 'completed' ? 'Completed' : 'Not started' });
@@ -199,3 +204,21 @@ loadKnown().then(() => { renderMine(); renderCreateOptions(); });
 renderCreateOptions();
 renderArchive();
 if (param('a')) find(param('a'));
+
+// Auctions the organisers listed on the home page ("Listed" in Access and sharing).
+if (!isLocal) {
+  db.on('directory', (d) => {
+    const order = { live: 0, setup: 1, completed: 2 };
+    const items = Object.entries(d || {}).sort(([, x], [, y]) => (order[x.status] ?? 1) - (order[y.status] ?? 1));
+    $('#open-now').classList.toggle('hidden', !items.length);
+    $('#open-now').innerHTML = items.length ? `<h3 style="margin:0 0 var(--space-2)">Auctions open now</h3>
+      <div class="stack" style="gap:var(--space-2)">${items.map(([id, x]) => `
+        <div class="row" style="justify-content:space-between;border:1px solid var(--line);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)">
+          <div style="min-width:0"><b>${esc(x.name)}</b> ${badge(x.status === 'live' ? 'live' : x.status === 'completed' ? 'sold' : 'upcoming', { text: x.status === 'live' ? 'Live' : x.status === 'completed' ? 'Completed' : 'Coming up' })}
+            <br><small class="muted">${esc([x.tournament, x.season && `Season ${x.season}`, x.date, x.time, x.venue].filter(Boolean).join(' · '))}</small></div>
+          <div class="row"><a class="btn btn-sm" href="${pageUrl('live.html', { a: id })}">Watch</a>
+            <button type="button" class="btn-sm" data-join="${esc(id)}">Join with a code</button></div>
+        </div>`).join('')}</div>` : '';
+    $$('[data-join]').forEach((b) => (b.onclick = () => find(b.dataset.join)));
+  });
+}

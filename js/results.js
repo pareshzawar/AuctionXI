@@ -4,6 +4,7 @@
 import { db } from './db.js';
 import { normalize, ROLES, roleId, isAllotted, leaderLabel, category, basePrice } from './engine.js';
 import { toCSV } from './csv.js';
+import { viewGate, waitUntilOpen } from './actions.js';
 import { $, esc, param, download, mountHeader, getSession } from './ui.js';
 import { price, teamBadge, playerTable } from './ds.js';
 import { squads, rulesSummary } from './views.js';
@@ -57,10 +58,17 @@ if (archive) {
     .then((data) => render(applyMedia(normalize(data), data?.media)))
     .catch(() => render(null));
 } else if (aid) {
+  const gate = await viewGate(aid);
+  if (!gate.meta) render(null);
+  else if (!gate.ok) { $('#title').textContent = gate.meta.name; waitUntilOpen(aid, gate.meta, $('#squads')); }
+  else openResults();
+} else {
+  render(null);
+}
+
+function openResults() {
   let media = {};
   let last = null;
   watchMedia(aid, (m) => { media = m; if (last) render(applyMedia(last, media)); });
   db.on(`auctions/${aid}`, (v) => { last = normalize(v); render(applyMedia(last, media)); });
-} else {
-  render(null);
 }
