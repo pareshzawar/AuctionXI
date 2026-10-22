@@ -122,6 +122,38 @@ export async function createMockAuction(fromAid, a) {
   return { aid, adminCode };
 }
 
+// A past auction kept as a record: an AuctionXI file (exportSnapshot's format, auctionxi/1) saved as a
+// finished, private auction with new admin and captain codes. Photos in the file go to media/.
+export async function importAuction(snap) {
+  if (!snap || snap.format !== 'auctionxi/1' || !snap.meta || !snap.teams) throw new Error('This is not an AuctionXI auction file');
+  const aid = await newAuctionId(snap.meta.name || 'record', snap.meta.tournament);
+  const photos = {};
+  const players = {};
+  for (const [id, { photoData, ...p }] of Object.entries(snap.players || {})) {
+    players[id] = p;
+    if (photoData) photos[id] = photoData;
+  }
+  const teams = Object.fromEntries(Object.entries(snap.teams).map(([id, { spent, maxBid, ...t }]) => [id, t]));
+  const { ownerUid, ...meta } = snap.meta;
+  await db.set(`auctions/${aid}`, {
+    meta: { ...meta, ownerUid: db.uid(), createdAt: db.now(), importedAt: db.now(), status: 'completed', locked: true, visibility: 'private', mock: null },
+    rules: snap.rules || DEFAULT_RULES,
+    teams,
+    players,
+    sales: snap.sales || null,
+    unsold: snap.unsold || null,
+    log: snap.log || null,
+  });
+  const codes = { teamCodes: {}, vcCodes: {} };
+  for (const id of Object.keys(teams)) { codes.teamCodes[id] = randomCode(6); codes.vcCodes[id] = randomCode(6); }
+  await db.set(`secrets/${aid}`, { adminCode: randomCode(8), ...codes });
+  await db.update(`auctions/${aid}`, capsUpdate(normalize(await db.get(`auctions/${aid}`))));
+  const m = snap.media || {};
+  Object.assign(photos, m.players || {});
+  if (m.logo || m.banner || Object.keys(photos).length) await db.set(`media/${aid}`, { logo: m.logo || null, banner: m.banner || null, players: photos });
+  return { aid };
+}
+
 // Back to "not started" with nothing sold. Mock auctions only.
 export async function resetAuction(aid, a) {
   if (!a.meta.mock) throw new Error('Only a mock auction can be reset');

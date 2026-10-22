@@ -29,7 +29,7 @@ let secrets = { teamCodes: {}, vcCodes: {} };
 let captains = {};
 let coadmins = {};
 let media = {}; // uploaded player photos, league logo and banner
-let tab = localStorage.getItem('auctionxi:admintab') || 'setup';
+let tab = param('tab') || localStorage.getItem('auctionxi:admintab') || 'setup';
 let pendingRender = false;
 // Next-player panel: 'random' draw (optionally from one pool / role) or 'chit' (search by name).
 let drawMode = localStorage.getItem('auctionxi:drawmode') || null;
@@ -648,6 +648,7 @@ function wirePhotos(el) {
       e.stopPropagation();
       const { matched, unmatched } = matchPhotoFiles(A.players, [...bulk.files]);
       bulk.value = '';
+      if (matched.length > 3) toast(`Saving ${matched.length} photos…`);
       for (const { file, pid } of matched) await setPlayerPhoto(aid, pid, await resizeImage(file, PHOTO));
       toast(`${matched.length} photo${matched.length === 1 ? '' : 's'} saved`, 'ok');
       if (unmatched.length) alert(`No player matched these file names (use the player ID or the exact name):\n\n${unmatched.join('\n')}`);
