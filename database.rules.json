@@ -86,6 +86,17 @@
         ".write": "auth != null && auth.token.email_verified == true && (root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists() || newData.parent().parent().child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists())",
         ".validate": "newData.isBoolean()"
       }
+    },
+    "accounts": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
+        "auctions": {
+          "$aid": {
+            ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('role').isString())"
+          }
+        }
+      }
     }
   }
 }

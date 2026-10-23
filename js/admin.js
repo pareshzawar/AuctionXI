@@ -10,7 +10,7 @@ import {
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
   startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
-  setVisibility, syncDirectory, directoryEntry,
+  setVisibility, syncDirectory, directoryEntry, rememberOnAccount,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
@@ -121,6 +121,13 @@ async function boot() {
   }
   if (!(await isAdmin(aid, meta))) {
     $('#gate').classList.remove('hidden');
+    // On a new laptop: the Google account that created the auction is enough; otherwise the admin code.
+    if (!isLocal && !db.email()) {
+      const b = document.createElement('p');
+      b.innerHTML = '<button type="button" class="btn-sm" id="gate-google">Sign in with Google</button> <small class="muted">if this auction was made with your Google account</small>';
+      $('#gate-form').before(b);
+      $('#gate-google').onclick = run(async () => { await db.signInGoogle(); location.reload(); });
+    }
     $('#gate-form').addEventListener('submit', run(async (e) => {
       e.preventDefault();
       await claimCoadmin(aid, $('#gate-code').value.trim().toUpperCase(), $('#gate-name').value.trim());
@@ -130,6 +137,7 @@ async function boot() {
   }
   setSession(aid, { role: 'admin' });
   rememberAuction(aid, meta.name, 'admin');
+  rememberOnAccount(aid, meta, meta.ownerUid === db.uid() ? 'owner' : 'admin');
   $('#app').classList.remove('hidden');
   $('#aid').textContent = aid;
 

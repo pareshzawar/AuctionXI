@@ -217,6 +217,7 @@ export async function resetAuction(aid, a) {
 // Remove an auction and everything that belongs to it. The auction itself goes last, because the
 // database rules check its owner for the other parts.
 export async function deleteAuction(aid) {
+  forgetOnAccount(aid);
   for (const part of ['directory', 'secrets', 'media', 'captains', 'coadmins']) await db.set(`${part}/${aid}`, null).catch(() => {});
   await db.set(`auctions/${aid}`, null);
 }
@@ -254,6 +255,23 @@ export function waitUntilOpen(aid, meta, el) {
     <p>The organisers are still setting this auction up. This page opens by itself as soon as they open it.</p></div>`;
   db.on(`auctions/${aid}/meta/visibility`, (v) => { if (v !== 'private') location.reload(); });
 }
+
+/* ---------------- your auctions, on your Google account ---------------- */
+// The home page's "My tournaments and auctions" list lives in each browser. Signed in with Google,
+// it is also kept on the account (accounts/{uid}/auctions), so any laptop or private window shows it.
+export async function rememberOnAccount(aid, meta, role) {
+  if (isLocal || !db.email?.() || !meta) return;
+  await db.set(`accounts/${db.uid()}/auctions/${aid}`, {
+    name: meta.name || aid, tournament: meta.tournament || '', season: String(meta.season || ''), kind: meta.kind || 'major',
+    mock: !!meta.mock, role, at: db.now(),
+  }).catch(() => {});
+}
+export async function accountAuctions() {
+  if (isLocal || !db.email?.()) return [];
+  const v = await db.get(`accounts/${db.uid()}/auctions`).catch(() => null);
+  return Object.entries(v || {}).map(([id, x]) => ({ id, ...x }));
+}
+export const forgetOnAccount = (aid) => (isLocal || !db.email?.() ? null : db.set(`accounts/${db.uid()}/auctions/${aid}`, null).catch(() => {}));
 
 export async function isAdmin(aid, meta) {
   if (isLocal) return true;
