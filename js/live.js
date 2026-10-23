@@ -10,7 +10,8 @@ import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus } from './views.js';
+import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
+import { seasonsOf } from './history.js';
 
 const aid = (param('a') || '').toUpperCase();
 const stage = param('screen') === '1';
@@ -139,6 +140,8 @@ function renderStage() {
       <div class="stage-main">
         ${meta.stageView?.type === 'list' ? stageBoard(A, meta.stageView.which, boardPage)
           : meta.stageView?.type === 'player' && A.players[meta.stageView.id] ? `${cardFor(A, meta.stageView.id, 'stage')}${stageProfileSide(meta.stageView.id)}`
+          : meta.stageView?.type === 'history' ? stageHistory(A, meta.stageView.season)
+          : meta.stageView?.type === 'team' && A.teams[meta.stageView.id] ? teamProfile(A, meta.stageView.id, { stage: true })
           : hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
           : `<div class="stage-wait ${A.media?.banner ? 'has-banner' : ''}" style="grid-column:1/-1">${bannerImg(A, { cls: 'stage-banner' })}<div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
@@ -216,7 +219,7 @@ function renderPhone() {
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
     <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
-      ${[['squads', 'Squads'], ['pool', 'Players'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
+      ${[['squads', 'Squads'], ['pool', 'Players'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ...(seasonsOf(A).length ? [['hist', 'Past seasons']] : []), ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
     </nav>`;
   renderBelow();
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; belowDirty = true; $('#below').innerHTML = ''; renderPhone(); }));
@@ -305,6 +308,7 @@ function limitLine() {
 function below(tab) {
   if (tab === 'feed') return `<div class="card">${feed(A, 100)}</div>`;
   if (tab === 'pool') return profilesView(A, profileQuery);
+  if (tab === 'hist') return historyView(A);
   if (tab === 'rules') return rulesSummary(A);
   if (tab === 'comm') return `<div class="card"><div class="feed" style="max-height:none">${commentator.lines.map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span><time>${new Date(l.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<p class="muted">Nothing yet.</p>'}</div></div>`;
   return squads(A, { viewer: viewer() });

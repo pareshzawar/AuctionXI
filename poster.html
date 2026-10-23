@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR poster - AuctionXI</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%230d0f12'/><text x='50' y='68' font-size='54' font-family='Arial Narrow,sans-serif' font-weight='700' fill='%23f2b84b' text-anchor='middle'>XI</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/poster.css">
+  <script src="vendor/qrcode-generator.js"></script>
+</head>
+<body>
+  <div class="poster-bar no-print">
+    <b>QR poster</b>
+    <label>Paper <select id="size"><option value="a4">A4</option><option value="a3">A3</option></select></label>
+    <label>Colours <select id="theme"><option value="dark">Dark (like the stage)</option><option value="light">Light (saves ink)</option></select></label>
+    <button id="print">Print or save as PDF</button>
+    <span class="hint">Print at 100% scale, no margins. Pin it up in the club house, at the gate and near the projector.</span>
+  </div>
+  <main id="poster" class="poster"></main>
+  <script type="module" src="js/poster.js"></script>
+</body>
+</html>

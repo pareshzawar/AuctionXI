@@ -44,6 +44,7 @@ export const DEFAULT_RULES = {
   bidMode: 'both',
   commentary: true, // live commentary lines on the stage, phones and console
   commentaryLang: 'en', // 'en' | 'hi' (Hinglish) | 'mr' (Marathi); each device can switch
+  humour: 'high', // 'high' = punchlines in the commentary, 'normal' = plain
   houseRules: [],
 };
 
@@ -141,6 +142,7 @@ export function normalize(a) {
     live: a.live || null,
     log: a.log || {},
     aicomm: a.aicomm || {}, // AI commentary lines, when the control room has AI commentary on
+    history: a.history || {}, // past seasons of the tournament (js/history.js)
   };
 }
 

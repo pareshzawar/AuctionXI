@@ -151,7 +151,7 @@ body.stage-mode main { max-width: none; padding: 0; }
   border: 1px solid var(--line); border-left: 6px solid var(--gold); border-radius: var(--radius-md); background: var(--surface); }
 .stage-comm .stage-label { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); padding: 2px var(--space-3); border-radius: var(--radius-xs); background: var(--gold-soft); color: var(--gold); }
 .stage-comm .comm-mic { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
-.stage-comm p { margin: 0; min-width: 0; font-size: 30px; line-height: 38px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-comm p { margin: 0; min-width: 0; font-size: 28px; line-height: 35px; color: var(--ink); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .stage-comm.is-new p { animation: comm-in .7s cubic-bezier(.2, .8, .2, 1); }
 .stage-comm.is-new { animation: comm-glow 1.6s ease-out; }
 .stage-comm::after { content: ''; position: absolute; inset: 0 auto 0 -40%; width: 40%; pointer-events: none; opacity: 0;
@@ -177,7 +177,8 @@ body.stage-mode main { max-width: none; padding: 0; }
 
 footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padding: var(--space-8) var(--space-4); }
 .qr { background: #ffffff; padding: var(--space-2); border-radius: var(--radius-sm); display: inline-block; }
-.qr img, .qr canvas { display: block; }
+.qr img, .qr canvas, .qr svg { display: block; }
+.qr svg { width: 150px; height: 150px; }
 
 @media (prefers-reduced-motion: reduce) {
   .overlay .ax-stamp, .ax-badge-live .ax-dot, .ax-ticker-scroll .ax-ticker-list { animation: none !important; }
@@ -224,3 +225,51 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 .plan-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-1); align-items: end; }
 .plan-nums input { width: 100%; min-height: 36px; }
 .plan-nums .ax-kv b { font-variant-numeric: tabular-nums; }
+
+/* Team banners */
+.team-banner-thumb { flex: none; display: grid; place-items: center; width: 120px; height: 68px; overflow: hidden; border-radius: var(--radius-xs); background: var(--surface-raised); }
+.team-banner-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.team-banner { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: var(--radius-sm); background: var(--surface-raised); }
+
+/* Past seasons and team profiles */
+.hist-gold { color: var(--gold); font-weight: 600; }
+.hist-silver { color: #c9d1db; font-weight: 600; }
+.hist-bronze { color: #d99a6c; font-weight: 600; }
+.hist-champ { margin: 0 0 var(--space-3); }
+.hist-ko { margin: var(--space-3) 0 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: 4px; color: var(--ink-muted); }
+.hist-ko b { color: var(--ink); margin-right: 6px; }
+.hist-tops { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.hist-top { background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--space-3); }
+.hist-top h4 { margin: 0 0 var(--space-2); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.hist-top ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.hist-top li > span:last-child { float: right; font-variant-numeric: tabular-nums; }
+.hist-buys { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.team-profile { display: grid; grid-template-columns: 140px 1fr; gap: var(--space-3); align-items: center; padding: var(--space-3); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: var(--radius-sm); background: var(--surface); }
+.team-profile-banner { width: 140px; height: 96px; object-fit: contain; border-radius: var(--radius-xs); background: var(--surface-raised); }
+.team-profile-nobanner { display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 34px; color: var(--c); }
+.team-profile-body h3 { margin: 0; }
+.team-profile-leaders { margin: 2px 0 0; font-size: 14px; color: var(--ink-muted); }
+.team-profile-leaders b { color: var(--ink); }
+.team-profile-past { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.team-profile-past li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.team-profile-squad { margin: var(--space-2) 0 0; font-size: 13px; }
+@media (max-width: 480px) { .team-profile { grid-template-columns: 96px 1fr; } .team-profile-banner { width: 96px; height: 72px; } }
+/* On the stage */
+.stage-history { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
+.stage-history-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: var(--space-6); min-height: 0; }
+.stage-history .ax-table { font-size: 24px; line-height: 30px; }
+.stage-history .ax-table th { font-size: 16px; }
+.stage-history .hist-ko { font-size: 20px; }
+.stage-history .hist-tops { grid-template-columns: 1fr; margin-top: 0; gap: var(--space-3); }
+.stage-history .hist-top { font-size: 19px; line-height: 24px; padding: var(--space-2) var(--space-4); }
+.stage-history .hist-top ol { gap: 1px; }
+.stage-history .hist-top li small { font-size: 14px; }
+.stage-history .hist-top h4 { font-size: 15px; margin-bottom: 4px; }
+.team-profile-stage { grid-column: 1 / -1; grid-template-columns: 720px 1fr; gap: var(--space-8); padding: var(--space-6); border-left-width: 10px; border-radius: var(--radius-lg); align-items: center; }
+.team-profile-stage .team-profile-banner { width: 720px; height: 560px; }
+.team-profile-stage .team-profile-nobanner { font-size: 160px; }
+.team-profile-stage h3 { font-family: var(--font-display); font-size: 88px; line-height: 88px; }
+.team-profile-stage .team-profile-leaders { font-size: 30px; line-height: 40px; margin-top: var(--space-3); }
+.team-profile-stage .team-profile-past { font-size: 28px; gap: 10px; margin-top: var(--space-5); }
+.team-profile-stage .team-profile-past .muted, .team-profile-stage .team-profile-past span { font-size: 24px; }
+.team-profile-stage .team-profile-squad { font-size: 24px; line-height: 34px; margin-top: var(--space-5); }

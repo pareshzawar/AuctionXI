@@ -210,7 +210,7 @@ export async function aiCommentLine(a, e, lang, money) {
     r.purseVisibility === 'everyone' && team ? `${team.name} points left: ${amt(Number(team.purse ?? r.purse) - Number(team.spent || 0))}` : '',
   ].filter(Boolean).join('\n');
   const text = await askAI({
-    system: `You are the live commentator at a friendly ${a.meta.tournament || 'cricket'} player auction. Write ONE or TWO short, lively sentences (at most 35 words) in ${LANG_NAME[lang] || LANG_NAME.en}. Use only the facts given: never invent stats, nicknames or history. No emoji, no hashtags, no quotes around the line. Amounts exactly as written.`,
+    system: `You are the live commentator at a friendly ${a.meta.tournament || 'cricket'} player auction. Write ONE or TWO short, lively sentences (at most 35 words) in ${LANG_NAME[lang] || LANG_NAME.en}.${r.humour === 'normal' ? '' : ' Be funny: end with a quick, witty punchline about the bidding, the money or the drama, like a cheeky IPL auctioneer. Keep it warm: never mock a player, their looks, age or skill.'} Use only the facts given: never invent stats, nicknames or history. No emoji, no hashtags, no quotes around the line. Amounts exactly as written.`,
     prompt: facts,
     maxTokens: 200,
   });

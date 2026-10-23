@@ -175,12 +175,13 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   ok(E.bowlingLabel(Object.values(old.players)[0]) === 'Right-arm off-spin' && E.battingLabel(Object.values(old.players)[0]) === 'Left-hand bat', 'players: older batting_style / bowling_style still read');
 }
 
-// CPL point chart: 50 → +10 to 150, +15 to 300, +20 to 500, +25 to 700, +50 above
+// A five-slab point chart from the questionnaire: 50 → +10 to 150, +15 to 300, +20 to 500, +25 to 700, +50 above
 {
-  const cpl = csv.importSetup(csv.parseCSV(fs.readFileSync(`${root}/tournaments/cpl/cpl_season3_setup.csv`, 'utf8')), {}, {});
-  const r = cpl.rules;
+  const ans = [['currency', 'pts'], ['season', '3'], ...[[150, 10], [300, 15], [500, 20], [700, 25], ['', 50]].flatMap(([u, st], i) => [[`increment_${i + 1}_below`, String(u)], [`increment_${i + 1}_raise_by`, String(st)]])];
+  const chart = csv.importSetup(ans.map(([key, answer]) => ({ key, answer })), {}, {});
+  const r = chart.rules;
   const steps = [50, 140, 150, 290, 300, 490, 500, 690, 700, 1000].map((x) => E.increment(x, r));
-  ok(JSON.stringify(steps) === JSON.stringify([10, 10, 15, 15, 20, 20, 25, 25, 50, 50]) && r.currency === 'pts' && cpl.meta.season === '3', 'CPL setup: point chart increments, points, season 3');
+  ok(JSON.stringify(steps) === JSON.stringify([10, 10, 15, 15, 20, 20, 25, 25, 50, 50]) && r.currency === 'pts' && chart.meta.season === '3', 'point chart from the questionnaire: five slabs, points, season');
 }
 
 // unsold rounds bring players back in the order they first came up
@@ -217,4 +218,20 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
     && !plan.steps[3].fits && plan.steps[3].limit === 300 && plan.spend === 550 && plan.left === 450 && plan.restSlots === 4 && plan.spare === 250
     && w.allowed && w.after.remaining === 500 && w.after.maxBid === 250 && w.lost.length === 1,
   `captain plan: leaves ${plan.steps.map((s) => s.fits ? s.remaining : 'x').join(',')}; what-if left ${w.after.remaining}, max ${w.after.maxBid}`);
+}
+{
+  // Past seasons: a record with results becomes a small history entry; team names match across spellings.
+  const H = await import(root + '/js/history.js');
+  const rec = { format: 'auctionxi/1', meta: { season: '2', tournament: 'Test League' }, rules: { currency: 'pts', purse: 1000 },
+    teams: { T1: { name: 'Sinhagad Spartans' }, T2: { name: 'Pratapgadche Mavle' } },
+    players: { P1: { name: 'A' }, P2: { name: 'B' }, P3: { name: 'C' } },
+    sales: { P1: { team: 'T1', price: 300 }, P2: { team: 'T2', price: 120 }, P3: { team: 'T2', price: 250, allotted: true } },
+    results: { champion: 'Pratapgad Mavale', runnerUp: 'Sinhgad Spartans',
+      standings: [{ team: 'Sinhgad Spartans', played: 4, won: 4, lost: 0, points: 8, nrr: 1.2, finish: 'Runner-up' }, { team: 'Pratapgad Mavale', played: 4, won: 3, lost: 1, points: 6, finish: 'Champion' }],
+      performers: [{ name: 'A', team: 'Sinhgad Spartans', runs: 90, sr: 180, wickets: 2, mvpRank: 2 }, { name: 'B', team: 'Pratapgad Mavale', runs: 40, wickets: 7, economy: 6.5, mvpRank: 1 }] } };
+  const h = H.historyFromRecord(rec);
+  const past = H.teamPast(h, 'Pratapgadache Mawale');
+  ok(h.top.mvp[0].name === 'B' && h.top.runs[0].name === 'A' && h.top.wickets[0].name === 'B' && h.auction.topBuys[0].price === 300 && h.auction.sold === 2
+    && past?.finish === 'Champion' && past.won === 3 && H.sameTeam('Sinhagad Spartans', 'Sinhgad Spartans') && !H.sameTeam('Raigad Rakshak', 'Rajgad Yodhas'),
+  `past seasons: champion ${past?.finish}, top buy ${h.auction.topBuys[0]?.price}, MVP ${h.top.mvp[0]?.name}`);
 }

@@ -113,6 +113,96 @@ const PHRASES = {
   },
 };
 
+
+/* ---------------- punchlines ---------------- */
+// With humour on (the default; Setup → "Commentary humour"), lines get a friendly punchline. Jokes
+// are about the auction, the money and the drama, never about a person. Plain bids get one only
+// now and then, so the voice keeps up.
+
+const JOKES = {
+  en: {
+    start: ['Captains, poker faces on please.', 'May your purses be deep and your regrets be few.', 'Calculators ready. Friendships on hold.'],
+    upHitter: ['Strike rate {sr}: the ball has filed a police complaint.', 'Fielders in the deep, start stretching now.', 'Strike rate {sr}. Bowlers, this is your cue to look busy.'],
+    upBowler: ['{wkts} wickets. Batters, act like you are not nervous.', 'Batters, quietly check your stance.', '{wkts} wickets. The stumps have trust issues.'],
+    upAllRounder: ['Bats, bowls, and probably brings the snacks too.', 'Two players for the price of one. Allegedly.'],
+    upNew: ['No stats yet. A mystery player, and mystery costs extra.', 'Zero stats, full confidence. We respect it.'],
+    up: ['Wallets out, captains.', 'Captains, this is where the maths gets emotional.', 'Somebody\'s calculator is about to get a workout.', 'Act casual, captains. Everyone can see you counting.'],
+    sold: ['Somewhere, a treasurer just sighed.', 'No refunds, no exchanges.', 'Welcome to the family. Snacks are on the new signing.', 'Done deal. The paddle can finally rest.'],
+    soldBase: ['Bargain of the evening. The other captains are checking if they dozed off.', 'Steal deal. Someone call the police.', 'Base price! The other captains were busy doing maths.'],
+    soldRecord: ['That is not a bid, that is a statement.', 'Somebody\'s piggy bank just retired.', 'Record price. The calculator needs a glass of water.'],
+    unsold: ['The silence is loud. Comeback story loading.', 'Legends are often discovered late.', 'Even the chits feel bad. See you next round.'],
+    bidFirst: ['And we are off!', 'First blood.', 'The ice is broken.'],
+    bidWar: ['This is getting personal.', 'Grab the popcorn.', 'Nobody is blinking. Has anyone checked they are breathing?', 'This is less an auction, more a family feud.'],
+    bidRecord: ['New territory. Oxygen masks may drop from the ceiling.', 'The record book is shaking.'],
+    bidMultiple: ['The base price is now a distant memory.', 'At this rate, this one needs a bodyguard.'],
+    bidJoin: ['A wild challenger appears!', 'Plot twist!', 'Look who woke up.'],
+    bid: ['The paddle is getting a workout.', 'Tick tock.', 'Hold on to your purses.'],
+    end: ['Captains, please return your calculators at the front desk.', 'Some will celebrate, some will explain to their team.'],
+  },
+  hi: {
+    start: ['Captains, poker face on kar lo.', 'Purse bhaari ho, pachtawa halka.', 'Calculator taiyaar, dosti side mein.'],
+    upHitter: ['Strike rate {sr}: ball ne police complaint kar di hai.', 'Boundary pe khade fielders, abhi se stretching shuru karo.', 'Strike rate {sr}. Bowlers, busy dikhne ka time hai.'],
+    upBowler: ['{wkts} wickets. Batters, nervous mat dikhna.', 'Batters, chupke se apna stance check kar lo.', '{wkts} wickets. Stumps ko ab trust issues hain.'],
+    upAllRounder: ['Batting, bowling, aur shayad snacks bhi yahi laayenge.', 'Ek ke daam mein do players. Aisa sunne mein aaya hai.'],
+    upNew: ['Stats abhi nahi. Mystery player, aur mystery mehengi padti hai.', 'Stats zero, confidence full. Respect.'],
+    up: ['Captains, wallet nikaalo.', 'Ab maths emotional hone wala hai.', 'Kisi ka calculator ab kaam pe lagega.', 'Captains, casual raho. Sab dekh rahe hain aap gin rahe ho.'],
+    sold: ['Kahin ek treasurer ne lambi saans li.', 'No refund, no exchange.', 'Family mein swagat. Snacks naye player ki taraf se.', 'Deal pakki. Paddle ko ab aaram.'],
+    soldBase: ['Shaam ki sabse sasti deal. Baaki captains so rahe the kya?', 'Chori ka maal! Koi police bulao.', 'Base price! Baaki captains maths mein busy the.'],
+    soldRecord: ['Yeh bid nahi, statement hai.', 'Kisi ka gullak aaj retire ho gaya.', 'Record price. Calculator ko paani pilao.'],
+    unsold: ['Sannata bol raha hai. Comeback story loading.', 'Legends der se pehchaane jaate hain.', 'Chit ko bhi bura laga. Agle round mein milte hain.'],
+    bidFirst: ['Chalo shuru!', 'Pehla vaar.', 'Barf toot gayi.'],
+    bidWar: ['Ab yeh personal ho gaya.', 'Popcorn le aao.', 'Koi palak nahi jhapka raha. Saans le rahe ho na?', 'Yeh auction kam, khandaani jhagda zyada lag raha hai.'],
+    bidRecord: ['Nayi oonchai. Oxygen mask chhat se gir sakte hain.', 'Record book kaanp rahi hai.'],
+    bidMultiple: ['Base price ab purani yaad hai.', 'Is rate pe inko apni security chahiye hogi.'],
+    bidJoin: ['Naya challenger aa gaya!', 'Kahani mein twist!', 'Dekho kaun jaag gaya.'],
+    bid: ['Paddle ki exercise ho rahi hai.', 'Tick tock.', 'Purse sambhaal ke.'],
+    end: ['Captains, calculator wapas jama kar dena.', 'Kuch jashn manayenge, kuch team ko explain karenge.'],
+  },
+  mr: {
+    start: ['कॅप्टन्स, चेहरा एकदम पोकर फेस ठेवा.', 'पर्स भरलेली असो, पश्चात्ताप कमी असो.', 'कॅल्क्युलेटर तयार, मैत्री बाजूला.'],
+    upHitter: ['स्ट्राइक रेट {sr}: चेंडूने पोलिसात तक्रार केली आहे.', 'सीमारेषेवरच्या क्षेत्ररक्षकांनो, आत्तापासून वॉर्म-अप करा.', 'स्ट्राइक रेट {sr}. गोलंदाजांनो, कामात असल्यासारखं दाखवा.'],
+    upBowler: ['{wkts} बळी. फलंदाजांनो, घाबरलेलं दाखवू नका.', 'फलंदाजांनो, हळूच आपला स्टान्स तपासा.', '{wkts} बळी. स्टंप्सचा आता कोणावर विश्वास नाही.'],
+    upAllRounder: ['फलंदाजी, गोलंदाजी, आणि बहुतेक नाश्ताही हेच आणतील.', 'एकाच्या किमतीत दोन खेळाडू. असं ऐकिवात आहे.'],
+    upNew: ['अजून आकडेवारी नाही. रहस्यमय खेळाडू, आणि रहस्य महाग पडतं.', 'आकडे शून्य, आत्मविश्वास पूर्ण. सलाम.'],
+    up: ['कॅप्टन्स, पाकीट बाहेर काढा.', 'आता गणित भावनिक होणार आहे.', 'कोणाच्या तरी कॅल्क्युलेटरला आता काम मिळणार.', 'कॅप्टन्स, सहज राहा. तुम्ही मोजताय ते सगळ्यांना दिसतंय.'],
+    sold: ['कुठेतरी एका खजिनदाराने मोठा सुस्कारा सोडला.', 'परतावा नाही, बदली नाही.', 'कुटुंबात स्वागत. नाश्ता नव्या खेळाडूकडून.', 'सौदा पक्का. पॅडलला आता विश्रांती.'],
+    soldBase: ['आजच्या संध्याकाळचा सर्वात स्वस्त सौदा. बाकीचे कॅप्टन्स झोपले होते का?', 'हा तर चोरीचा माल! कोणीतरी पोलिसांना बोलवा.', 'मूळ किंमत! बाकीचे कॅप्टन्स गणितात गुंतले होते.'],
+    soldRecord: ['ही बोली नाही, हे विधान आहे.', 'कोणाचा तरी गल्ला आज निवृत्त झाला.', 'विक्रमी किंमत. कॅल्क्युलेटरला पाणी द्या.'],
+    unsold: ['शांतता खूप बोलकी आहे. पुनरागमनाची कथा लोड होत आहे.', 'दिग्गज उशिराच ओळखले जातात.', 'चिठ्ठीलाही वाईट वाटलं. पुढच्या फेरीत भेटू.'],
+    bidFirst: ['चला, सुरुवात झाली!', 'पहिला घाव.', 'बर्फ फुटला.'],
+    bidWar: ['आता हे वैयक्तिक झालंय.', 'पॉपकॉर्न आणा.', 'कोणीच पापणी हलवत नाहीये. श्वास घेताय ना?', 'हा लिलाव कमी, भाऊबंदकी जास्त वाटतेय.'],
+    bidRecord: ['नवा उच्चांक. छतावरून ऑक्सिजन मास्क पडू शकतात.', 'विक्रमांचं पुस्तक थरथरतंय.'],
+    bidMultiple: ['मूळ किंमत आता जुनी आठवण झाली.', 'या दराने यांना स्वतःचे सुरक्षारक्षक लागतील.'],
+    bidJoin: ['नवा दावेदार आला!', 'कथेत ट्विस्ट!', 'बघा कोण जागं झालं.'],
+    bid: ['पॅडलचा व्यायाम चालू आहे.', 'टिक टॉक.', 'पर्स सांभाळा.'],
+    end: ['कॅप्टन्स, कॅल्क्युलेटर परत जमा करा.', 'काही जण जल्लोष करतील, काही जण संघाला स्पष्टीकरण देतील.'],
+  },
+};
+
+const humourOn = (a) => a.rules.humour !== 'normal';
+// A punchline for this kind of line (or '' when humour is off or it's a quiet turn).
+function punch(a, lang, kind, key, facts = {}) {
+  if (!humourOn(a)) return '';
+  const J = JOKES[lang] || JOKES.en;
+  if (kind === 'bid' && hash(`${key}:j`) % 3) return '';
+  const list = J[kind];
+  if (!list) return '';
+  return ` ${pick(list, `${key}:j`).replace(/\{(\w+)\}/g, (_, k) => facts[k] ?? '')}`;
+}
+
+// Which kind of joke fits the player coming up.
+function upKind(p) {
+  const mat = Number(p.matches) || 0;
+  const runs = Number(p.runs) || 0;
+  const wkts = Number(p.wickets) || 0;
+  const sr = Number(p.strikeRate) || 0;
+  if (!mat) return 'upNew';
+  if (sr >= 150 && runs >= 50) return 'upHitter';
+  if (wkts && wkts >= mat * 0.6) return 'upBowler';
+  if (roleId(p.role) === 'ar') return 'upAllRounder';
+  return 'up';
+}
+
 /* ---------------- facts from the auction ---------------- */
 
 const teamName = (a, id) => a.teams[id]?.name || id;
@@ -145,21 +235,21 @@ function lineForLog(a, e, key, lang) {
       return L.start({
         name: a.meta.name, teams: Object.keys(a.teams).length, size: r.squadSize,
         toBuy: r.squadSize - (r.leaders === 'captain_vc' ? 2 : 1), pool: Object.values(a.players).filter((x) => !isAllotted(x)).length,
-      }, key);
+      }, key) + punch(a, lang, 'start', key);
     case 'up':
-      return L.up({ how: e.drawn, intro: intro(a, p, lang), base: m(e.amount) }, key);
+      return L.up({ how: e.drawn, intro: intro(a, p, lang), base: m(e.amount) }, key) + punch(a, lang, upKind(p), key, { sr: Math.round(Number(p.strikeRate) || 0), wkts: Number(p.wickets) || 0 });
     case 'sold': {
       const t = teamName(a, e.team);
       const s = teamSummary(a, e.team);
       const f = { p: p.name, t, amt: m(e.amount), count: s.count, size: r.squadSize, full: s.toBuy === 0, left: m(s.remaining) };
       const tail = ` ${L.squad(f)}${r.purseVisibility === 'everyone' ? L.purse(f) : ''}`;
       const rec = recordPrice(a, e.playerId);
-      if (rec && Number(e.amount) > rec) return L.soldRecord(f) + tail;
-      if (Number(e.amount) <= basePrice(p, r)) return L.soldBase(f, key) + tail;
-      return L.sold(f, key) + tail;
+      if (rec && Number(e.amount) > rec) return L.soldRecord(f) + punch(a, lang, 'soldRecord', key) + tail;
+      if (Number(e.amount) <= basePrice(p, r)) return L.soldBase(f, key) + punch(a, lang, 'soldBase', key) + tail;
+      return L.sold(f, key) + punch(a, lang, 'sold', key) + tail;
     }
     case 'unsold':
-      return Number(a.meta.round || 1) <= Number(r.unsoldRounds) ? L.unsoldAgain({ p: p.name }, key) : L.unsold({ p: p.name });
+      return (Number(a.meta.round || 1) <= Number(r.unsoldRounds) ? L.unsoldAgain({ p: p.name }, key) : L.unsold({ p: p.name })) + punch(a, lang, 'unsold', key);
     case 'undo':
       return L.undo({ p: p.name, t: teamName(a, e.team) });
     case 'round':
@@ -167,7 +257,7 @@ function lineForLog(a, e, key, lang) {
     case 'end': {
       const sales = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained).sort((x, y) => y[1].price - x[1].price);
       const top = sales[0];
-      return L.end({ count: sales.length, top: top ? { p: a.players[top[0]]?.name, t: teamName(a, top[1].team), amt: m(top[1].price) } : null });
+      return L.end({ count: sales.length, top: top ? { p: a.players[top[0]]?.name, t: teamName(a, top[1].team), amt: m(top[1].price) } : null }) + punch(a, lang, 'end', key);
     }
     default:
       return null;
@@ -179,17 +269,18 @@ function lineForBid(a, lot, bid, key, lang) {
   const f = { t: teamName(a, bid.team), amt: money(bid.amount, a.rules) };
   const p = a.players[a.live.playerId] || {};
   const before = lot.slice(0, -1);
-  if (!before.length) return L.bidFirst(f, key);
+  const j = (kind) => punch(a, lang, kind, key);
+  if (!before.length) return L.bidFirst(f, key) + j('bidFirst');
   const rec = recordPrice(a, a.live.playerId);
-  if (rec && Number(bid.amount) > rec && !before.some((b) => Number(b.amount) > rec)) return L.bidRecord(f);
+  if (rec && Number(bid.amount) > rec && !before.some((b) => Number(b.amount) > rec)) return L.bidRecord(f) + j('bidRecord');
   const last4 = lot.slice(-4).map((b) => b.team);
   const pair = [...new Set(last4)];
-  if (last4.length === 4 && pair.length === 2) return L.bidWar({ ...f, other: teamName(a, pair.find((x) => x !== bid.team)) }, key);
+  if (last4.length === 4 && pair.length === 2) return L.bidWar({ ...f, other: teamName(a, pair.find((x) => x !== bid.team)) }, key) + j('bidWar');
   const base = basePrice(p, a.rules);
   const x = Number(bid.amount) / base;
-  if (x >= 3 && Math.floor(x) !== Math.floor((Number(before.at(-1).amount) || 0) / base)) return L.bidMultiple({ ...f, x: Math.floor(x) });
-  if (!before.some((b) => b.team === bid.team)) return L.bidJoin(f, key);
-  return L.bid(f, key);
+  if (x >= 3 && Math.floor(x) !== Math.floor((Number(before.at(-1).amount) || 0) / base)) return L.bidMultiple({ ...f, x: Math.floor(x) }) + j('bidMultiple');
+  if (!before.some((b) => b.team === bid.team)) return L.bidJoin(f, key) + j('bidJoin');
+  return L.bid(f, key) + j('bid');
 }
 
 /* ---------------- commentator ---------------- */
