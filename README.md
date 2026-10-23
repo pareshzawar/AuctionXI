@@ -77,6 +77,8 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 
 The full day-of checklist is in **[docs/AUCTION_DAY.md](docs/AUCTION_DAY.md)**.
 
+**Guide for organisers and captains:** a slide deck covering every feature and how to use it, as [PDF](docs/guide/AuctionXI-Guide.pdf) and [PowerPoint](docs/guide/AuctionXI-Guide.pptx) ([docs/guide](docs/guide/README.md)).
+
 ## Tournaments, seasons, major and mini auctions
 
 One site and one Firebase project serve all your tournaments, e.g. a society league and a friends' tournament.
@@ -155,7 +157,7 @@ design/           the design-system source: tokens.json and notes
 templates/        setup questionnaire, player & team templates, sample data
 archive/          permanently archived auctions
 tournaments/      filled templates for real tournaments (e.g. tournaments/cpl)
-docs/             setup, rules guide, auction-day checklist
+docs/             setup, rules guide, auction-day checklist; docs/guide/ the organiser and captain guide (PDF, PowerPoint)
 ```
 
 No build step and no npm. It's plain HTML, CSS and JavaScript modules, so anyone can fork it and change it.
