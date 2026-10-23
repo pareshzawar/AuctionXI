@@ -104,7 +104,10 @@ $('#h-pack').onclick = () => downloadPack();
 // Every error message offers the offline pack, so the auction so far is never lost.
 const packAction = { label: 'Download offline pack', onClick: () => downloadPack() };
 const run = (fn) => async (...args) => {
-  try { await fn(...args); } catch (e) { console.error(e); toast(e.message || String(e), 'error', A?.meta?.status === 'live' || A?.meta?.status === 'completed' ? { action: packAction } : {}); }
+  try { await fn(...args); } catch (e) {
+    console.error(e);
+    const msg = /permission/i.test(e.message || '') ? 'Not allowed: creating auctions (mock, mini) needs an approved organiser signed in with Google on the home page; changing this one needs its admin.' : (e.message || String(e));
+    toast(msg, 'error', A?.meta?.status === 'live' || A?.meta?.status === 'completed' ? { action: packAction } : {}); }
 };
 // Anything unexpected on this page: same offer.
 addEventListener('error', (e) => { if (A) toast(`Something went wrong: ${e.message || 'unknown error'}`, 'error', { action: packAction }); });

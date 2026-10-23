@@ -100,11 +100,13 @@
             <p class="notice notice-info" style="margin-top:var(--space-4)">Sign in with Google to manage this auction from any device.
               You also get an admin code as a backup.</p>
             <button type="button" id="google-btn">Sign in with Google</button> <small id="who"></small>
+            <div id="org-status" style="margin-top:var(--space-3)"></div>
           </div>
           <p style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="c-submit">Create major auction</button></p>
         </form>
         <p class="hint" style="margin-top:var(--space-4)">Keeping a record of an auction held before? <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Add a past auction (record)<input type="file" id="c-record" accept=".json,application/json" hidden></label>
           Choose its AuctionXI file (<i>auction.json</i>): it is saved as a finished, private auction with its squads and prices, grouped under its tournament.</p>
+        <div id="org-card" class="card hidden" style="margin-top:var(--space-5)"></div>
       </section>
     </div>
 

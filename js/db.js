@@ -134,6 +134,7 @@ async function firebaseBackend(cfg) {
     name: 'firebase',
     uid: () => auth.currentUser?.uid,
     user: () => auth.currentUser,
+    email: () => (auth.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser.email : null),
     now: () => Date.now() + offset,
     get: async (p) => (await D.get(ref(p))).val(),
     set: (p, v) => D.set(ref(p), v),
