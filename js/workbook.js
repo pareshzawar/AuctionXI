@@ -73,6 +73,7 @@ const ui = { aiQ: '', aiA: '', view: 'players', q: '', pool: '', role: '', favOn
 function playerStatus(a, pid) {
   const s = a.sales[pid];
   if (!s && a.players[pid]?.list === 'waiting') return { kind: 'waiting' };
+  if (!s && a.players[pid]?.list === 'cancelled') return { kind: 'cancelled' };
   if (s) return { kind: s.allotted || s.retained ? 'retained' : 'sold', team: s.team, price: s.price };
   if (a.live?.playerId === pid && a.live.status === 'bidding') return { kind: 'live' };
   if (a.unsold[pid]) return { kind: 'unsold' };
@@ -92,7 +93,7 @@ function playersView(a, book) {
       || (r.categories.findIndex((c) => c.id === x.p.category) - r.categories.findIndex((c) => c.id === y.p.category)) || x.p.name.localeCompare(y.p.name));
   const favCount = Object.values(book.players).filter((x) => x.fav).length;
   const status = (st) => (st.kind === 'sold' ? `${badge('sold')} ${teamBadge(a.teams[st.team])} ${esc(money(st.price, r))}`
-    : st.kind === 'live' ? badge('live', { text: 'Up now' }) : st.kind === 'unsold' ? badge('unsold') : st.kind === 'waiting' ? badge('upcoming', { text: 'Waiting list' }) : '<span class="muted">Available</span>');
+    : st.kind === 'live' ? badge('live', { text: 'Up now' }) : st.kind === 'unsold' ? badge('unsold') : st.kind === 'waiting' ? badge('upcoming', { text: 'Waiting list' }) : st.kind === 'cancelled' ? '<span class="muted">Registration cancelled</span>' : '<span class="muted">Available</span>');
   return `
     <div class="row" style="margin-bottom:var(--space-3)">
       <input data-wb="q" value="${esc(ui.q)}" placeholder="Search name or number" style="flex:1;min-width:160px">
@@ -174,7 +175,7 @@ function adviserContext(a, book, team) {
   const toBuy = Math.max(0, r.squadSize - s.count);
   const base = minBase(r);
   const max = toBuy ? Math.max(0, Math.min(s.remaining, s.remaining - (toBuy - 1) * base)) : 0;
-  const left = Object.entries(a.players).filter(([id, p]) => !isAllotted(p) && !a.sales[id] && p.list !== 'waiting');
+  const left = Object.entries(a.players).filter(([id, p]) => !isAllotted(p) && !a.sales[id] && !p.list);
   const mine = Object.entries(book.players).filter(([, x]) => x.fav || x.max != null || x.note);
   return [
     `My team: ${t?.name}. Points left: ${money(s.remaining, r)}. Squad: ${s.count} of ${r.squadSize}, ${toBuy} still to buy. My max bid now: ${money(max, r)}.`,

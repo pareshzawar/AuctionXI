@@ -56,12 +56,13 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
   const from = slabs.map((s, i) => (i === 0 ? 0 : Number(slabs[i - 1].upto) || 0));
   const TS = ref('Teams Summary');
   const tLast = teams.length + 1;
-  const used = new Set(['guide', 'auction', 'live auction', 'ranking board', 'teams summary', 'players', 'rules', 'ladder']);
+  const used = new Set(['guide', 'auction', 'live auction', 'find player', 'ranking board', 'teams summary', 'players', 'rules', 'ladder']);
 
   /* Sheets in the order the organiser uses them */
   const G = wb.addWorksheet('Guide', { properties: { tabColor: { argb: GOLD } } });
   const K = wb.addWorksheet('Auction', { properties: { tabColor: { argb: GOLD } } });
   const LV = wb.addWorksheet('Live Auction');
+  const FP = wb.addWorksheet('Find Player', { properties: { tabColor: { argb: GOLD } } });
   const RB = wb.addWorksheet('Ranking Board');
   const T = wb.addWorksheet('Teams Summary');
   const P = wb.addWorksheet('Players');
@@ -82,6 +83,7 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
     ['   Only rows marked OK count towards points and squads. Fix a red row and it counts.'],
     ['Live Auction: put it on the big screen. It shows the last player entered, SOLD / UNSOLD, and every team\'s points and max bid.'],
     ['   Type the current bid in the yellow cell to see the next valid bid.'],
+    ['Find Player: type a name (or part of it) or a player number (24 or P024) in the yellow box to see who it is, base price, status, team and price.'],
     ['Ranking Board and Teams Summary: points used and remaining, players bought, still to buy, max bid.'],
     ['Players: everyone in the auction with base price and where they went. Add late names in the empty yellow rows.'],
     ['One sheet per team: captain, vice-captain and every player bought, with prices.'],
@@ -231,6 +233,42 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
     { type: 'expression', formulae: ['$D2="SOLD"'], style: GREEN },
     { type: 'expression', formulae: ['$D2="UNSOLD"'], style: RED },
   ] });
+
+  /* Find Player: B2 is a name (or part) or a player number; up to 20 matches from Players.
+     Hidden H1/H2: the number as P024 and as P24, so either style of ID matches. */
+  {
+    const N = POOL_ROWS + 1;
+    header(FP, [['No.', 9], ['Player Name', 28], ['Role', 14], ['Status', 11], ['Base Price', 11], ['Team', 24], ['Sold Price', 11], ['', 4]], 4);
+    FP.getCell('A1').value = 'Find a player'; FP.getCell('A1').font = { bold: true, size: 16 };
+    FP.getCell('A2').value = 'Name or No.'; FP.getCell('A2').font = { bold: true };
+    FP.mergeCells('B2:D2');
+    FP.getCell('B2').fill = fill(INPUT); FP.getCell('B2').font = { bold: true, size: 14 };
+    FP.getCell('B2').border = { top: { style: 'medium' }, left: { style: 'medium' }, bottom: { style: 'medium' }, right: { style: 'medium' } };
+    FP.getCell('E2').value = f('IF(TRIM(B2)="","",IF(H5="","No match",COUNT(H5:H24)&" found"))');
+    FP.getCell('A3').value = 'Type in the yellow box: part of a name (e.g. aadesh) or a number (24 or P024).'; FP.getCell('A3').font = { italic: true, color: { argb: 'FF6B7280' } };
+    const num = 'SUBSTITUTE(UPPER(TRIM($B$2)),"P","")';
+    FP.getCell('H1').value = f(`IFERROR("P"&TEXT(VALUE(${num}),"000"),"#")`);
+    FP.getCell('H2').value = f(`IFERROR("P"&VALUE(${num}),"#")`);
+    const rng = (c) => `Players!$${c}$2:$${c}$${N}`;
+    for (let k = 1; k <= 20; k++) {
+      const n = k + 4;
+      FP.getCell(`H${n}`).value = f(`IF(TRIM($B$2)="","",IFERROR(_xlfn.AGGREGATE(15,6,(ROW(${rng('A')})-1)/((${rng('A')}<>"")*((${rng('M')}=$H$1)+(${rng('M')}=$H$2)+(${rng('M')}=UPPER(TRIM($B$2)))+ISNUMBER(SEARCH(TRIM($B$2),${rng('A')}))>0)),${k}),""))`);
+      const at = (c) => `IF($H${n}="","",INDEX(Players!$${c}$2:$${c}$${N},$H${n})&"")`;
+      FP.getCell(`A${n}`).value = f(at('M'));
+      FP.getCell(`B${n}`).value = f(at('A'));
+      FP.getCell(`C${n}`).value = f(at('F'));
+      FP.getCell(`D${n}`).value = f(at('E'));
+      FP.getCell(`E${n}`).value = f(`IF($H${n}="","",INDEX(Players!$B$2:$B$${N},$H${n}))`);
+      FP.getCell(`F${n}`).value = f(at('D'));
+      FP.getCell(`G${n}`).value = f(`IF($H${n}="","",INDEX(Players!$C$2:$C$${N},$H${n}))`);
+      for (const col of 'ABCDEFG') FP.getCell(`${col}${n}`).fill = fill(CALC);
+    }
+    FP.getColumn('H').hidden = true;
+    FP.addConditionalFormatting({ ref: 'D5:D24', rules: [
+      { type: 'expression', formulae: ['$D5="SOLD"'], style: GREEN },
+      { type: 'expression', formulae: ['$D5="UNSOLD"'], style: RED },
+    ] });
+  }
 
   /* Live Auction: the last row of Auction, big, for the screen */
   LV.getColumn(1).width = 24; LV.getColumn(2).width = 34; LV.getColumn(3).width = 4; LV.getColumn(4).width = 22; LV.getColumn(5).width = 16; LV.getColumn(6).width = 22;

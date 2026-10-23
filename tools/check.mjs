@@ -192,3 +192,11 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
   for (let i = 0; i < 3; i++) { const p = E.pickNext(a); order.push(p.id); a.unsold[p.id] = { ...a.unsold[p.id], round: 2 }; }
   ok(order.join() === 'P1,P3,P2', `unsold round: original order (${order.join()})`);
 }
+ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn', '', 'x'].map(csv.listOf).join() === 'waiting,waiting,cancelled,cancelled,cancelled,,'
+  && !E.inAuction({ name: 'X', list: 'cancelled' }) && E.inAuction({ name: 'X' }), 'list column: waiting / registration cancelled / auction');
+{
+  const L = [{ id: 'P024', name: 'Aadesh Nichite' }, { id: 'P003', name: 'Abhijeet Limaye' }, { id: 'P046', name: 'Akshay Thakur' }, { id: 'P240', name: 'Aadesh Kumar' }];
+  const f = (q) => E.searchPlayers(L, q).map((p) => p.id).join();
+  ok(f('24') === 'P024' && f('P024') === 'P024' && f('aadesh') === 'P240,P024' && f('24 aadesh') === 'P024' && f('aadesh 24') === 'P024' && f('thak') === 'P046' && f('3') === 'P003',
+    `search by name, number or both (${f('24')} | ${f('aadesh')} | ${f('24 aadesh')})`);
+}

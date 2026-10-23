@@ -2,13 +2,14 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers } from './engine.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
   const s = a.sales[pid];
   if (s) return s.allotted || s.retained ? 'retained' : 'sold';
   if (isWaiting(a.players[pid])) return 'waiting';
+  if (isCancelled(a.players[pid])) return 'cancelled';
   if (a.live?.playerId === pid && a.live.status === 'bidding') return 'live';
   if (a.unsold[pid]) return 'unsold';
   return 'upcoming';
@@ -139,11 +140,21 @@ const statLine = (p) => [p.matches != null && `${p.matches} m`, p.runs != null &
   p.wickets != null && `${p.wickets} w`, p.economy != null && `eco ${Number(p.economy).toFixed(1)}`].filter(Boolean).join(' · ');
 
 // Phones: both lists, each player opens to the full card.
-export function profilesView(a) {
-  const { available, waiting } = profileGroups(a);
-  const row = (p) => `<details class="profile-row"><summary>
+// Phones: a search box (name, number or both) over the two lists.
+export function profilesView(a, q = '') {
+  return `<div class="card" style="margin-bottom:var(--space-4)"><input id="pf-q" type="search" value="${esc(q)}" placeholder="Search by name, number or both" autocomplete="off" aria-label="Search players"></div>
+    <div id="pf-lists">${profileLists(a, q)}</div>`;
+}
+
+export function profileLists(a, q = '') {
+  const groups = profileGroups(a);
+  const hit = q.trim() ? new Set(searchPlayers([...groups.available, ...groups.waiting], q, 999).map((p) => p.id)) : null;
+  const available = hit ? groups.available.filter((p) => hit.has(p.id)) : groups.available;
+  const waiting = hit ? groups.waiting.filter((p) => hit.has(p.id)) : groups.waiting;
+  if (hit && !available.length && !waiting.length) return '<p class="muted">No player up for auction or on the waiting list matches.</p>';
+  const row = (p) => `<details class="profile-row"${hit && hit.size === 1 ? ' open' : ''}><summary>
       <span class="ax-avatar" style="width:40px;height:40px">${p.photoData ? `<img src="${esc(p.photoData)}" alt="">` : esc(p.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join(''))}</span>
-      <span style="min-width:0;flex:1"><b>${esc(p.name)}</b> <small class="muted">${esc(ROLES[roleId(p.role)].code)}${a.unsold[p.id] ? ' · unsold so far' : ''}</small><br><small class="muted">${esc(statLine(p) || 'No stats yet')}</small></span>
+      <span style="min-width:0;flex:1"><b>${esc(p.name)}</b> <small class="muted">${esc(p.id)} · ${esc(ROLES[roleId(p.role)].code)}${a.unsold[p.id] ? ' · unsold so far' : ''}</small><br><small class="muted">${esc(statLine(p) || 'No stats yet')}</small></span>
     </summary><div style="padding:var(--space-2) 0">${cardFor(a, p.id)}</div></details>`;
   return `<div class="card"><h3 style="margin-top:0">Up for auction (${available.length})</h3>${available.map(row).join('') || '<p class="muted">Everyone has been bought.</p>'}</div>
     <div class="card" style="margin-top:var(--space-4)"><h3 style="margin-top:0">Waiting list (${waiting.length})</h3>${waiting.map(row).join('') || '<p class="muted">Nobody on the waiting list.</p>'}

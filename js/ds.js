@@ -18,7 +18,7 @@ export function price(amount, rules, { size = 'md', tone = '', cls = '' } = {}) 
     + '</span>';
 }
 
-const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained', waiting: 'Waiting list' };
+const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained', waiting: 'Waiting list', cancelled: 'Registration cancelled' };
 
 export function badge(status, { size = '', text = '' } = {}) {
   const cls = status;
