@@ -129,7 +129,7 @@ async function firebaseBackend(cfg) {
   let offset = 0;
   D.onValue(D.ref(rtdb, '.info/serverTimeOffset'), (s) => { offset = s.val() || 0; });
 
-  const ref = (p) => D.ref(rtdb, p);
+  const ref = (p) => (p ? D.ref(rtdb, p) : D.ref(rtdb)); // '' = the top of the database
   return {
     name: 'firebase',
     uid: () => auth.currentUser?.uid,
