@@ -319,7 +319,9 @@ export function createCommentator({ onLine = () => {}, onLog = () => {}, lang = 
       const fresh = entries.filter(([k]) => !seen.has(k));
       const history = ready ? fresh : fresh.slice(-8);
       fresh.forEach(([k]) => seen.add(k));
-      const aiOn = !!a.meta?.aiCommentary;
+      // AI on, unless the control room has paused it after a failure (meta.aiStatus): then the
+      // built-in line is read at once.
+      const aiOn = !!a.meta?.aiCommentary && !(a.meta.aiStatus?.down && Number(a.meta.aiStatus.until) > Date.now());
       for (const [k, e] of history) {
         const waitForAi = ready && aiOn && AI_KINDS.includes(e.type);
         const text = lineForLog(a, e, k, lg);

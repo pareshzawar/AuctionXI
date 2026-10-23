@@ -41,22 +41,36 @@ export const aiReady = () => !!aiSettings().key;
 const modelOf = (s) => s.model || PROVIDERS[s.provider]?.model || '';
 const baseOf = (s) => (s.base || PROVIDERS[s.provider]?.base || '').replace(/\/+$/, '');
 
+// Errors carry a kind, so callers can decide what to do: 'limit' (rate limit or quota used up),
+// 'key' (refused), 'down' (no answer, timed out, or the service failed) or 'other'.
+function aiError(msg, kind) { const e = new Error(`AI: ${msg}`); e.kind = kind; return e; }
+
 async function failure(res) {
   let msg = `${res.status}`;
   try { const j = await res.json(); msg = j.error?.message || j.error?.type || j.message || msg; } catch { /* not JSON */ }
-  if (res.status === 401 || res.status === 403) msg = `the key was refused (${msg})`;
-  if (res.status === 429) msg = `rate limit reached; wait a minute (${msg})`;
-  return new Error(`AI: ${msg}`);
+  if (res.status === 401 || res.status === 403) return aiError(`the key was refused (${msg})`, 'key');
+  if (res.status === 429) return aiError(`rate limit or quota reached (${msg})`, 'limit');
+  if (res.status >= 500) return aiError(`the AI service is not answering (${msg})`, 'down');
+  return aiError(msg, 'other');
+}
+
+// fetch with a time limit; a network failure or a timeout counts as 'down'.
+async function call(url, opts, timeoutMs) {
+  try {
+    return await fetch(url, { ...opts, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    throw aiError(e.name === 'TimeoutError' ? `no answer within ${Math.round(timeoutMs / 1000)} seconds` : 'could not reach the AI service', 'down');
+  }
 }
 
 // One short completion. Returns the text, or throws with a readable message.
-export async function askAI({ system = '', prompt, maxTokens = 600, json = false }) {
+export async function askAI({ system = '', prompt, maxTokens = 600, json = false, timeoutMs = 30000 }) {
   const s = aiSettings();
   if (!s.key) throw new Error('Add an AI key first (AI assistant settings)');
   const model = modelOf(s);
   if (!model) throw new Error('Choose a model in the AI settings');
   if (s.provider === 'gemini') {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    const res = await call(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': s.key },
       body: JSON.stringify({
@@ -64,26 +78,26 @@ export async function askAI({ system = '', prompt, maxTokens = 600, json = false
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: { maxOutputTokens: maxTokens, ...(json ? { responseMimeType: 'application/json' } : {}) },
       }),
-    });
+    }, timeoutMs);
     if (!res.ok) throw await failure(res);
     const j = await res.json();
     return (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
   }
   if (s.provider === 'anthropic') {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await call('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'content-type': 'application/json', 'x-api-key': s.key, 'anthropic-version': '2026-10-21',
         'anthropic-dangerous-direct-browser-access': 'true', // the key is the user's own, used from their own browser
       },
       body: JSON.stringify({ model, max_tokens: Math.max(maxTokens, 2000), output_config: { effort: 'low' }, system: system || undefined, messages: [{ role: 'user', content: prompt }] }),
-    });
+    }, timeoutMs);
     if (!res.ok) throw await failure(res);
     const j = await res.json();
     if (j.stop_reason === 'refusal') throw new Error('AI: the model declined this request');
     return (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
   }
-  const res = await fetch(`${baseOf(s)}/chat/completions`, {
+  const res = await call(`${baseOf(s)}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${s.key}` },
     body: JSON.stringify({
@@ -91,7 +105,7 @@ export async function askAI({ system = '', prompt, maxTokens = 600, json = false
       messages: [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: prompt }],
       ...(json ? { response_format: { type: 'json_object' } } : {}),
     }),
-  });
+  }, timeoutMs);
   if (!res.ok) throw await failure(res);
   const j = await res.json();
   return String(j.choices?.[0]?.message?.content || '').trim();
@@ -213,6 +227,7 @@ export async function aiCommentLine(a, e, lang, money) {
     system: `You are the live commentator at a friendly ${a.meta.tournament || 'cricket'} player auction. Write ONE or TWO short, lively sentences (at most 35 words) in ${LANG_NAME[lang] || LANG_NAME.en}.${r.humour === 'normal' ? '' : ' Be funny: end with a quick, witty punchline about the bidding, the money or the drama, like a cheeky IPL auctioneer. Keep it warm: never mock a player, their looks, age or skill.'} Use only the facts given: never invent stats, nicknames or history. No emoji, no hashtags, no quotes around the line. Amounts exactly as written.`,
     prompt: facts,
     maxTokens: 200,
+    timeoutMs: 7000, // a line that arrives later than this is no use: the built-in line is read instead
   });
   return text.replace(/^["'“”]+|["'“”]+$/g, '').trim();
 }

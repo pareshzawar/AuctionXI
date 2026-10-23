@@ -45,12 +45,34 @@ const makeCommentator = () => createCommentator({ lang: commLang, onLog: aiOnEve
 
 // AI commentary: this laptop writes a line for each player up / sold / unsold with its own AI key,
 // and saves it in the auction so every screen shows (and can read out) the same line.
+// If the AI fails (quota or rate limit used up, key refused, service down or too slow), AI commentary
+// pauses by itself: 1, then 5, then 15 minutes (30 for a refused key), then it tries again. While it
+// is paused meta/aiStatus tells every screen to read the built-in lines at once.
 let aiBusy = false;
 let aiNext = null;
+let aiFails = 0;
+let aiPausedUntil = 0;
+const AI_PAUSE = [60e3, 5 * 60e3, 15 * 60e3];
+const AI_WHY = { limit: 'the AI key\'s limit is used up', key: 'the AI key was refused', down: 'the AI service is not answering', other: 'the AI gave an error' };
 function aiOnEvent(e) {
   if (!A?.meta.aiCommentary || !aiReady() || !['up', 'sold', 'unsold'].includes(e.type)) return;
+  if (Date.now() < aiPausedUntil) return; // paused: the built-in line is used
   aiNext = e;
   if (!aiBusy) aiRun();
+}
+async function aiFailed(err) {
+  aiFails++;
+  const wait = err.kind === 'key' ? 30 * 60e3 : AI_PAUSE[Math.min(aiFails - 1, AI_PAUSE.length - 1)];
+  aiPausedUntil = Date.now() + wait;
+  await db.set(`${P}/meta/aiStatus`, { down: true, until: db.now() + wait, why: err.kind || 'other' }).catch(() => {});
+  toast(`${AI_WHY[err.kind] || AI_WHY.other}: switched to the built-in commentary for ${Math.round(wait / 60e3)} min, then AI is tried again. (${err.message})`, 'error');
+}
+async function aiRecovered() {
+  if (!aiFails && !A.meta.aiStatus) return;
+  aiFails = 0;
+  aiPausedUntil = 0;
+  await db.set(`${P}/meta/aiStatus`, null).catch(() => {});
+  toast('AI commentary is back', 'ok');
 }
 async function aiRun() {
   const e = aiNext;
@@ -61,8 +83,9 @@ async function aiRun() {
     const lang = A.rules.commentaryLang || 'en';
     const text = await aiCommentLine(A, e, lang, money);
     if (text) await db.push(`${P}/aicomm`, { text: text.slice(0, 400), lang, kind: e.type, event: e.at, at: db.now() });
+    await aiRecovered();
   } catch (err) {
-    toast(err.message, 'error');
+    await aiFailed(err);
   } finally {
     aiBusy = false;
     if (aiNext) aiRun();
@@ -623,21 +646,32 @@ async function saveDeck() {
 // AI scouting notes: one short note per player from their stats, reviewed before saving (field `scout`).
 async function aiScouting() {
   if (!aiReady()) { tab = 'setup'; render(true); throw new Error('Add an AI key first (Setup → AI assistant)'); }
-  const list = Object.entries(A.players).filter(([, p]) => p.matches || p.runs || p.wickets || p.notes);
-  if (!list.length) throw new Error('No player has stats or notes to write from');
+  const all = Object.entries(A.players).filter(([, p]) => p.matches || p.runs || p.wickets || p.notes);
+  if (!all.length) throw new Error('No player has stats or notes to write from');
+  // Players without a note first; when everyone has one, write them all again.
+  const missing = all.filter(([, p]) => !p.scout);
+  const list = missing.length ? missing : all;
   if (!confirm(`Write scouting notes for ${list.length} players with your AI key? Their names and stats are sent to the AI provider. You can edit every note before saving.`)) return;
   const drafts = {};
   const batches = [];
   for (let i = 0; i < list.length; i += 12) batches.push(list.slice(i, i + 12));
   for (const [n, batch] of batches.entries()) {
     toast(`Writing notes… ${n * 12 + 1}-${n * 12 + batch.length} of ${list.length}`);
-    const text = await askAI({
+    let text;
+    try {
+      text = await askAI({
       system: 'You scout players for a friendly society cricket auction. For each player write one scouting note of at most 20 words: their strength and how a captain might use them, from the given stats only. Never invent facts. Plain English, no emoji. Reply with a JSON object mapping each player ID to its note, and nothing else.',
       prompt: batch.map(([id, p]) => `ID ${id}\n${playerFacts(p, A, money)}`).join('\n\n'),
       maxTokens: 1500,
       json: true,
-    });
-    Object.assign(drafts, parseJSON(text));
+      });
+      Object.assign(drafts, parseJSON(text));
+    } catch (err) {
+      // Keep what was written; the rest can be done later (players with a note are skipped next time).
+      if (!Object.keys(drafts).length) throw err;
+      toast(`${err.message}. Stopped after ${Object.keys(drafts).length} notes: review and save these, then run it again later for the rest.`, 'error');
+      break;
+    }
   }
   const dlg = document.createElement('dialog');
   dlg.className = 'card';
@@ -981,6 +1015,7 @@ function control(el) {
           ${voice.supported ? `<button class="btn-sm" id="c-voice">${voice.on ? 'Stop reading aloud' : 'Read aloud on this laptop'}</button>` : ''}</div>
           ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This laptop has no Marathi or Hindi voice, so lines are shown but not read. Install one in the system language settings.</p>' : ''}
           <label class="check" style="margin:0 0 var(--space-2)"><input type="checkbox" id="c-ai" ${A.meta.aiCommentary ? 'checked' : ''} ${aiReady() ? '' : 'disabled'}> AI commentary${aiReady() ? ' (uses this laptop\'s AI key; every screen shows the lines)' : ': add an AI key in Setup first'}</label>
+          ${A.meta.aiCommentary && A.meta.aiStatus?.down && Number(A.meta.aiStatus.until) > Date.now() ? `<p class="notice notice-warn" style="margin:0 0 var(--space-2)">AI paused: ${esc(AI_WHY[A.meta.aiStatus.why] || AI_WHY.other)}. Every screen is using the built-in commentary until ${esc(new Date(A.meta.aiStatus.until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}, then AI is tried again. <button class="btn-sm" id="c-ai-retry">Try AI now</button></p>` : ''}
           <div id="c-comm" class="feed"></div></div>`}
         <div class="card"><h2>Activity</h2>${feed(A)}</div>
       </div>
@@ -990,7 +1025,8 @@ function control(el) {
   wireStagePanel(el);
   renderCommentary();
   if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(commLang()); render(true); };
-  if ($('#c-ai')) $('#c-ai').onchange = run(async (e) => { await db.set(`${P}/meta/aiCommentary`, e.target.checked || null); });
+  if ($('#c-ai')) $('#c-ai').onchange = run(async (e) => { aiFails = 0; aiPausedUntil = 0; await db.update(`${P}/meta`, { aiCommentary: e.target.checked || null, aiStatus: null }); });
+  if ($('#c-ai-retry')) $('#c-ai-retry').onclick = run(async () => { aiFails = 0; aiPausedUntil = 0; await db.set(`${P}/meta/aiStatus`, null); toast('AI will be tried on the next player', 'ok'); });
   if ($('#c-lang')) $('#c-lang').onchange = (e) => { setDeviceCommLang(e.target.value === A.rules.commentaryLang ? '' : e.target.value); commentator = makeCommentator(); commentator.update(A); e.target.blur(); render(true); };
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
