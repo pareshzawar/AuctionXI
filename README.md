@@ -82,7 +82,7 @@ Running locally: any static server works, e.g. `python3 -m http.server` → http
 
 The full day-of checklist is in **[docs/AUCTION_DAY.md](docs/AUCTION_DAY.md)**.
 
-**Guide for organisers and captains:** a slide deck covering every feature and how to use it, as [PDF](docs/guide/AuctionXI-Guide.pdf) and [PowerPoint](docs/guide/AuctionXI-Guide.pptx) ([docs/guide](docs/guide/README.md)).
+**Guide for organisers and captains:** a 31-slide deck covering every feature and how to use it, as [PDF](docs/guide/AuctionXI-Guide.pdf) and [PowerPoint](docs/guide/AuctionXI-Guide.pptx) ([docs/guide](docs/guide/README.md)).
 
 ## Tournaments, seasons, major and mini auctions
 
