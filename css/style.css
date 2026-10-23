@@ -217,3 +217,10 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 .stage-tile-photo { flex: none; width: 54px; height: 72px; border-radius: 6px; overflow: hidden; display: grid; place-items: center; background: var(--surface-raised); font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--line-strong); }
 .stage-tile-photo img { width: 100%; height: 100%; object-fit: cover; }
 .stage-profile-side { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+
+/* Captain's plan: one row per target, numbers in a grid that fits a phone */
+.plan-row { padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.plan-row-bad { background: var(--danger-soft); border-color: var(--danger); }
+.plan-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-1); align-items: end; }
+.plan-nums input { width: 100%; min-height: 36px; }
+.plan-nums .ax-kv b { font-variant-numeric: tabular-nums; }

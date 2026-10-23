@@ -200,3 +200,21 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
   ok(f('24') === 'P024' && f('P024') === 'P024' && f('aadesh') === 'P240,P024' && f('24 aadesh') === 'P024' && f('aadesh 24') === 'P024' && f('thak') === 'P046' && f('3') === 'P003',
     `search by name, number or both (${f('24')} | ${f('aadesh')} | ${f('24 aadesh')})`);
 }
+{
+  // Captain's plan: purse 1000, squad 9 with C + VC allotted, base 50 -> 7 to buy, first max bid 700.
+  const PL = await import(root + '/js/plan.js');
+  const rules = E.withDefaults({ purse: 1000, squadSize: 9, categories: [{ id: 'A', label: 'Pool A', base: 50 }] });
+  const players = { C1: { name: 'Cap', allottedTeam: 'T1', allottedAs: 'C' }, V1: { name: 'Vice', allottedTeam: 'T1', allottedAs: 'VC' } };
+  for (let i = 1; i <= 12; i++) players[`P${i}`] = { name: `Player ${i}`, category: 'A', role: 'bat' };
+  const a = E.normalize({ meta: { round: 1 }, rules, teams: { T1: { name: 'One' }, T2: { name: 'Two' } }, players,
+    sales: { C1: { team: 'T1', price: 250, allotted: true }, V1: { team: 'T1', price: 150, allotted: true } } });
+  const now = PL.standing(a, 'T1');
+  const before = PL.standing({ ...a, sales: {} }, 'T1'); // before the start: C + VC not in the squad yet
+  const plan = PL.planFor(a, 'T1', [{ id: 'P1', max: 300 }, { id: 'P2', max: 200 }, { id: 'P3', max: null }, { id: 'P4', max: 400 }]);
+  const w = PL.whatIf(a, 'T1', 'P5', 500, [{ id: 'P1', max: 300 }]);
+  ok(now.remaining === 1000 && now.toBuy === 7 && now.maxBid === 700 && before.toBuy === 7 && before.maxBid === 700
+    && plan.steps[0].remaining === 700 && plan.steps[0].maxBid === 450 && plan.steps[1].remaining === 500 && plan.steps[2].remaining === 450
+    && !plan.steps[3].fits && plan.steps[3].limit === 300 && plan.spend === 550 && plan.left === 450 && plan.restSlots === 4 && plan.spare === 250
+    && w.allowed && w.after.remaining === 500 && w.after.maxBid === 250 && w.lost.length === 1,
+  `captain plan: leaves ${plan.steps.map((s) => s.fits ? s.remaining : 'x').join(',')}; what-if left ${w.after.remaining}, max ${w.after.maxBid}`);
+}

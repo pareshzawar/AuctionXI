@@ -4,6 +4,7 @@
 import { db } from './db.js';
 import { basePrice, normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat, viewGate, waitUntilOpen } from './actions.js';
+import { whatIf, buyable } from './plan.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
@@ -277,6 +278,21 @@ let profileQuery = '';
 
 // The captain's own limit for the player on the block, from the workbook.
 function myLimit() {
+  return limitLine() + impactLine();
+}
+
+// What winning the player on the block would leave this team (from the public squad and points).
+function impactLine() {
+  const live = A.live;
+  if (live?.status !== 'bidding' || !myTeam || !buyable(A, live.playerId)) return '';
+  const lead = live.bid?.team === myTeam;
+  const price = lead ? Number(live.bid.amount) : (nextBid(live, A.rules) ?? basePrice(A.players[live.playerId], A.rules));
+  const w = whatIf(A, myTeam, live.playerId, price);
+  if (!w.allowed) return '';
+  return `<p class="hint" style="margin:0 0 var(--space-2)">${lead ? 'If it ends at' : 'Win at'} ${esc(money(price, A.rules))}: ${esc(money(w.after.remaining, A.rules))} left for ${w.after.toBuy} more player${w.after.toBuy === 1 ? '' : 's'}, max bid then ${esc(money(w.after.maxBid, A.rules))}.</p>`;
+}
+
+function limitLine() {
   const live = A.live;
   const mine = wb?.book && live?.status === 'bidding' && wb.book.players[live.playerId];
   if (!mine || mine.max == null) return '';
