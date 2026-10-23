@@ -146,8 +146,24 @@ body.stage-mode main { max-width: none; padding: 0; }
 .stage-tally div { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .stage-tally b { font-family: var(--font-display); font-size: 44px; line-height: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stage-main { display: grid; grid-template-columns: minmax(0, 1fr) 600px; gap: var(--space-8); min-height: 0; }
-.stage-comm { display: flex; align-items: baseline; gap: var(--space-5); min-height: 40px; }
-.stage-comm p { margin: 0; font-size: 30px; line-height: 38px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Commentary in a feature box: the new line slides in once; every 90 s a gold shine sweeps across it. */
+.stage-comm { position: relative; display: flex; align-items: center; gap: var(--space-5); min-height: 64px; padding: var(--space-3) var(--space-5); overflow: hidden;
+  border: 1px solid var(--line); border-left: 6px solid var(--gold); border-radius: var(--radius-md); background: var(--surface); }
+.stage-comm .stage-label { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); padding: 2px var(--space-3); border-radius: var(--radius-xs); background: var(--gold-soft); color: var(--gold); }
+.stage-comm .comm-mic { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+.stage-comm p { margin: 0; min-width: 0; font-size: 30px; line-height: 38px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-comm.is-new p { animation: comm-in .7s cubic-bezier(.2, .8, .2, 1); }
+.stage-comm.is-new { animation: comm-glow 1.6s ease-out; }
+.stage-comm::after { content: ''; position: absolute; inset: 0 auto 0 -40%; width: 40%; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold) 28%, transparent), transparent); }
+.stage-comm.is-shine::after { animation: comm-shine 1.8s ease-in-out; }
+.stage-comm.is-shine .comm-mic, .stage-comm.is-new .comm-mic { animation: comm-mic .6s ease-in-out 3; }
+@keyframes comm-in { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes comm-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent); } 100% { box-shadow: 0 0 0 18px transparent; } }
+@keyframes comm-shine { 0% { left: -40%; opacity: 1; } 100% { left: 110%; opacity: 1; } }
+@keyframes comm-mic { 50% { transform: scale(1.8); opacity: .5; } }
+.feed .comm-latest { border-left: 4px solid var(--gold); padding-left: var(--space-3); border-radius: var(--radius-xs); background: var(--surface-raised); }
+.feed .comm-latest.is-new { animation: comm-in .6s cubic-bezier(.2, .8, .2, 1); }
 .stage-teams { display: grid; grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); gap: var(--space-4); }
 .stage-ticker { margin: 0 calc(-1 * var(--space-10)); }
 .stage-wait { display: grid; place-items: center; text-align: center; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
@@ -165,6 +181,7 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 
 @media (prefers-reduced-motion: reduce) {
   .overlay .ax-stamp, .ax-badge-live .ax-dot, .ax-ticker-scroll .ax-ticker-list { animation: none !important; }
+  .stage-comm, .stage-comm p, .stage-comm::after, .stage-comm .comm-mic, .feed .comm-latest { animation: none !important; }
 }
 
 /* League logo, banner and player photos */
