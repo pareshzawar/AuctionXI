@@ -1,5 +1,5 @@
 import { db, isLocal } from './db.js';
-import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction, organiserStatus, claimSite, listOrganisers, addOrganiser, removeOrganiser } from './actions.js';
+import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction, accountAuctions, organiserStatus, claimSite, listOrganisers, addOrganiser, removeOrganiser } from './actions.js';
 import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
 import { vcCanBid, withDefaults, normalize, visibilityOf } from './engine.js';
@@ -13,7 +13,10 @@ let known = [];
 let kind = 'major';
 
 async function loadKnown() {
-  const list = myAuctions();
+  // This browser's list, plus the auctions kept on your Google account (any laptop, private windows).
+  const local = myAuctions();
+  const seen = new Set(local.map((x) => x.id));
+  const list = [...local, ...(await accountAuctions()).filter((x) => !seen.has(x.id)).map((x) => ({ id: x.id, name: x.name, role: x.role === 'owner' ? 'admin' : x.role }))];
   const metas = await Promise.all(list.map((x) => db.get(`auctions/${x.id}/meta`).catch(() => null)));
   known = list.map((x, i) => ({ ...x, meta: metas[i] })).filter((x) => x.meta)
     .sort((x, y) => String(y.meta.season || '').localeCompare(String(x.meta.season || ''), undefined, { numeric: true }) || (y.meta.createdAt || 0) - (x.meta.createdAt || 0));
@@ -150,7 +153,7 @@ if (!isLocal) {
   };
   who();
   $('#google-btn').addEventListener('click', async () => {
-    try { await db.signInGoogle(); who(); await refreshOrganiser(); } catch (e) { toast(e.message, 'error'); }
+    try { await db.signInGoogle(); who(); await refreshOrganiser(); await loadKnown(); renderMine(); renderCreateOptions(); } catch (e) { toast(e.message, 'error'); }
   });
   refreshOrganiser();
 }
