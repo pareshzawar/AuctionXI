@@ -20,7 +20,7 @@ import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, wat
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer, profileGroups } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
-import { downloadTracker } from './tracker.js';
+import { downloadTracker, preloadExcel } from './tracker.js';
 import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
 import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
@@ -96,12 +96,19 @@ let commentator = makeCommentator();
 const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
 if (miniPreset) tab = 'results'; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
 
-mountHeader(`<a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
+mountHeader(`<button class="btn-sm" id="h-pack" title="Excel tracker filled in with everything so far, plus a backup file: to carry on by hand if anything goes wrong">Download offline pack</button>
+  <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
   <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid, screen: 1 })}">Open stage screen</a>`);
+$('#h-pack').onclick = () => downloadPack();
 
+// Every error message offers the offline pack, so the auction so far is never lost.
+const packAction = { label: 'Download offline pack', onClick: () => downloadPack() };
 const run = (fn) => async (...args) => {
-  try { await fn(...args); } catch (e) { console.error(e); toast(e.message || String(e), 'error'); }
+  try { await fn(...args); } catch (e) { console.error(e); toast(e.message || String(e), 'error', A?.meta?.status === 'live' || A?.meta?.status === 'completed' ? { action: packAction } : {}); }
 };
+// Anything unexpected on this page: same offer.
+addEventListener('error', (e) => { if (A) toast(`Something went wrong: ${e.message || 'unknown error'}`, 'error', { action: packAction }); });
+addEventListener('unhandledrejection', (e) => { if (A) toast(`Something went wrong: ${e.reason?.message || e.reason || 'unknown error'}`, 'error', { action: packAction }); });
 
 async function boot() {
   const meta = await db.get(`${P}/meta`);
@@ -134,13 +141,14 @@ async function boot() {
   watchMedia(aid, (m) => { media = m; if (A) { applyMedia(A, media); render(); } });
   watchConnection(db, {
     text: 'The database can\'t be reached. Everything you change is kept in this tab and sent when the connection is back, so <b>don\'t close or reload this tab</b>. Phones can\'t bid meanwhile: take paddle bids and record them here, or carry on with the slides and the Excel tracker.',
-    extra: ' <button class="btn-sm" data-offline-action="backup">Download backup</button>',
+    extra: ' <button class="btn-sm" data-offline-action="backup">Download offline pack</button>',
   });
-  document.addEventListener('offline-action', (e) => { if (e.detail === 'backup') downloadBackup(); });
+  document.addEventListener('offline-action', (e) => { if (e.detail === 'backup') downloadPack(); });
   db.on(P, (v) => {
     A = applyMedia(normalize(v), media);
     if (!A) return;
     keepBackup();
+    if (A.meta.status === 'live') preloadExcel().catch(() => {});
     commentator.update(A);
     $('#title').textContent = A.meta.name;
     const st = A.meta.status;
@@ -557,6 +565,17 @@ function keepBackup() {
     try { localStorage.setItem(BACKUP_KEY(), JSON.stringify({ savedAt: Date.now(), snap: { ...exportSnapshot({ ...A, media: null }), media: null } })); } catch { /* storage full or private mode */ }
   }, 3000);
 }
+// The offline pack: the Excel tracker filled in with every sale and unsold player so far (purses,
+// squads and max bids recalculate from there, so the auction can carry on by hand), and the backup
+// record file with everything else. Works without the database: it uses what this laptop has.
+async function downloadPack() {
+  downloadBackup();
+  if (A) {
+    toast('Preparing the Excel tracker with the auction so far…');
+    try { await downloadTracker(A, `${slug(A.meta.name) || aid}_offline_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.xlsx`); } catch (e) { toast(`Excel tracker: ${e.message}. The backup file has everything.`, 'error'); }
+  }
+}
+
 function downloadBackup() {
   let snap = null;
   let savedAt = Date.now();
@@ -1106,6 +1125,7 @@ function control(el) {
           <select id="c-lang" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
           ${voice.supported ? `<button class="btn-sm" id="c-voice">${voice.on ? 'Stop reading aloud' : 'Read aloud on this laptop'}</button>` : ''}</div>
           ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This laptop has no Marathi or Hindi voice, so lines are shown but not read. Install one in the system language settings.</p>' : ''}
+          <label class="check" style="margin:0 0 var(--space-2)"><input type="checkbox" id="c-sfx" ${A.meta.sfx === false ? '' : 'checked'}> Gavel sound and confetti on SOLD (stage; phones get confetti, and the gavel when reading aloud)</label>
           <label class="check" style="margin:0 0 var(--space-2)"><input type="checkbox" id="c-ai" ${A.meta.aiCommentary ? 'checked' : ''} ${aiReady() ? '' : 'disabled'}> AI commentary${aiReady() ? ' (uses this laptop\'s AI key; every screen shows the lines)' : ': add an AI key in Setup first'}</label>
           ${A.meta.aiCommentary && A.meta.aiStatus?.down && Number(A.meta.aiStatus.until) > Date.now() ? `<p class="notice notice-warn" style="margin:0 0 var(--space-2)">AI paused: ${esc(AI_WHY[A.meta.aiStatus.why] || AI_WHY.other)}. Every screen is using the built-in commentary until ${esc(new Date(A.meta.aiStatus.until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}, then AI is tried again. <button class="btn-sm" id="c-ai-retry">Try AI now</button></p>` : ''}
           <div id="c-comm" class="feed"></div></div>`}
@@ -1117,6 +1137,7 @@ function control(el) {
   wireStagePanel(el);
   renderCommentary();
   if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(commLang()); render(true); };
+  if ($('#c-sfx')) $('#c-sfx').onchange = run(async (e) => { await db.set(`${P}/meta/sfx`, e.target.checked ? null : false); });
   if ($('#c-ai')) $('#c-ai').onchange = run(async (e) => { aiFails = 0; aiPausedUntil = 0; await db.update(`${P}/meta`, { aiCommentary: e.target.checked || null, aiStatus: null }); });
   if ($('#c-ai-retry')) $('#c-ai-retry').onclick = run(async () => { aiFails = 0; aiPausedUntil = 0; await db.set(`${P}/meta/aiStatus`, null); toast('AI will be tried on the next player', 'ok'); });
   if ($('#c-lang')) $('#c-lang').onchange = (e) => { setDeviceCommLang(e.target.value === A.rules.commentaryLang ? '' : e.target.value); commentator = makeCommentator(); commentator.update(A); e.target.blur(); render(true); };

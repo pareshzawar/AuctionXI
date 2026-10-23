@@ -277,3 +277,7 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 /* Shown while the database can't be reached */
 .offline-bar { position: sticky; top: 0; z-index: calc(var(--layer-overlay) + 1); padding: var(--space-3) var(--space-4); background: var(--danger-soft); border-bottom: 2px solid var(--danger); color: var(--ink); font-size: 15px; line-height: 21px; }
 .offline-bar .btn-sm { margin-left: var(--space-2); }
+
+/* SOLD celebration */
+.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: calc(var(--layer-overlay) + 2); pointer-events: none; }
+.stage-sound-hint { position: absolute; right: var(--space-10); top: 140px; z-index: 3; padding: 6px 14px; border-radius: var(--radius-full); background: var(--gold-soft); color: var(--gold); font-size: 18px; letter-spacing: .04em; }

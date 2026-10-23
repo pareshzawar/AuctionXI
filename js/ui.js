@@ -11,14 +11,24 @@ export function esc(s) {
 
 export const param = (name) => new URLSearchParams(location.search).get(name);
 
-export function toast(msg, type = 'info') {
+// action: { label, onClick } adds a button (and keeps the message up longer).
+export function toast(msg, type = 'info', { action = null } = {}) {
   let box = $('#toasts');
   if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.append(box); }
   const t = document.createElement('div');
   t.className = `toast toast-${type}`;
   t.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'btn-sm';
+    b.style.cssText = 'margin-left:8px;pointer-events:auto';
+    b.textContent = action.label;
+    b.onclick = () => { t.remove(); action.onClick(); };
+    t.append(b);
+    t.style.pointerEvents = 'auto';
+  }
   box.append(t);
-  setTimeout(() => t.remove(), 4000);
+  setTimeout(() => t.remove(), action ? 12000 : 4000);
 }
 
 export function download(filename, text, mime = 'text/csv') {
