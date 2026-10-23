@@ -74,6 +74,14 @@ export const teamTemplate = () => toCSV(TEAM_COLUMNS, TEAM_EXAMPLE);
 
 // Numbers may be written as 500000, 5,00,000, 5L, 5 lakh, 1.5Cr, 2k.
 // Decimals as written: strike rate 135.12, economy 8.8.
+// The list column: "waiting" (or "waiting list"), "cancelled" (or "registration cancelled", "withdrawn"); blank = in the auction.
+export function listOf(v) {
+  const t = String(v || '').trim();
+  if (/^w(ait)/i.test(t)) return 'waiting';
+  if (/cancel|withdr/i.test(t)) return 'cancelled';
+  return null;
+}
+
 export function dec(v) {
   const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, ''));
   return Number.isFinite(n) ? n : null;
@@ -155,7 +163,7 @@ export function importPlayers(rows, rules, existingIds = []) {
       highest: (r.highest_score || r.highest || '').trim() || null, // may be "82*" (not out)
       economy: dec(r.economy),
       notes: r.notes || null,
-      list: /^w/i.test(String(r.list || r.status || '').trim()) ? 'waiting' : null, // "waiting" / "waiting list"; blank = in the auction
+      list: listOf(r.list || r.status), // "waiting" / "waiting list", "cancelled"; blank = in the auction
       cricheroesUrl: /^https:\/\/(www\.)?cricheroes\.(com|in)\//i.test(r.cricheroes_url || '') ? r.cricheroes_url.trim() : null,
       allottedTeam: team,
       allottedAs: team ? as : null,
@@ -189,7 +197,7 @@ export function playersToCSV(players) {
   return toCSV(PLAYER_COLUMNS, Object.entries(players).map(([id, p]) => [
     id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice,
     { R: 'Right', L: 'Left' }[battingHandOf(p)] || '', { R: 'Right', L: 'Left' }[bowlingArmOf(p)] || '', bowlingTypeOf(p) || '',
-    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.strikeRate, p.highest, p.economy, p.notes, p.cricheroesUrl, p.allottedTeam, p.allottedAs, p.list === 'waiting' ? 'waiting' : '',
+    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.strikeRate, p.highest, p.economy, p.notes, p.cricheroesUrl, p.allottedTeam, p.allottedAs, p.list === 'waiting' ? 'waiting' : p.list === 'cancelled' ? 'cancelled' : '',
   ]));
 }
 

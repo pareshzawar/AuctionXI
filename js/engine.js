@@ -193,8 +193,10 @@ export function minBase(rules) {
 export const isAllotted = (p) => !!(p && p.allottedTeam);
 // The waiting list: registered, but not in the auction unless an organiser moves them in.
 export const isWaiting = (p) => p?.list === 'waiting';
-// Players who are auctioned: not a captain / vice-captain / kept player, not on the waiting list.
-export const inAuction = (p) => !!p && !isAllotted(p) && !isWaiting(p);
+// Registration cancelled: kept on record, but out of the auction, the lists and the downloads.
+export const isCancelled = (p) => p?.list === 'cancelled';
+// Players who are auctioned: not a captain / vice-captain / kept player, not on the waiting list, not cancelled.
+export const inAuction = (p) => !!p && !isAllotted(p) && !isWaiting(p) && !isCancelled(p);
 // allottedAs: 'C' captain, 'VC' vice-captain, 'R' kept from last season (mini auction).
 export const leaderLabel = (as) => (as === 'C' ? 'Captain' : as === 'VC' ? 'Vice-captain' : as === 'R' ? 'Retained' : 'Allotted');
 
@@ -325,19 +327,29 @@ export function poolCounts(a) {
   return (a.rules.categories || []).map((c) => ({ ...c, left: left.filter((p) => p.category === c.id).length }));
 }
 
-// Search the players left in this round by name or ID (for chits).
-export function searchPool(a, q, limit = 8) {
+// Search players by name, by number (P024, 24) or both ("24 arjun"). Best matches first.
+export function searchPlayers(list, q, limit = 8) {
   const s = String(q || '').trim().toLowerCase();
   if (!s) return [];
-  const words = s.split(/\s+/);
-  return pool(a)
+  const bare = (x) => x.replace(/^p0*/, '');
+  const isNum = (w) => /^p?\d+$/.test(w);
+  const nums = s.split(/\s+/).filter(isNum);
+  const words = s.split(/\s+/).filter((w) => !isNum(w));
+  const text = words.join(' ');
+  return list
     .map((p) => {
       const name = String(p.name || '').toLowerCase();
       const id = String(p.id).toLowerCase();
-      if (id === s || id.replace(/^p0*/, '') === s.replace(/^p0*/, '')) return [p, 0];
-      if (name.startsWith(s)) return [p, 1];
+      if (id === s) return [p, 0];
+      if (nums.length && !nums.some((n) => bare(id) === bare(n))) {
+        // Not that number: still try the whole query as a name or an ID ("P0" prefix and so on).
+        if (!words.length && id.startsWith(s)) return [p, 4];
+        return null;
+      }
+      if (!words.length) return [p, 0];
+      if (name.startsWith(text)) return [p, 1];
       if (words.every((w) => name.split(/\s+/).some((n) => n.startsWith(w)))) return [p, 2];
-      if (name.includes(s)) return [p, 3];
+      if (name.includes(text)) return [p, 3];
       return null;
     })
     .filter(Boolean)
@@ -345,6 +357,9 @@ export function searchPool(a, q, limit = 8) {
     .slice(0, limit)
     .map(([p]) => p);
 }
+
+// Search the players left in this round (for chits).
+export const searchPool = (a, q, limit = 8) => searchPlayers(pool(a), q, limit);
 
 // Random draw. Without filters it follows the tournament's order (pool by pool, Pool A first);
 // `filter.pool` / `filter.role` draw at random from one pool and/or one role instead.

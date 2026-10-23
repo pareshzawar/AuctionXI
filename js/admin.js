@@ -1,9 +1,9 @@
 import { db, isLocal } from './db.js';
 import {
-  normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, capsUpdate, basePrice, withDefaults,
+  normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, searchPlayers, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
-  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, inAuction,
+  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, isCancelled, inAuction,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
@@ -463,7 +463,8 @@ function players(el) {
   const handOpts = (v, right, left, none = '—') => `<option value="">${none}</option><option value="R" ${v === 'R' ? 'selected' : ''}>${right}</option><option value="L" ${v === 'L' ? 'selected' : ''}>${left}</option>`;
   const allotted = list.filter(([, p]) => isAllotted(p)).length;
   const waiting = list.filter(([, p]) => isWaiting(p)).length;
-  const counts = [`${list.length - allotted - waiting} to auction`, waiting ? `${waiting} on the waiting list` : '', `${allotted} captains / vice-captains allotted`].filter(Boolean).join(' · ');
+  const cancelled = list.filter(([, p]) => isCancelled(p)).length;
+  const counts = [`${list.length - allotted - waiting - cancelled} to auction`, waiting ? `${waiting} on the waiting list` : '', cancelled ? `${cancelled} registration${cancelled === 1 ? '' : 's'} cancelled` : '', `${allotted} captains / vice-captains allotted`].filter(Boolean).join(' · ');
 
   el.innerHTML = `
     ${locked
@@ -499,7 +500,7 @@ function players(el) {
             <td><input data-f="photoUrl" value="${esc(p.photoUrl || '')}" ${dis}></td>
             <td><select data-f="allottedTeam" ${dis}>${teamOpts(p.allottedTeam)}</select></td>
             <td><select data-f="allottedAs" ${dis}>${asOpts(p.allottedAs)}</select>${isAllotted(p) ? `<span class="hint">${esc(money(allottedPrice(p, A.rules), A.rules))}</span>` : ''}</td>
-            <td>${isAllotted(p) ? '' : A.sales[id] ? '<small class="muted">Sold</small>' : `<select data-list="${esc(id)}" title="In the auction, or on the waiting list (can be changed at any time)"><option value="">Auction</option><option value="waiting" ${isWaiting(p) ? 'selected' : ''}>Waiting list</option></select>`}</td>
+            <td>${isAllotted(p) ? '' : A.sales[id] ? '<small class="muted">Sold</small>' : `<select data-list="${esc(id)}" title="In the auction, on the waiting list, or registration cancelled (can be changed at any time)"><option value="">Auction</option><option value="waiting" ${isWaiting(p) ? 'selected' : ''}>Waiting list</option><option value="cancelled" ${isCancelled(p) ? 'selected' : ''}>Registration cancelled</option></select>`}</td>
             <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
           </tr>`).join('') || '<tr><td colspan="14" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
@@ -519,7 +520,7 @@ function players(el) {
     const id = s.dataset.list;
     if (A.live?.playerId === id && A.live.status === 'bidding') { render(true); throw new Error('This player is up for bidding now'); }
     await db.set(`${P}/players/${id}/list`, s.value || null);
-    toast(`${A.players[id].name}: ${s.value ? 'moved to the waiting list' : 'in the auction'}`, 'ok');
+    toast(`${A.players[id].name}: ${{ waiting: 'moved to the waiting list', cancelled: 'registration cancelled' }[s.value] || 'in the auction'}`, 'ok');
   })));
   $('#p-deck').onclick = run(saveDeck);
   $('#p-ai').onclick = run(aiScouting);
@@ -1055,16 +1056,17 @@ function stagePanel(bidding) {
   const v = A.meta.stageView;
   const now = v?.type === 'list' ? (v.which === 'waiting' ? 'the waiting list' : 'the players up for auction')
     : v?.type === 'player' ? `${A.players[v.id]?.name || 'a player'}'s profile` : (bidding ? 'the bidding' : 'the auction');
-  const opts = (list) => list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
   return `<div class="card" style="margin-top:var(--space-4)">
     <div class="section-title"><h2 style="margin:0">On the stage</h2><small>Now showing ${esc(now)}</small><span class="spacer"></span>
       ${v ? '<button class="btn-sm btn-primary" id="sv-back">Back to the auction</button>' : ''}</div>
     <p class="row">
       <button class="btn-sm" data-sv="available" ${bidding ? 'disabled title="Finish the player on the block first"' : ''}>Show players up for auction (${available.length})</button>
       <button class="btn-sm" data-sv="waiting" ${bidding || !waiting.length ? 'disabled' : ''}>Show the waiting list (${waiting.length})</button>
-      <select id="sv-player" style="width:auto" ${bidding ? 'disabled' : ''}><option value="">A player's profile…</option>
-        ${available.length ? `<optgroup label="Up for auction">${opts(available)}</optgroup>` : ''}${waiting.length ? `<optgroup label="Waiting list">${opts(waiting)}</optgroup>` : ''}</select>
     </p>
+    <div style="max-width:560px">
+      <input id="sv-search" placeholder="Show a player's profile: type the name, the number, or both" autocomplete="off" ${bidding ? 'disabled' : ''}>
+      <div id="sv-results" class="stack" style="gap:var(--space-1);margin-top:var(--space-2)"></div>
+    </div>
     <span class="hint">Phones always have these under the Players tab. Bringing up the next player puts the stage back on the auction.</span>
   </div>`;
 }
@@ -1072,7 +1074,26 @@ function stagePanel(bidding) {
 function wireStagePanel(el) {
   const set = run((view) => db.set(`${P}/meta/stageView`, view));
   $$('[data-sv]', el).forEach((b) => (b.onclick = () => set({ type: 'list', which: b.dataset.sv })));
-  if ($('#sv-player', el)) $('#sv-player', el).onchange = (e) => { if (e.target.value) set({ type: 'player', id: e.target.value }); };
+  const input = $('#sv-search', el);
+  if (input) {
+    const { available, waiting } = profileGroups(A);
+    const wait = new Set(waiting.map((p) => p.id));
+    const found = () => searchPlayers([...available, ...waiting], input.value, 6);
+    const show = () => {
+      const list = found();
+      $('#sv-results', el).innerHTML = !input.value.trim() ? '' : list.length ? list.map((p, i) => `
+        <div class="row" style="padding:var(--space-2) var(--space-3);border:1px solid ${i ? 'var(--line)' : 'var(--gold)'};border-radius:var(--radius-sm)">
+          <code>${esc(p.id)}</code> <b>${esc(p.name)}</b> <small>${esc(ROLES[roleId(p.role)].name)}${wait.has(p.id) ? ' · waiting list' : ''}</small>
+          <span class="spacer"></span><button class="btn-sm ${i ? '' : 'btn-primary'}" data-svp="${esc(p.id)}">Show on stage</button>
+        </div>`).join('') : '<p class="muted" style="margin:0">No player up for auction or on the waiting list matches.</p>';
+      $$('[data-svp]', el).forEach((b) => (b.onclick = () => { input.value = ''; set({ type: 'player', id: b.dataset.svp }); }));
+    };
+    input.oninput = show;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') { const first = found()[0]; if (first) { input.value = ''; input.blur(); set({ type: 'player', id: first.id }); } }
+      if (e.key === 'Escape') { input.value = ''; show(); }
+    };
+  }
   if ($('#sv-back', el)) $('#sv-back', el).onclick = () => set(null);
 }
 

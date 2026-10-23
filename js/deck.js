@@ -92,6 +92,7 @@ export function buildDeck(PptxGenJS, auction) {
     for (const [id, p] of pool) if (p.category === c.id) slideOf[id] = ++next;
   }
   for (const [id] of pool) if (!slideOf[id]) slideOf[id] = ++next; // a player in no known pool
+  const idxPage = (id) => Math.max(0, idxSlides.findIndex((part) => part.some(([x]) => x === id))); // the index page listing this player
   if (waiting.length) { next += 1; for (const [id] of waiting) slideOf[id] = ++next; } // divider, then the waiting list
 
   /* 1. Cover */
@@ -192,13 +193,20 @@ export function buildDeck(PptxGenJS, auction) {
   idxSlides.forEach((part, i) => {
     const s = slide();
     eyebrow(s, `Players${idxSlides.length > 1 ? ` (${i + 1}/${idxSlides.length})` : ''}`);
-    title(s, `${pool.length} players in the auction${waiting.length ? ` and ${waiting.length} on the waiting list` : ''}: click a name to go to the player`, 0.8, 24);
-    const cols = chunk(part, 10);
-    cols.forEach((col, c) => {
-      s.addText(col.map(([id, p]) => ({
-        text: `${id}  ${p.name}  ·  ${ROLES[roleId(p.role)].code}${r.categories.length > 1 && !isWaiting(p) ? ` · ${category(r, p.category)?.label || p.category}` : ''}${isWaiting(p) ? ' · waiting list' : ''}`,
-        options: { hyperlink: { slide: slideOf[id], tooltip: `Go to ${p.name}` }, color: C.ink, breakLine: true },
-      })), { x: 0.6 + c * 4.1, y: 1.75, w: 4.0, h: 4.9, fontFace: FONT, fontSize: 14, valign: 'top', paraSpaceAfter: 8 });
+    title(s, `${pool.length} players in the auction${waiting.length ? ` and ${waiting.length} on the waiting list` : ''}`, 0.8, 24);
+    s.addText('In the slide show, click a name, or type its slide number and press Enter.', { x: 0.6, y: 1.45, w: W - 1.2, h: 0.3, fontFace: FONT, fontSize: 12, color: C.muted });
+    // One box per player, so the whole row is clickable (in the slide show).
+    part.forEach(([id, p], k) => {
+      const x = 0.6 + Math.floor(k / 10) * 4.1;
+      const y = 1.85 + (k % 10) * 0.47;
+      const link = { slide: slideOf[id], tooltip: `Go to ${p.name}` };
+      card(s, x, y, 4.0, 0.42);
+      s.addText([
+        { text: `${id}  `, options: { color: C.gold, bold: true, hyperlink: link } },
+        { text: `${p.name}`, options: { color: C.ink, hyperlink: link } },
+        { text: `  ${ROLES[roleId(p.role)].code}${r.categories.length > 1 && !isWaiting(p) ? ` · ${category(r, p.category)?.label || p.category}` : ''}${isWaiting(p) ? ' · waiting' : ''}`, options: { color: C.muted, fontSize: 11, hyperlink: link } },
+      ], { x: x + 0.1, y, w: 3.25, h: 0.42, fontFace: FONT, fontSize: 13, valign: 'middle', fit: 'shrink', hyperlink: link });
+      s.addText(`${slideOf[id]}`, { x: x + 3.3, y, w: 0.6, h: 0.42, fontFace: FONT, fontSize: 12, bold: true, color: C.muted, align: 'right', valign: 'middle', hyperlink: link });
     });
   });
 
@@ -242,10 +250,10 @@ export function buildDeck(PptxGenJS, auction) {
     const statRows = Math.ceil(stats.length / 3);
     const noteText = [p.notes, p.scout && `Scout: ${p.scout}`].filter(Boolean).join('\n');
     if (noteText) s.addText(noteText, { x, y: 3.1 + statRows * 0.95, w, h: 6.2 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
-    if (p.cricheroesUrl) s.addText('CricHeroes profile', { x: W - 4.3, y: 0.15, w: 1.8, h: 0.3, fontFace: FONT, fontSize: 10, color: C.gold, align: 'right', hyperlink: { url: p.cricheroesUrl } });
+    if (p.cricheroesUrl) s.addText('CricHeroes profile', { x: W - 4.65, y: 0.12, w: 2.0, h: 0.36, fontFace: FONT, fontSize: 11, bold: true, color: C.gold, align: 'center', valign: 'middle', fill: { color: C.surface }, line: { color: C.gold, width: 0.75 }, hyperlink: { url: p.cricheroesUrl, tooltip: 'Open the CricHeroes profile' } });
     const ladder = [base];
     while (ladder.length < 9) ladder.push(ladder.at(-1) + increment(ladder.at(-1), r));
-    s.addText('Players list', { x: W - 2.3, y: 0.15, w: 1.7, h: 0.3, fontFace: FONT, fontSize: 10, color: C.muted, align: 'right', hyperlink: { slide: indexAt, tooltip: 'Back to the players list' } });
+    s.addText('Back to players list', { x: W - 2.5, y: 0.12, w: 1.9, h: 0.36, fontFace: FONT, fontSize: 11, bold: true, color: C.ink, align: 'center', valign: 'middle', fill: { color: C.surface }, line: { color: C.line, width: 0.75 }, hyperlink: { slide: indexAt + idxPage(id), tooltip: 'Back to the players list' } });
     s.addNotes([`${p.name} (${id})`, `${ROLES[roleId(p.role)].name}, ${c?.label || ''}`, battingLabel(p), bowlingLabel(p),
       stats.map(([k, v]) => `${k} ${v}`).join(', '), p.notes, p.cricheroesUrl, `Base price ${amt(base)}. Bids: ${ladder.map(amt).join(', ')}`].filter(Boolean).join('\n'));
   };

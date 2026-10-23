@@ -9,7 +9,7 @@ import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, stageBoard, playerStatus } from './views.js';
+import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus } from './views.js';
 
 const aid = (param('a') || '').toUpperCase();
 const stage = param('screen') === '1';
@@ -260,17 +260,20 @@ const currentTab = () => tab || (A.meta.status === 'setup' ? 'rules' : 'squads')
 function renderBelow() {
   const el = $('#below');
   const t = currentTab() === 'wb' && !wb ? 'squads' : currentTab();
+  // Never redraw under the viewer's fingers; catch up when they leave the field.
+  const f = document.activeElement;
+  if (el.contains(f) && f.matches('input, textarea, select')) { belowDirty = true; return; }
   if (t === 'wb') {
-    // Never redraw under the captain's fingers; catch up when they leave the field.
-    const f = document.activeElement;
-    if (el.contains(f) && f.matches('input, textarea, select')) { belowDirty = true; return; }
     belowDirty = false;
     renderWorkbook(el, { get a() { return A; }, wb, team: myTeam, seatLabel: `${A.teams[myTeam]?.name || myTeam} ${role === 'vc' ? 'vice-captain' : 'captain'}`, rerender: renderPhone });
     return;
   }
   belowDirty = false;
   el.innerHTML = below(t);
+  const q = $('#pf-q', el);
+  if (q) q.oninput = () => { profileQuery = q.value; $('#pf-lists', el).innerHTML = profileLists(A, profileQuery); };
 }
+let profileQuery = '';
 
 // The captain's own limit for the player on the block, from the workbook.
 function myLimit() {
@@ -285,7 +288,7 @@ function myLimit() {
 
 function below(tab) {
   if (tab === 'feed') return `<div class="card">${feed(A, 100)}</div>`;
-  if (tab === 'pool') return profilesView(A);
+  if (tab === 'pool') return profilesView(A, profileQuery);
   if (tab === 'rules') return rulesSummary(A);
   if (tab === 'comm') return `<div class="card"><div class="feed" style="max-height:none">${commentator.lines.map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span><time>${new Date(l.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<p class="muted">Nothing yet.</p>'}</div></div>`;
   return squads(A, { viewer: viewer() });
