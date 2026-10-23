@@ -10,7 +10,7 @@ import {
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
   startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
-  setVisibility, syncDirectory, directoryEntry, rememberOnAccount,
+  setVisibility, syncDirectory, directoryEntry, rememberOnAccount, undoSale, editSale, setTimer,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
@@ -606,6 +606,93 @@ function downloadBackup() {
   download(`${slug(snap.meta?.name || aid)}_backup_${stamp}.json`, JSON.stringify(snap, null, 1), 'application/json');
 }
 
+// Every sale, newest first, with Edit and Undo (admins only). Both ask for a manual check first.
+function salesCard() {
+  const rows = Object.entries(A.sales).filter(([, x]) => !x.allotted && !x.retained).sort((x, y) => (y[1].at || 0) - (x[1].at || 0));
+  if (!rows.length) return '';
+  const r = A.rules;
+  return `<div class="card" style="margin-top:var(--space-4)">
+    <div class="section-title"><h2 style="margin:0">All sales</h2><small class="muted">${rows.length} sold · correct any of them: Edit changes the team or price, Undo sends the player back to the pool</small></div>
+    <div class="table-wrap" style="max-height:340px;overflow:auto"><table class="grid-table"><thead><tr><th>Player</th><th>Team</th><th>Price</th><th></th></tr></thead><tbody>
+    ${rows.map(([pid, x]) => `<tr><td><b>${esc(A.players[pid]?.name || pid)}</b> <small class="muted">${esc(pid)}</small>${x.was ? ' <small class="muted">· corrected</small>' : ''}</td>
+      <td>${teamBadge(A.teams[x.team], { showName: true })}</td><td>${esc(money(x.price, r))}</td>
+      <td style="white-space:nowrap"><button class="btn-sm" data-sale-edit="${esc(pid)}">Edit</button> <button class="btn-sm btn-ghost" data-sale-undo="${esc(pid)}">Undo</button></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+// A dialog that shows what will change and needs "I've checked this" ticked before it goes ahead.
+function checkDialog({ title, body, confirmLabel, danger = false, extra = '' }) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'card';
+    dlg.style.cssText = 'max-width:620px;width:calc(100% - 32px);color:var(--ink);background:var(--surface);border:1px solid var(--line)';
+    dlg.innerHTML = `<h2 style="margin-top:0">${title}</h2>${extra}<div data-body>${body}</div>
+      <label class="check" style="margin-top:var(--space-4)"><input type="checkbox" data-ok> I've checked this with the auctioneer and the scorer</label>
+      <p class="row" style="margin-top:var(--space-3)"><button class="${danger ? 'btn-danger' : 'btn-primary'}" data-go disabled>${confirmLabel}</button><button class="btn-ghost" data-no>Cancel</button></p>`;
+    document.body.append(dlg);
+    dlg.showModal();
+    const ok = $('[data-ok]', dlg);
+    const go = $('[data-go]', dlg);
+    ok.onchange = () => { go.disabled = !ok.checked; };
+    const done = (v) => { dlg.close(); dlg.remove(); resolve(v); };
+    $('[data-no]', dlg).onclick = () => done(null);
+    dlg.oncancel = () => done(null);
+    go.onclick = () => done(dlg);
+    dlg.refresh = (html) => { $('[data-body]', dlg).innerHTML = html; };
+  });
+}
+
+// "Team: 760 left → 600 left, 5 → 6 players" for each team a change touches.
+function purseChange(before, after, teams) {
+  return `<table class="grid-table" style="margin-top:var(--space-3)"><thead><tr><th>Team</th><th>Budget left</th><th>Squad</th></tr></thead><tbody>${[...new Set(teams)].filter(Boolean).map((id) => {
+    const b = teamSummary(before, id); const x = teamSummary(after, id);
+    return `<tr><td>${teamBadge(A.teams[id], { showName: true })}</td><td>${esc(money(b.remaining, A.rules))} → <b>${esc(money(x.remaining, A.rules))}</b></td><td>${b.count} → <b>${x.count}</b></td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function wireSalesCard(el) {
+  $$('[data-sale-undo]', el).forEach((b) => (b.onclick = run(async () => {
+    const pid = b.dataset.saleUndo;
+    const s = A.sales[pid];
+    const after = { ...A, sales: Object.fromEntries(Object.entries(A.sales).filter(([k]) => k !== pid)) };
+    const ok = await checkDialog({
+      title: `Undo the sale of ${esc(A.players[pid]?.name || pid)}?`, danger: true, confirmLabel: 'Undo this sale',
+      body: `<p>Sold to <b>${esc(A.teams[s.team]?.name || s.team)}</b> for <b>${esc(money(s.price, A.rules))}</b>. After undoing, the player goes back to the pool and comes up again; the team gets the money back.</p>${purseChange(A, after, [s.team])}`,
+    });
+    if (!ok) return;
+    await undoSale(aid, A, pid);
+    saved(`Sale of ${A.players[pid]?.name || pid} undone`);
+  })));
+  $$('[data-sale-edit]', el).forEach((b) => (b.onclick = run(async () => {
+    const pid = b.dataset.saleEdit;
+    const s = A.sales[pid];
+    const teamSel = `<select data-t>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}" ${id === s.team ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>`;
+    const preview = (team, price) => {
+      const after = { ...A, sales: { ...A.sales, [pid]: { ...s, team, price: Number(price) || 0 } } };
+      return `<p>Now: <b>${esc(A.teams[s.team]?.name)}</b>, ${esc(money(s.price, A.rules))} → after: <b>${esc(A.teams[team]?.name)}</b>, <b>${esc(money(Number(price) || 0, A.rules))}</b></p>${purseChange(A, after, [s.team, team])}`;
+    };
+    const dlgP = checkDialog({
+      title: `Edit the sale of ${esc(A.players[pid]?.name || pid)}`, confirmLabel: 'Save the correction',
+      extra: `<div class="row"><label style="margin:0">Team ${teamSel}</label><label style="margin:0">Price <input data-p inputmode="numeric" value="${esc(s.price)}" style="width:120px"></label></div>`,
+      body: preview(s.team, s.price),
+    });
+    const dlg = document.querySelector('dialog[open]');
+    const upd = () => dlg.refresh(preview($('[data-t]', dlg).value, num($('[data-p]', dlg).value)));
+    $('[data-t]', dlg).onchange = upd; $('[data-p]', dlg).oninput = upd;
+    const ok = await dlgP;
+    if (!ok) return;
+    const team = $('[data-t]', ok).value;
+    const price = num($('[data-p]', ok).value);
+    if (price == null) throw new Error('Enter the price');
+    let warning = await editSale(aid, A, pid, { team, price });
+    if (warning) {
+      if (!confirm(`${warning}\n\nSave it anyway?`)) return;
+      warning = await editSale(aid, A, pid, { team, price }, true);
+    }
+    saved(`${A.players[pid]?.name || pid}: sale corrected`);
+  })));
+}
+
 function players(el) {
   const locked = !!A.meta.locked;
   const list = Object.entries(A.players).sort(([x], [y]) => x.localeCompare(y, undefined, { numeric: true }));
@@ -1111,6 +1198,7 @@ function control(el) {
         <button class="btn-sold btn-lg" id="c-sold" ${leader ? '' : 'disabled'}>Mark sold${leader ? ` to ${esc(leader.short || leader.name)} · ${esc(money(live.bid.amount, rules))}` : ''} <kbd>S</kbd></button>
         <button class="btn-lg" id="c-unsold" ${bidding ? '' : 'disabled'}>Unsold <kbd>U</kbd></button>
         <button class="btn-ghost" id="c-undobid" ${bidding && live.bid?.team ? '' : 'disabled'}>Undo last bid <kbd>Z</kbd></button>
+        <label class="check" style="margin:0" title="Only shown on screens: the bidding never closes by itself"><input type="checkbox" id="c-timer" ${Number(rules.bidTimer) ? 'checked' : ''}> Countdown after each bid${Number(rules.bidTimer) ? ` (${Number(rules.bidTimer)} s)` : ' (off)'}</label>
         <span class="spacer"></span>
         <button class="btn-sm btn-ghost" id="c-undo">Reverse last sale</button>
       </div>
@@ -1142,6 +1230,7 @@ function control(el) {
         ${meta.status === 'live' ? '<button class="btn-sm btn-danger" id="c-finish">End auction</button>' : ''}
       </div>
     </div>
+    ${salesCard()}
     <div class="grid grid-2" style="margin-top:var(--space-4)">
       <div class="card"><h2>Purses</h2><div class="stack">${purses(A, { viewer: { role: 'admin' } })}</div></div>
       <div class="stack">
@@ -1168,7 +1257,13 @@ function control(el) {
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
   $('#c-undobid').onclick = run(() => undoLastBid(aid, A));
-  $('#c-undo').onclick = run(async () => { if (confirm('Reverse the most recent sale? The player goes back to the pool.')) await undoLastSale(aid, A); });
+  if ($('#c-timer')) $('#c-timer').onchange = run(async (e) => { await setTimer(aid, A, e.target.checked); toast(e.target.checked ? 'Countdown on' : 'Countdown off: bidding stays open until you close it', 'ok'); });
+  wireSalesCard(el);
+  $('#c-undo').onclick = run(async () => {
+    const last = Object.entries(A.sales).filter(([, x]) => !x.allotted && !x.retained).sort((x, y) => (y[1].at || 0) - (x[1].at || 0))[0];
+    if (!last) throw new Error('No sale to undo');
+    document.querySelector(`[data-sale-undo="${CSS.escape(last[0])}"]`)?.click(); // same checked dialog as any other undo
+  });
   $('#c-round') && ($('#c-round').onclick = run(() => nextRound(aid, A)));
   $('#c-finish') && ($('#c-finish').onclick = run(async () => {
     const short = teamIds.filter((id) => teamSummary(A, id).count < rules.squadSize);

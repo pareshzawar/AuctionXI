@@ -92,6 +92,7 @@ export function feed(a, limit = 30) {
       case 'unsold': return `${badge('unsold')} ${name(e.playerId)}`;
       case 'up': return `${badge('upcoming', { text: e.drawn === 'chit' ? 'Chit' : e.drawn === 'random' ? 'Drawn' : 'Up' })} ${name(e.playerId)} <span class="muted">base ${esc(money(e.amount, a.rules))}</span>`;
       case 'undo': return `${badge('paused', { text: 'Reversed' })} Sale of ${name(e.playerId)} reversed`;
+      case 'edit': return `${badge('paused', { text: 'Corrected' })} ${name(e.playerId)} ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm', tone: 'sold' })} <span class="muted">was ${esc(a.teams[e.fromTeam]?.short || e.fromTeam || '')} ${esc(money(e.fromAmount, a.rules))}</span>`;
       case 'round': return `${badge('upcoming', { text: 'Round' })} Round ${esc(e.round)}: unsold players return`;
       case 'start': return `${badge('live')} Auction started`;
       case 'end': return `${badge('paused', { text: 'Closed' })} Auction completed`;

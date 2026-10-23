@@ -45,6 +45,7 @@ const PHRASES = {
     unsoldAgain: (f, k) => pick([`No bids for ${f.p}. Back in the pool for the next round.`, `${f.p} goes unsold for now. Another chance in the next round.`], k),
     unsold: (f) => `No bids for ${f.p}. Unsold.`,
     undo: (f) => `Correction: the sale of ${f.p} to ${f.t} has been reversed.`,
+    edit: (f) => `Correction: ${f.p} goes to ${f.t} for ${f.amt}.`,
     round: (f) => `Round ${f.r}. The unsold players are back for another chance.`,
     end: (f) => `That is the end of the auction. ${f.count} players sold${f.top ? `; the top buy was ${f.top.p} to ${f.top.t} for ${f.top.amt}` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} open the bidding at ${f.amt}.`, `${f.t} make the first move, ${f.amt}.`, `First bid: ${f.t}, ${f.amt}.`], k),
@@ -73,6 +74,7 @@ const PHRASES = {
     unsoldAgain: (f, k) => pick([`${f.p} ke liye koi bid nahi. Agle round mein phir mauka.`, `${f.p} abhi unsold. Agle round mein wapas aayenge.`], k),
     unsold: (f) => `${f.p} ke liye koi bid nahi. Unsold.`,
     undo: (f) => `Correction: ${f.p} ki ${f.t} wali sale cancel ho gayi hai.`,
+    edit: (f) => `Correction: ${f.p} ab ${f.t} mein, ${f.amt}.`,
     round: (f) => `Round ${f.r}. Unsold players phir se auction mein.`,
     end: (f) => `Auction khatam. ${f.count} players bike${f.top ? `; sabse badi boli ${f.top.p} ki, ${f.top.t} ne ${f.top.amt} mein li` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} ne bidding shuru ki, ${f.amt}.`, `Pehli boli ${f.t} ki, ${f.amt}.`, `${f.t} ne pehla kadam uthaya, ${f.amt}.`], k),
@@ -101,6 +103,7 @@ const PHRASES = {
     unsoldAgain: (f, k) => pick([`${f.p} साठी एकही बोली नाही. पुढच्या फेरीत पुन्हा संधी.`, `${f.p} सध्या न विकले गेलेले. पुढच्या फेरीत परत येतील.`], k),
     unsold: (f) => `${f.p} साठी एकही बोली नाही. न विकले गेले.`,
     undo: (f) => `दुरुस्ती: ${f.p} ची ${f.t} कडे झालेली विक्री रद्द केली आहे.`,
+    edit: (f) => `दुरुस्ती: ${f.p} आता ${f.t} कडे, ${f.amt} ला.`,
     round: (f) => `फेरी ${f.r}. न विकलेले खेळाडू पुन्हा लिलावात.`,
     end: (f) => `लिलाव संपला. ${f.count} खेळाडू विकले गेले${f.top ? `; सर्वात मोठी बोली ${f.top.p} साठी, ${f.top.t} ने ${f.top.amt} ला घेतलं` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} ने ${f.amt} ने बोली सुरू केली.`, `पहिली बोली ${f.t} ची, ${f.amt}.`, `${f.t} ने पहिलं पाऊल टाकलं, ${f.amt}.`], k),
@@ -252,6 +255,8 @@ function lineForLog(a, e, key, lang) {
       return (Number(a.meta.round || 1) <= Number(r.unsoldRounds) ? L.unsoldAgain({ p: p.name }, key) : L.unsold({ p: p.name })) + punch(a, lang, 'unsold', key);
     case 'undo':
       return L.undo({ p: p.name, t: teamName(a, e.team) });
+    case 'edit':
+      return L.edit({ p: p.name, t: teamName(a, e.team), amt: m(e.amount) });
     case 'round':
       return L.round({ r: e.round });
     case 'end': {
