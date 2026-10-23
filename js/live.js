@@ -145,7 +145,7 @@ function renderStage() {
           : meta.stageView?.type === 'player' && A.players[meta.stageView.id] ? `${cardFor(A, meta.stageView.id, 'stage')}${stageProfileSide(meta.stageView.id)}`
           : meta.stageView?.type === 'history' ? stageHistory(A, meta.stageView.season)
           : meta.stageView?.type === 'team' && A.teams[meta.stageView.id] ? teamProfile(A, meta.stageView.id, { stage: true })
-          : hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
+          : hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage', viewer())}`
           : `<div class="stage-wait ${A.media?.banner ? 'has-banner' : ''}" style="grid-column:1/-1">${bannerImg(A, { cls: 'stage-banner' })}<div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
@@ -211,7 +211,7 @@ function renderPhone() {
     ${isBidder() && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot && live.status === 'bidding' ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined, hidePurse: !canSeePurse(rules, viewer(), myTeam) }) : ''}
     <div class="live-grid" style="margin-top:var(--space-4)">
       <div>${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
-      <div>${hasLot ? livePanel(A) : ''}</div>
+      <div>${hasLot ? livePanel(A, '', viewer()) : ''}</div>
     </div>
     ${A.rules.commentary === false ? '' : `<div class="card" style="margin-top:var(--space-4)"><div class="section-title"><h3 style="margin:0">Commentary</h3><span class="spacer"></span>
       <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>

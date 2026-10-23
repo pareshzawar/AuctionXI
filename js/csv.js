@@ -264,8 +264,12 @@ function setupFields() {
   number('Captain and vice-captain', 'vc_price', 'Vice-captain value (not taken from the purse)', 'e.g. 150. Same as above for the vice-captain. Ignored with captain only', 'vcPrice');
   f.push(['Captain and vice-captain', 'bidders', 'Who bids for the team (captain / captain_vc)', 'captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code',
     (m, r) => r.bidders, (m, r, v, warn) => { if (/^c(apt(ain)?)?$/i.test(v)) r.bidders = 'captain'; else if (/v/i.test(v)) r.bidders = 'captain_vc'; else if (v) warn(`bidders: "${v}" should be captain or captain_vc`); }]);
-  f.push(['Captain and vice-captain', 'purse_visibility', `Who sees remaining purse and max bid (${Object.keys(PURSE_VISIBILITY).join(' / ')})`, 'own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all',
+  f.push(['Captain and vice-captain', 'purse_visibility', `Who sees each team's remaining budget (${Object.keys(PURSE_VISIBILITY).join(' / ')})`, 'own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience and the stage. Admins always see all',
     (m, r) => r.purseVisibility, (m, r, v, warn) => { if (PURSE_VISIBILITY[v]) r.purseVisibility = v; else if (v) warn(`purse_visibility: "${v}" not recognised, kept ${r.purseVisibility}`); }]);
+  f.push(['Captain and vice-captain', 'max_bid_visibility', `Who sees each team's max bid (${Object.keys(PURSE_VISIBILITY).join(' / ')}; blank = same as the budget)`, 'A captain always sees their own team\'s max bid',
+    (m, r) => r.maxBidVisibility || '', (m, r, v, warn) => { if (!v) r.maxBidVisibility = ''; else if (PURSE_VISIBILITY[v]) r.maxBidVisibility = v; else warn(`max_bid_visibility: "${v}" not recognised`); }]);
+  f.push(['Captain and vice-captain', 'show_current_bid', 'Show the current bid on the stage and audience phones? (yes / no)', 'no = the room hears the bids but the screens show only who is up, until SOLD. Admins and bidding captains always see it',
+    (m, r) => (r.showCurrentBid === false ? 'no' : 'yes'), (m, r, v) => { r.showCurrentBid = !/^(n|no|off|false|0|hide)/i.test(v); }]);
 
   for (let i = 1; i <= MAX_CATEGORIES; i++) {
     const c = (r) => r.categories[i - 1] || {};

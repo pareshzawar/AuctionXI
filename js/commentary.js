@@ -265,6 +265,7 @@ function lineForLog(a, e, key, lang) {
 }
 
 function lineForBid(a, lot, bid, key, lang) {
+  if (a.rules.showCurrentBid === false) return null; // bids stay off the screens in this tournament
   const L = PHRASES[lang];
   const f = { t: teamName(a, bid.team), amt: money(bid.amount, a.rules) };
   const p = a.players[a.live.playerId] || {};
