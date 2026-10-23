@@ -210,11 +210,17 @@ export function buildDeck(PptxGenJS, auction) {
     const c = category(r, p.category);
     const base = basePrice(p, r);
     const photo = p.photoData || null;
-    if (photo) s.addImage({ data: photo, ...fit(photo, { x: 0.6, y: 0.6, w: 4.2, h: 5.6 }) });
+    const box = photo ? fit(photo, { x: 0.6, y: 0.6, w: 4.2, h: 5.6 }) : { x: 0.6, y: 0.6, w: 4.2, h: 5.6 };
+    if (photo) s.addImage({ data: photo, ...box });
     else {
       card(s, 0.6, 0.6, 4.2, 5.6, C.raised);
       s.addText(initials(p.name), { x: 0.6, y: 0.6, w: 4.2, h: 5.6, fontFace: FONT, fontSize: 96, bold: true, color: C.line, align: 'center', valign: 'middle' });
     }
+    // Small base-price tag on the lower left of the photo.
+    s.addText([
+      { text: 'Base price: ', options: { fontSize: 11, color: C.muted } },
+      { text: amt(base), options: { fontSize: 13, bold: true, color: C.gold } },
+    ], { x: box.x + 0.12, y: box.y + box.h - 0.47, w: 1.75, h: 0.35, fontFace: FONT, fill: { color: C.bg, transparency: 15 }, align: 'center', valign: 'middle' });
     const x = 5.3;
     const w = W - x - 0.6;
     s.addText(isWaiting(p) ? `WAITING LIST  ·  ${id}` : `${(c?.label || 'Player').toUpperCase()}  ·  ${id}  ·  ${lot} OF ${pool.length}`, { x, y: 0.6, w, h: 0.35, fontFace: FONT, fontSize: 13, bold: true, color: C.gold, charSpacing: 3 });
@@ -235,16 +241,10 @@ export function buildDeck(PptxGenJS, auction) {
     });
     const statRows = Math.ceil(stats.length / 3);
     const noteText = [p.notes, p.scout && `Scout: ${p.scout}`].filter(Boolean).join('\n');
-    if (noteText) s.addText(noteText, { x, y: 3.1 + statRows * 0.95, w, h: 5.25 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
+    if (noteText) s.addText(noteText, { x, y: 3.1 + statRows * 0.95, w, h: 6.2 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
     if (p.cricheroesUrl) s.addText('CricHeroes profile', { x: W - 4.3, y: 0.15, w: 1.8, h: 0.3, fontFace: FONT, fontSize: 10, color: C.gold, align: 'right', hyperlink: { url: p.cricheroesUrl } });
-    card(s, x, 5.35, w, 0.95, C.raised);
     const ladder = [base];
     while (ladder.length < 9) ladder.push(ladder.at(-1) + increment(ladder.at(-1), r));
-    s.addText([
-      { text: 'BASE PRICE  ', options: { fontSize: 12, bold: true, color: C.muted, charSpacing: 2 } },
-      { text: amt(base), options: { fontSize: 30, bold: true, color: C.gold } },
-      { text: `      then ${ladder.slice(1, 7).map(num).join(' · ')} …`, options: { fontSize: 15, color: C.muted } },
-    ], { x: x + 0.25, y: 5.35, w: w - 0.4, h: 0.95, fontFace: FONT, valign: 'middle' });
     s.addText('Players list', { x: W - 2.3, y: 0.15, w: 1.7, h: 0.3, fontFace: FONT, fontSize: 10, color: C.muted, align: 'right', hyperlink: { slide: indexAt, tooltip: 'Back to the players list' } });
     s.addNotes([`${p.name} (${id})`, `${ROLES[roleId(p.role)].name}, ${c?.label || ''}`, battingLabel(p), bowlingLabel(p),
       stats.map(([k, v]) => `${k} ${v}`).join(', '), p.notes, p.cricheroesUrl, `Base price ${amt(base)}. Bids: ${ladder.map(amt).join(', ')}`].filter(Boolean).join('\n'));
