@@ -1,6 +1,6 @@
-﻿id,name,role,pool,base_price,batting_hand,bowling_arm,bowling_type,age,locality,photo_url,matches,runs,wickets,strike_rate,highest_score,economy,notes,cricheroes_url,allotted_team,allotted_as
-P001,Vikram Rao,All-rounder,A,,Right,Left,Spin,32,Wing A - 410,,12,340,9,142.5,58*,9.2,,https://cricheroes.com/player-profile/123/vikram-rao,T1,C
-P002,Amit Shah,Wicket-keeper,B,,Left,,,34,Wing A - 105,,8,150,0,118,33,,,,T1,VC
-P003,Sanjay Mehta,Batter,A,,Right,Right,Off-spin,29,Wing B - 202,,10,410,1,165.3,71,12,,,T2,C
-P004,Rohan Patil,Bowler,B,,Right,Right,Fast,28,Wing B - 302,,12,90,14,,,8.4,Opening bowler,,,
-P005,Nikhil Joshi,Batter,C,,Left,,,41,Wing D - 201,,,,,,,,Available on weekends only,,,
+﻿id,name,role,pool,base_price,batting_hand,bowling_arm,bowling_type,age,locality,photo_url,matches,runs,wickets,strike_rate,highest_score,economy,notes,cricheroes_url,allotted_team,allotted_as,list
+P001,Vikram Rao,All-rounder,A,,Right,Left,Spin,32,Wing A - 410,,12,340,9,142.5,58*,9.2,,https://cricheroes.com/player-profile/123/vikram-rao,T1,C,
+P002,Amit Shah,Wicket-keeper,B,,Left,,,34,Wing A - 105,,8,150,0,118,33,,,,T1,VC,
+P003,Sanjay Mehta,Batter,A,,Right,Right,Off-spin,29,Wing B - 202,,10,410,1,165.3,71,12,,,T2,C,
+P004,Rohan Patil,Bowler,B,,Right,Right,Fast,28,Wing B - 302,,12,90,14,,,8.4,Opening bowler,,,,
+P005,Nikhil Joshi,Batter,C,,Left,,,41,Wing D - 201,,,,,,,,Available on weekends only,,,,waiting

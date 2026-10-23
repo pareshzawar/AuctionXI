@@ -36,7 +36,7 @@ function render(A) {
   // Remaining purses follow the tournament's visibility rule for this device's role.
   const session = archive ? {} : getSession(aid);
   $('#squads').innerHTML = squads(A, { viewer: { role: session.role || 'audience', team: session.team } });
-  const unsold = Object.entries(A.players).filter(([pid, p]) => !A.sales[pid] && !isAllotted(p)).map(([id, p]) => ({
+  const unsold = Object.entries(A.players).filter(([pid, p]) => !A.sales[pid] && !isAllotted(p) && p.list !== 'waiting').map(([id, p]) => ({
     id, name: p.name, role: p.role, category: category(rules, p.category)?.label, base: basePrice(p, rules),
     status: A.unsold[id] ? 'unsold' : 'upcoming', sub: [p.age ? `Age ${p.age}` : null, p.locality].filter(Boolean).join(' · '),
   }));

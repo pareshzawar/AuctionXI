@@ -10,7 +10,7 @@ import { ROLES, roleId, withDefaults, DEFAULT_RULES, PICK_ORDERS, PURSE_VISIBILI
 export const PLAYER_COLUMNS = [
   'id', 'name', 'role', 'pool', 'base_price', 'batting_hand', 'bowling_arm', 'bowling_type', 'age',
   'locality', 'photo_url', 'matches', 'runs', 'wickets', 'strike_rate', 'highest_score', 'economy', 'notes', 'cricheroes_url',
-  'allotted_team', 'allotted_as',
+  'allotted_team', 'allotted_as', 'list',
 ];
 
 // Only `name` is required. captain / vice_captain: player names; they become the team's leaders
@@ -18,11 +18,11 @@ export const PLAYER_COLUMNS = [
 export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'captain', 'vice_captain', 'owner', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
-  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '142.5', '58*', '9.2', '', 'https://cricheroes.com/player-profile/123/vikram-rao', 'T1', 'C'],
-  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left', '', '', '34', 'Wing A - 105', '', '8', '150', '0', '118', '33', '', '', '', 'T1', 'VC'],
-  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right', 'Right', 'Off-spin', '29', 'Wing B - 202', '', '10', '410', '1', '165.3', '71', '12', '', '', 'T2', 'C'],
-  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right', 'Right', 'Fast', '28', 'Wing B - 302', '', '12', '90', '14', '', '', '8.4', 'Opening bowler', '', '', ''],
-  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Left', '', '', '41', 'Wing D - 201', '', '', '', '', '', '', '', 'Available on weekends only', '', '', ''],
+  ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '142.5', '58*', '9.2', '', 'https://cricheroes.com/player-profile/123/vikram-rao', 'T1', 'C', ''],
+  ['P002', 'Amit Shah', 'Wicket-keeper', 'B', '', 'Left', '', '', '34', 'Wing A - 105', '', '8', '150', '0', '118', '33', '', '', '', 'T1', 'VC', ''],
+  ['P003', 'Sanjay Mehta', 'Batter', 'A', '', 'Right', 'Right', 'Off-spin', '29', 'Wing B - 202', '', '10', '410', '1', '165.3', '71', '12', '', '', 'T2', 'C', ''],
+  ['P004', 'Rohan Patil', 'Bowler', 'B', '', 'Right', 'Right', 'Fast', '28', 'Wing B - 302', '', '12', '90', '14', '', '', '8.4', 'Opening bowler', '', '', '', ''],
+  ['P005', 'Nikhil Joshi', 'Batter', 'C', '', 'Left', '', '', '41', 'Wing D - 201', '', '', '', '', '', '', '', 'Available on weekends only', '', '', '', 'waiting'],
 ];
 
 const TEAM_EXAMPLE = [
@@ -155,6 +155,7 @@ export function importPlayers(rows, rules, existingIds = []) {
       highest: (r.highest_score || r.highest || '').trim() || null, // may be "82*" (not out)
       economy: dec(r.economy),
       notes: r.notes || null,
+      list: /^w/i.test(String(r.list || r.status || '').trim()) ? 'waiting' : null, // "waiting" / "waiting list"; blank = in the auction
       cricheroesUrl: /^https:\/\/(www\.)?cricheroes\.(com|in)\//i.test(r.cricheroes_url || '') ? r.cricheroes_url.trim() : null,
       allottedTeam: team,
       allottedAs: team ? as : null,
@@ -188,7 +189,7 @@ export function playersToCSV(players) {
   return toCSV(PLAYER_COLUMNS, Object.entries(players).map(([id, p]) => [
     id, p.name, ROLES[roleId(p.role)].name, p.category, p.basePrice,
     { R: 'Right', L: 'Left' }[battingHandOf(p)] || '', { R: 'Right', L: 'Left' }[bowlingArmOf(p)] || '', bowlingTypeOf(p) || '',
-    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.strikeRate, p.highest, p.economy, p.notes, p.cricheroesUrl, p.allottedTeam, p.allottedAs,
+    p.age, p.locality, p.photoUrl, p.matches, p.runs, p.wickets, p.strikeRate, p.highest, p.economy, p.notes, p.cricheroesUrl, p.allottedTeam, p.allottedAs, p.list === 'waiting' ? 'waiting' : '',
   ]));
 }
 

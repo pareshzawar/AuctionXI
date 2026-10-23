@@ -11,6 +11,7 @@ import { $, $$, esc, toast } from './ui.js';
 import { money, category, ROLES, roleId, basePrice, teamSummary, isAllotted, minBase } from './engine.js';
 import { roleChip, badge, teamBadge } from './ds.js';
 import { keyFor, encryptJSON, decryptJSON, calc } from './vault.js';
+import { aiReady, aiSettingsCard, askAI, playerFacts } from './ai.js';
 
 export { calc };
 
@@ -67,10 +68,11 @@ export function openWorkbook(aid, seat) {
 
 /* ---------------- view ---------------- */
 
-const ui = { view: 'players', q: '', pool: '', role: '', favOnly: false, availOnly: true };
+const ui = { aiQ: '', aiA: '', view: 'players', q: '', pool: '', role: '', favOnly: false, availOnly: true };
 
 function playerStatus(a, pid) {
   const s = a.sales[pid];
+  if (!s && a.players[pid]?.list === 'waiting') return { kind: 'waiting' };
   if (s) return { kind: s.allotted || s.retained ? 'retained' : 'sold', team: s.team, price: s.price };
   if (a.live?.playerId === pid && a.live.status === 'bidding') return { kind: 'live' };
   if (a.unsold[pid]) return { kind: 'unsold' };
@@ -85,12 +87,12 @@ function playersView(a, book) {
     .map(([id, p]) => ({ id, p, st: playerStatus(a, id), mine: book.players[id] || {} }))
     .filter((x) => (!q || x.p.name.toLowerCase().includes(q) || x.id.toLowerCase() === q)
       && (!ui.pool || x.p.category === ui.pool) && (!ui.role || roleId(x.p.role) === ui.role)
-      && (!ui.favOnly || x.mine.fav) && (!ui.availOnly || ['upcoming', 'live', 'unsold'].includes(x.st.kind)))
+      && (!ui.favOnly || x.mine.fav) && (!ui.availOnly || ['upcoming', 'live', 'unsold', 'waiting'].includes(x.st.kind)))
     .sort((x, y) => Number(y.st.kind === 'live') - Number(x.st.kind === 'live') || Number(!!y.mine.fav) - Number(!!x.mine.fav)
       || (r.categories.findIndex((c) => c.id === x.p.category) - r.categories.findIndex((c) => c.id === y.p.category)) || x.p.name.localeCompare(y.p.name));
   const favCount = Object.values(book.players).filter((x) => x.fav).length;
   const status = (st) => (st.kind === 'sold' ? `${badge('sold')} ${teamBadge(a.teams[st.team])} ${esc(money(st.price, r))}`
-    : st.kind === 'live' ? badge('live', { text: 'Up now' }) : st.kind === 'unsold' ? badge('unsold') : '<span class="muted">Available</span>');
+    : st.kind === 'live' ? badge('live', { text: 'Up now' }) : st.kind === 'unsold' ? badge('unsold') : st.kind === 'waiting' ? badge('upcoming', { text: 'Waiting list' }) : '<span class="muted">Available</span>');
   return `
     <div class="row" style="margin-bottom:var(--space-3)">
       <input data-wb="q" value="${esc(ui.q)}" placeholder="Search name or number" style="flex:1;min-width:160px">
@@ -153,7 +155,35 @@ function padView(book) {
     <div class="row"><input data-calc placeholder="e.g. 650 - 7*50" style="flex:1"><b data-calc-out style="min-width:80px"></b></div>
     <label>Scratch pad</label>
     <textarea data-pad rows="14" placeholder="Plans, targets, who to push up…">${esc(book.pad || '')}</textarea>
+  </div>
+  <div class="card" style="margin-top:var(--space-4)">
+    <div class="section-title"><h3 style="margin:0">Ask AI</h3><small>optional, with your own AI key on this phone</small></div>
+    ${aiReady() ? `<p class="muted" style="margin-top:0">The AI sees your team's points and squad, your list with your max bids and notes, and the players still available. Your notes go to the AI provider you chose; nobody else sees the question or the answer.</p>
+      <textarea data-ai-q rows="2" placeholder="e.g. Who should I target next with my points? Which bowlers are still available?">${esc(ui.aiQ)}</textarea>
+      <p class="row" style="margin:var(--space-2) 0"><button class="btn-sm btn-primary" data-ai-ask>Ask</button><button class="btn-sm btn-ghost" data-ai-keep ${ui.aiA ? '' : 'hidden'}>Add the answer to my scratch pad</button></p>
+      <div data-ai-a class="muted" style="white-space:pre-wrap">${esc(ui.aiA)}</div>` : ''}
+    <details ${aiReady() ? '' : 'open'}><summary class="muted">AI settings on this phone</summary><div data-ai-settings style="margin-top:var(--space-3)"></div></details>
   </div>`;
+}
+
+// What the captain's AI adviser is told: this team, the captain's own list, and who is left.
+function adviserContext(a, book, team) {
+  const r = a.rules;
+  const t = a.teams[team];
+  const s = teamSummary(a, team);
+  const toBuy = Math.max(0, r.squadSize - s.count);
+  const base = minBase(r);
+  const max = toBuy ? Math.max(0, Math.min(s.remaining, s.remaining - (toBuy - 1) * base)) : 0;
+  const left = Object.entries(a.players).filter(([id, p]) => !isAllotted(p) && !a.sales[id] && p.list !== 'waiting');
+  const mine = Object.entries(book.players).filter(([, x]) => x.fav || x.max != null || x.note);
+  return [
+    `My team: ${t?.name}. Points left: ${money(s.remaining, r)}. Squad: ${s.count} of ${r.squadSize}, ${toBuy} still to buy. My max bid now: ${money(max, r)}.`,
+    `My squad: ${s.players.map((p) => `${p.name} (${p.role}${p.allotted ? '' : `, ${money(p.price, r)}`})`).join('; ') || 'none yet'}.`,
+    `Rules: base price ${money(base, r)}; every team must reach ${r.squadSize} players; ${r.playersPerSide}-a-side.`,
+    `My list: ${mine.map(([id, x]) => `${a.players[id]?.name || id}${x.max != null ? ` (my max ${x.max})` : ''}${x.note ? ` - ${x.note}` : ''}`).join('; ') || 'empty'}.`,
+    'Players still available:',
+    ...left.map(([, p]) => playerFacts(p, a, money).replace(/\n/g, ' | ')),
+  ].join('\n');
 }
 
 // Draw the workbook into `el`. ctx: { a, wb, team, seatLabel, rerender }; `a` may be a getter so redraws see the latest auction.
@@ -211,6 +241,32 @@ export function renderWorkbook(el, ctx) {
   $$('[data-del]', el).forEach((b) => (b.onclick = () => { const [id, i] = b.dataset.del.split(':'); book.ledger[id].splice(Number(i), 1); changed(); redraw(); }));
   $$('[data-tnote]', el).forEach((t) => (t.oninput = () => { book.teamNotes[t.dataset.tnote] = t.value; changed(); }));
   $$('[data-tpurse]', el).forEach((t) => (t.onchange = () => { book.teamPurse[t.dataset.tpurse] = Number(t.value) || 0; changed(); redraw(); }));
+  // Ask AI
+  if ($('[data-ai-settings]', el)) aiSettingsCard($('[data-ai-settings]', el), { onChange: redraw });
+  const ask = $('[data-ai-ask]', el);
+  if (ask) {
+    ask.onclick = async () => {
+      const q = $('[data-ai-q]', el).value.trim();
+      if (!q) return;
+      ui.aiQ = q;
+      const out = $('[data-ai-a]', el);
+      out.textContent = 'Thinking…';
+      ask.disabled = true;
+      try {
+        ui.aiA = await askAI({
+          system: 'You are a calm, practical adviser to one captain at a friendly society cricket player auction. Answer in at most 150 words, in plain English, using only the facts given. Respect the max-bid rule and the squad size. Never make up statistics.',
+          prompt: `${adviserContext(a, book, ctx.team)}\n\nQuestion: ${q}`,
+          maxTokens: 500,
+        });
+      } catch (e) { ui.aiA = e.message; }
+      redraw(); // the answer is kept in memory, so live updates don't wipe it
+    };
+    $('[data-ai-keep]', el).onclick = () => {
+      book.pad = `${book.pad ? `${book.pad}\n\n` : ''}AI: ${ui.aiA}`;
+      changed();
+      redraw();
+    };
+  }
   // Scratch pad
   const pad = $('[data-pad]', el);
   if (pad) pad.oninput = () => { book.pad = pad.value; changed(); };

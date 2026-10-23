@@ -302,6 +302,8 @@ export async function startPlayer(aid, a, playerId, how = {}) {
   if (!p) throw new Error('Unknown player');
   if (a.sales[playerId]) throw new Error(`${p.name} is already in a team`);
   if (a.live?.status === 'bidding') throw new Error('Finish the player on the block first (mark sold or unsold)');
+  if (p.list === 'waiting') throw new Error(`${p.name} is on the waiting list. Move them into the auction first (Players tab)`);
+  if (a.meta.stageView) await db.set(`auctions/${aid}/meta/stageView`, null); // the stage goes back to the auction
   await db.set(`auctions/${aid}/live`, {
     playerId, status: 'bidding', round: a.meta.round || 1, startedAt: db.now(),
     drawn: how.drawn || null, drawnPool: how.pool || null,

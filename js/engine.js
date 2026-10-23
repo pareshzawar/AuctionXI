@@ -140,6 +140,7 @@ export function normalize(a) {
     unsold: a.unsold || {},
     live: a.live || null,
     log: a.log || {},
+    aicomm: a.aicomm || {}, // AI commentary lines, when the control room has AI commentary on
   };
 }
 
@@ -190,6 +191,10 @@ export function minBase(rules) {
 
 // Captain / vice-captain allotted to a team before the auction.
 export const isAllotted = (p) => !!(p && p.allottedTeam);
+// The waiting list: registered, but not in the auction unless an organiser moves them in.
+export const isWaiting = (p) => p?.list === 'waiting';
+// Players who are auctioned: not a captain / vice-captain / kept player, not on the waiting list.
+export const inAuction = (p) => !!p && !isAllotted(p) && !isWaiting(p);
 // allottedAs: 'C' captain, 'VC' vice-captain, 'R' kept from last season (mini auction).
 export const leaderLabel = (as) => (as === 'C' ? 'Captain' : as === 'VC' ? 'Vice-captain' : as === 'R' ? 'Retained' : 'Allotted');
 
@@ -310,7 +315,7 @@ export function bidBlocker(a, teamId, amount) {
 export function pool(a) {
   const round = Number(a.meta.round) || 1;
   return Object.entries(a.players)
-    .filter(([pid, p]) => !isAllotted(p) && !a.sales[pid] && !(a.unsold[pid] && Number(a.unsold[pid].round) >= round))
+    .filter(([pid, p]) => inAuction(p) && !a.sales[pid] && !(a.unsold[pid] && Number(a.unsold[pid].round) >= round))
     .map(([id, p]) => ({ ...p, id }));
 }
 

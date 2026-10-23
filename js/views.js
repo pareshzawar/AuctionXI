@@ -2,12 +2,13 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting } from './engine.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
   const s = a.sales[pid];
   if (s) return s.allotted || s.retained ? 'retained' : 'sold';
+  if (isWaiting(a.players[pid])) return 'waiting';
   if (a.live?.playerId === pid && a.live.status === 'bidding') return 'live';
   if (a.unsold[pid]) return 'unsold';
   return 'upcoming';
@@ -15,7 +16,7 @@ export function playerStatus(a, pid) {
 
 // "Lot n of m": players brought up so far, counting the current one.
 export function lotInfo(a) {
-  const total = Object.values(a.players).filter((p) => !p.allottedTeam).length;
+  const total = Object.values(a.players).filter(inAuction).length;
   const done = Object.values(a.sales).filter((s) => !s.allotted && !s.retained).length + Object.keys(a.unsold).filter((pid) => !a.sales[pid]).length;
   const live = a.live?.status === 'bidding' ? 1 : 0;
   return { lot: done + live, total };
@@ -122,6 +123,46 @@ export function squads(a, { viewer = null } = {}) {
       ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading, hidePurse: !canSeePurse(a.rules, viewer, id) })}
       ${playerTable(squadRows(a, id), a.rules, { dense: true, columns: ['player', 'role', 'price'] })}
     </div>`).join('')}</div>`;
+}
+
+// Players still to come, and the waiting list, for profiles on phones and the stage.
+export function profileGroups(a) {
+  const left = pool(a);
+  const ids = new Set(left.map((p) => p.id));
+  const unsoldOut = Object.entries(a.players).filter(([id, p]) => inAuction(p) && !a.sales[id] && !ids.has(id)).map(([id, p]) => ({ ...p, id }));
+  const waiting = Object.entries(a.players).filter(([id, p]) => isWaiting(p) && !a.sales[id]).map(([id, p]) => ({ ...p, id }));
+  const byName = (x, y) => x.name.localeCompare(y.name);
+  return { available: [...left, ...unsoldOut].sort(byName), waiting: waiting.sort(byName) };
+}
+
+const statLine = (p) => [p.matches != null && `${p.matches} m`, p.runs != null && `${p.runs} r`, p.strikeRate != null && `SR ${Math.round(p.strikeRate)}`,
+  p.wickets != null && `${p.wickets} w`, p.economy != null && `eco ${Number(p.economy).toFixed(1)}`].filter(Boolean).join(' · ');
+
+// Phones: both lists, each player opens to the full card.
+export function profilesView(a) {
+  const { available, waiting } = profileGroups(a);
+  const row = (p) => `<details class="profile-row"><summary>
+      <span class="ax-avatar" style="width:40px;height:40px">${p.photoData ? `<img src="${esc(p.photoData)}" alt="">` : esc(p.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join(''))}</span>
+      <span style="min-width:0;flex:1"><b>${esc(p.name)}</b> <small class="muted">${esc(ROLES[roleId(p.role)].code)}${a.unsold[p.id] ? ' · unsold so far' : ''}</small><br><small class="muted">${esc(statLine(p) || 'No stats yet')}</small></span>
+    </summary><div style="padding:var(--space-2) 0">${cardFor(a, p.id)}</div></details>`;
+  return `<div class="card"><h3 style="margin-top:0">Up for auction (${available.length})</h3>${available.map(row).join('') || '<p class="muted">Everyone has been bought.</p>'}</div>
+    <div class="card" style="margin-top:var(--space-4)"><h3 style="margin-top:0">Waiting list (${waiting.length})</h3>${waiting.map(row).join('') || '<p class="muted">Nobody on the waiting list.</p>'}
+    <p class="hint">Waiting-list players come into the auction only if the organisers move them in.</p></div>`;
+}
+
+// The stage: a board of player tiles (which = 'available' | 'waiting'), 30 to a page; the stage
+// turns the pages by itself (page = a running counter).
+export const BOARD_PAGE = 30;
+export function stageBoard(a, which, page = 0) {
+  const all = profileGroups(a)[which] || [];
+  const pages = Math.max(1, Math.ceil(all.length / BOARD_PAGE));
+  const at = page % pages;
+  const list = all.slice(at * BOARD_PAGE, (at + 1) * BOARD_PAGE);
+  return `<div class="stage-board" style="grid-column:1/-1">
+    <h2 class="stage-board-title">${which === 'waiting' ? 'Waiting list' : 'Up for auction'} <span>${all.length} player${all.length === 1 ? '' : 's'}${pages > 1 ? ` · page ${at + 1} of ${pages}` : ''}</span></h2>
+    <div class="stage-board-grid">${list.map((p) => `<div class="stage-tile">
+      <span class="stage-tile-photo">${p.photoData ? `<img src="${esc(p.photoData)}" alt="">` : esc(p.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join(''))}</span>
+      <span style="min-width:0"><b>${esc(p.name)}</b><small>${esc(ROLES[roleId(p.role)].name)}</small><small>${esc(statLine(p))}</small></span></div>`).join('')}</div></div>`;
 }
 
 export function poolTable(a) {

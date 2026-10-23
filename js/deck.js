@@ -5,8 +5,8 @@
 // Opens in PowerPoint, Keynote, Google Slides and LibreOffice.
 
 import {
-  withDefaults, isAllotted, ROLES, roleId, battingLabel, bowlingLabel, money, basePrice, category, minBase,
-  hasVC, vcCanBid, increment, leadersOf,
+  withDefaults, ROLES, roleId, battingLabel, bowlingLabel, money, basePrice, category, minBase,
+  hasVC, vcCanBid, increment, leadersOf, inAuction, isWaiting,
 } from './engine.js';
 
 const C = { bg: '0D0F12', surface: '15181D', raised: '1D2128', line: '2A3038', ink: 'F3F1EC', muted: 'A3AAB3', gold: 'F2B84B', sold: '3DD6B0' };
@@ -73,13 +73,14 @@ export function buildDeck(PptxGenJS, auction) {
   const amt = (n) => money(n, r);
 
   const teams = Object.entries(a.teams);
-  const pool = Object.entries(a.players).filter(([, p]) => !isAllotted(p));
+  const pool = Object.entries(a.players).filter(([, p]) => inAuction(p));
+  const waiting = Object.entries(a.players).filter(([, p]) => isWaiting(p)).sort(([, x], [, y]) => x.name.localeCompare(y.name));
   const catIndex = (id) => { const i = r.categories.findIndex((c) => c.id === id); return i < 0 ? 99 : i; };
   pool.sort(([, x], [, y]) => catIndex(x.category) - catIndex(y.category) || x.name.localeCompare(y.name));
   const pools = r.categories.filter((c) => pool.some(([, p]) => p.category === c.id));
   const houseRules = (r.houseRules || []).filter((h) => h.a);
   const hrSlides = chunk(houseRules, 6);
-  const idxSlides = chunk(pool, 30);
+  const idxSlides = chunk([...pool, ...waiting], 30);
   const teamSlides = chunk(teams, 8);
   // Slide numbers, so the index can link to each player.
   let next = 1 + 1 + 1 + hrSlides.length + teamSlides.length; // cover, rules, bid steps, house rules, teams
@@ -91,6 +92,7 @@ export function buildDeck(PptxGenJS, auction) {
     for (const [id, p] of pool) if (p.category === c.id) slideOf[id] = ++next;
   }
   for (const [id] of pool) if (!slideOf[id]) slideOf[id] = ++next; // a player in no known pool
+  if (waiting.length) { next += 1; for (const [id] of waiting) slideOf[id] = ++next; } // divider, then the waiting list
 
   /* 1. Cover */
   {
@@ -190,11 +192,11 @@ export function buildDeck(PptxGenJS, auction) {
   idxSlides.forEach((part, i) => {
     const s = slide();
     eyebrow(s, `Players${idxSlides.length > 1 ? ` (${i + 1}/${idxSlides.length})` : ''}`);
-    title(s, `${pool.length} players in the auction: click a name to go to the player`, 0.8, 24);
+    title(s, `${pool.length} players in the auction${waiting.length ? ` and ${waiting.length} on the waiting list` : ''}: click a name to go to the player`, 0.8, 24);
     const cols = chunk(part, 10);
     cols.forEach((col, c) => {
       s.addText(col.map(([id, p]) => ({
-        text: `${id}  ${p.name}  ·  ${ROLES[roleId(p.role)].code}${r.categories.length > 1 ? ` · ${category(r, p.category)?.label || p.category}` : ''}`,
+        text: `${id}  ${p.name}  ·  ${ROLES[roleId(p.role)].code}${r.categories.length > 1 && !isWaiting(p) ? ` · ${category(r, p.category)?.label || p.category}` : ''}${isWaiting(p) ? ' · waiting list' : ''}`,
         options: { hyperlink: { slide: slideOf[id], tooltip: `Go to ${p.name}` }, color: C.ink, breakLine: true },
       })), { x: 0.6 + c * 4.1, y: 1.75, w: 4.0, h: 4.9, fontFace: FONT, fontSize: 14, valign: 'top', paraSpaceAfter: 8 });
     });
@@ -203,7 +205,7 @@ export function buildDeck(PptxGenJS, auction) {
   /* 7. Players, pool by pool */
   let lot = 0;
   const playerSlide = (id, p) => {
-    lot++;
+    if (!isWaiting(p)) lot++;
     const s = slide();
     const c = category(r, p.category);
     const base = basePrice(p, r);
@@ -215,7 +217,7 @@ export function buildDeck(PptxGenJS, auction) {
     }
     const x = 5.3;
     const w = W - x - 0.6;
-    s.addText(`${(c?.label || 'Player').toUpperCase()}  ·  ${id}  ·  ${lot} OF ${pool.length}`, { x, y: 0.6, w, h: 0.35, fontFace: FONT, fontSize: 13, bold: true, color: C.gold, charSpacing: 3 });
+    s.addText(isWaiting(p) ? `WAITING LIST  ·  ${id}` : `${(c?.label || 'Player').toUpperCase()}  ·  ${id}  ·  ${lot} OF ${pool.length}`, { x, y: 0.6, w, h: 0.35, fontFace: FONT, fontSize: 13, bold: true, color: C.gold, charSpacing: 3 });
     s.addText(p.name, { x, y: 1.0, w, h: 1.0, fontFace: FONT, fontSize: 44, bold: true, color: C.ink, fit: 'shrink' });
     s.addText(ROLES[roleId(p.role)].name, { x, y: 2.0, w: 3.0, h: 0.45, fontFace: FONT, fontSize: 16, bold: true, color: C.bg, fill: { color: C.gold }, align: 'center', valign: 'middle' });
     s.addText([p.age ? `Age ${p.age}` : null, battingLabel(p), bowlingLabel(p), p.locality].filter(Boolean).join('  ·  '), { x, y: 2.6, w, h: 0.45, fontFace: FONT, fontSize: 16, color: C.muted });
@@ -232,7 +234,8 @@ export function buildDeck(PptxGenJS, auction) {
         { x: sx + 0.15, y: sy + 0.02, w: 2.05, h: 0.8, fontFace: FONT, valign: 'middle' });
     });
     const statRows = Math.ceil(stats.length / 3);
-    if (p.notes) s.addText(p.notes, { x, y: 3.1 + statRows * 0.95, w, h: 5.25 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
+    const noteText = [p.notes, p.scout && `Scout: ${p.scout}`].filter(Boolean).join('\n');
+    if (noteText) s.addText(noteText, { x, y: 3.1 + statRows * 0.95, w, h: 5.25 - (3.1 + statRows * 0.95), fontFace: FONT, fontSize: 14, italic: true, color: C.ink, valign: 'top', fit: 'shrink' });
     if (p.cricheroesUrl) s.addText('CricHeroes profile', { x: W - 4.3, y: 0.15, w: 1.8, h: 0.3, fontFace: FONT, fontSize: 10, color: C.gold, align: 'right', hyperlink: { url: p.cricheroesUrl } });
     card(s, x, 5.35, w, 0.95, C.raised);
     const ladder = [base];
@@ -255,6 +258,13 @@ export function buildDeck(PptxGenJS, auction) {
     for (const [id, p] of pool) if (p.category === c.id) playerSlide(id, p);
   }
   for (const [id, p] of pool) if (!pools.some((c) => c.id === p.category)) playerSlide(id, p);
+  if (waiting.length) {
+    const s = slide();
+    eyebrow(s, 'If a place opens up', 2.4);
+    s.addText('Waiting list', { x: 0.6, y: 2.8, w: W - 1.2, h: 1.4, fontFace: FONT, fontSize: 64, bold: true, color: C.ink });
+    s.addText(`${waiting.length} player${waiting.length === 1 ? '' : 's'}`, { x: 0.6, y: 4.2, w: W - 1.2, h: 0.6, fontFace: FONT, fontSize: 22, color: C.gold });
+    for (const [id, p] of waiting) playerSlide(id, p);
+  }
 
   /* 8. Squads, once players are sold */
   const sales = a.sales || {};

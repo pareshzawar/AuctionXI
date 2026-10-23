@@ -2,14 +2,14 @@
 // ?screen=1 for the projector stage (fixed 1920 x 1080 canvas, always night).
 
 import { db } from './db.js';
-import { normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
+import { basePrice, normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat, viewGate, waitUntilOpen } from './actions.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, ticker, feed, squads, poolTable, rulesSummary, lotInfo, maxBidExplainer } from './views.js';
+import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, stageBoard, playerStatus } from './views.js';
 
 const aid = (param('a') || '').toUpperCase();
 const stage = param('screen') === '1';
@@ -91,6 +91,10 @@ async function boot() {
 
 /* ---------------- stage ---------------- */
 
+// A board of players longer than one screen turns its pages every 10 seconds.
+let boardPage = 0;
+if (stage) setInterval(() => { if (A?.meta.stageView?.type === 'list') { boardPage++; renderStage(); } }, 10000);
+
 function renderStage() {
   const { meta, live, rules } = A;
   const { lot, total } = lotInfo(A);
@@ -114,7 +118,9 @@ function renderStage() {
         </div>
       </header>
       <div class="stage-main">
-        ${hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
+        ${meta.stageView?.type === 'list' ? stageBoard(A, meta.stageView.which, boardPage)
+          : meta.stageView?.type === 'player' && A.players[meta.stageView.id] ? `${cardFor(A, meta.stageView.id, 'stage')}${stageProfileSide(meta.stageView.id)}`
+          : hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage')}`
           : `<div class="stage-wait ${A.media?.banner ? 'has-banner' : ''}" style="grid-column:1/-1">${bannerImg(A, { cls: 'stage-banner' })}<div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
@@ -123,6 +129,17 @@ function renderStage() {
       <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
     </div></div>`;
+}
+
+// Beside a player's profile on the stage (shown by the organisers outside bidding).
+function stageProfileSide(pid) {
+  const r = A.rules;
+  const st = playerStatus(A, pid);
+  const s = A.sales[pid];
+  const label = { waiting: 'On the waiting list', sold: `Sold to ${A.teams[s?.team]?.name || ''}`, retained: `In ${A.teams[s?.team]?.name || ''}`, unsold: 'Unsold so far', upcoming: 'Up for auction' }[st] || 'Up for auction';
+  return `<div class="stage-profile-side"><span class="stage-label">Player profile</span>
+    <h2 style="font-size:48px;line-height:52px;margin:0">${esc(label)}</h2>
+    ${st === 'sold' ? price(s.price, r, { size: 'stage', tone: 'gold' }) : `<div><span class="stage-label">Base price</span><div>${price(basePrice(A.players[pid], r), r, { size: 'lg' })}</div></div>`}</div>`;
 }
 
 // Key rules on the stage while the hall waits for the start.
@@ -174,13 +191,13 @@ function renderPhone() {
       <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
       ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
-      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div><span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
+      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
     <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
-      ${[['squads', 'Squads'], ['pool', 'Players left'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
+      ${[['squads', 'Squads'], ['pool', 'Players'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
     </nav>`;
   renderBelow();
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; belowDirty = true; $('#below').innerHTML = ''; renderPhone(); }));
@@ -250,9 +267,9 @@ function myLimit() {
 
 function below(tab) {
   if (tab === 'feed') return `<div class="card">${feed(A, 100)}</div>`;
-  if (tab === 'pool') return poolTable(A);
+  if (tab === 'pool') return profilesView(A);
   if (tab === 'rules') return rulesSummary(A);
-  if (tab === 'comm') return `<div class="card"><div class="feed" style="max-height:none">${commentator.lines.map((l) => `<div><span>${esc(l.text)}</span><time>${new Date(l.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<p class="muted">Nothing yet.</p>'}</div></div>`;
+  if (tab === 'comm') return `<div class="card"><div class="feed" style="max-height:none">${commentator.lines.map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span><time>${new Date(l.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<p class="muted">Nothing yet.</p>'}</div></div>`;
   return squads(A, { viewer: viewer() });
 }
 
