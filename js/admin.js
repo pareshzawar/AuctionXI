@@ -174,7 +174,9 @@ async function boot() {
   });
 
   $$('#tabs button').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; localStorage.setItem('auctionxi:admintab', tab); render(true); }));
-  $('#panel').addEventListener('focusout', () => setTimeout(() => pendingRender && render(), 0));
+  // Catch up after typing, but not while moving from the jump box to a team button (the click
+  // would land on a redrawn button and be lost).
+  $('#panel').addEventListener('focusout', (e) => setTimeout(() => pendingRender && !e.relatedTarget?.closest?.('[data-bid]') && render(), 0));
   document.addEventListener('keydown', onKey);
   startCountdowns(db.now);
 }
@@ -245,7 +247,10 @@ function setup(el) {
         </div>
         <span class="hint">The value is recorded for next season's mini auction: if the captain or vice-captain is unavailable, it is added to the team's budget along with its remaining purse.</span>
         ${field('Who bids for the team', `<select id="r-bidders">${Object.entries(BIDDERS).map(([k, v]) => `<option value="${k}" ${k === rules.bidders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Vice-captains get their own code under Access and sharing.')}
-        ${field('Who sees remaining purse and max bid', `<select id="r-visibility">${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.purseVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+        ${field('Who sees each team\'s remaining budget', `<select id="r-visibility">${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.purseVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
+        ${field('Who sees each team\'s max bid', `<select id="r-maxvis"><option value="" ${!rules.maxBidVisibility ? 'selected' : ''}>Same as the budget</option>${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.maxBidVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'A captain always sees their own team\'s max bid on their phone.')}
+        <label class="check" style="margin-top:var(--space-2)"><input type="checkbox" id="r-showbid" ${rules.showCurrentBid === false ? '' : 'checked'}> Show the current bid on the stage and audience phones</label>
+        <span class="hint">Off: the room hears the bids, the screens show who is up and then SOLD with the price. Admins and bidding captains always see the bid.</span>
         <p class="notice notice-info" style="margin:var(--space-4) 0 0">${esc(maxBidExplainer(rules).rule)}<br>${esc(maxBidExplainer(rules).example)}</p>
       </div>
       <div class="card wide">
@@ -339,6 +344,8 @@ async function saveSetup() {
     vcPrice: n('#r-vcprice'),
     bidders: $('#r-bidders').value,
     purseVisibility: $('#r-visibility').value,
+    maxBidVisibility: $('#r-maxvis').value,
+    showCurrentBid: $('#r-showbid').checked,
     playersPerSide: n('#r-side') || null,
     overs: n('#r-overs') || null,
     bidTimer: n('#r-timer'),
@@ -1107,7 +1114,13 @@ function control(el) {
         <span class="spacer"></span>
         <button class="btn-sm btn-ghost" id="c-undo">Reverse last sale</button>
       </div>
-      <h3 style="margin-top:var(--space-5)">Record a room bid ${bidding ? `<span class="muted">· next bid ${esc(money(next, rules))}</span>` : ''}</h3>
+      <h3 style="margin-top:var(--space-5)">Bids called out in the hall ${bidding ? `<span class="muted">· next bid ${esc(money(next, rules))}</span>` : ''}</h3>
+      <p class="hint" style="margin-top:0">As the auctioneer calls each bid, press that team (or its number key): the bid goes up one step and the stage, phones and commentary follow.
+        For a jump ("150 from Raigad!"), press <kbd>J</kbd>, type the amount, then press the team; or type <kbd>3 150</kbd> and Enter.</p>
+      <div class="row" style="margin-bottom:var(--space-2)">
+        <input id="c-jump" inputmode="numeric" placeholder="Jump to… (e.g. 150, or 3 150)" style="width:260px" ${bidding ? '' : 'disabled'} autocomplete="off">
+        <small class="muted" id="c-jump-hint"></small>
+      </div>
       <div class="room-bids">${teamIds.map((id, i) => {
         const t = A.teams[id];
         const why = bidding ? bidBlocker(A, id, next) : 'No player on the block';
@@ -1162,7 +1175,34 @@ function control(el) {
     const warn = short.length ? `\n\n${short.length} team(s) have fewer than ${rules.squadSize} players.` : '';
     if (confirm(`End the auction?${warn}`)) await finishAuction(aid);
   }));
-  $$('[data-bid]', el).forEach((b) => (b.onclick = run(() => placeBid(aid, A, b.dataset.bid, 'room'))));
+  // A room bid: one step up, or the amount typed in "Jump to".
+  const jumpBox = $('#c-jump', el);
+  const roomBid = async (team) => {
+    const typed = jumpBox?.value.trim();
+    const amount = typed ? num(typed) : null;
+    if (typed && amount == null) throw new Error(`"${typed}" is not an amount`);
+    await placeBid(aid, A, team, 'room', amount);
+    if (jumpBox) jumpBox.value = '';
+  };
+  $$('[data-bid]', el).forEach((b) => (b.onclick = run(() => roomBid(b.dataset.bid))));
+  if (jumpBox) {
+    jumpBox.oninput = () => {
+      const m = jumpBox.value.trim().match(/^([1-8])\s+(.+)$/);
+      const t = m && A.teams[Object.keys(A.teams)[Number(m[1]) - 1]];
+      $('#c-jump-hint', el).textContent = t && num(m[2]) != null ? `Enter: ${t.name} bids ${money(num(m[2]), A.rules)}` : jumpBox.value.trim() ? 'Now press the team' : '';
+    };
+    jumpBox.onkeydown = run(async (e) => {
+      if (e.key === 'Escape') { jumpBox.value = ''; jumpBox.blur(); return; }
+      if (e.key !== 'Enter') return;
+      const m = jumpBox.value.trim().match(/^([1-8])\s+(.+)$/);
+      if (!m) throw new Error('Type the team number and the amount, e.g. 3 150, or type the amount and press the team');
+      const team = Object.keys(A.teams)[Number(m[1]) - 1];
+      if (!team) throw new Error(`No team ${m[1]}`);
+      jumpBox.value = m[2];
+      await roomBid(team);
+      jumpBox.blur();
+    });
+  }
   $$('[data-mode]', el).forEach((b) => (b.onclick = run(() => db.set(`${P}/rules/bidMode`, b.dataset.mode))));
   $('#r-sell').onclick = run(async () => {
     const team = $('#r-team').value;
@@ -1445,6 +1485,7 @@ function onKey(e) {
   else if (k === 's' && bidding && A.live.bid?.team) run(() => sell(aid, A))();
   else if (k === 'u' && bidding) run(() => markUnsold(aid, A))();
   else if (k === 'z' && bidding) run(() => undoLastBid(aid, A))();
+  else if (k === 'j' && bidding) { e.preventDefault(); $('#c-jump')?.focus(); }
   else if (/^[1-8]$/.test(k) && bidding) {
     const id = Object.keys(A.teams)[Number(k) - 1];
     if (id) run(() => placeBid(aid, A, id, 'room'))();

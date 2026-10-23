@@ -2,7 +2,7 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers, leadersOf } from './engine.js';
+import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, canSeeMaxBid, canSeeBid, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers, leadersOf } from './engine.js';
 import { seasonsOf, teamPast, sameTeam } from './history.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
@@ -43,7 +43,7 @@ export function cardFor(a, pid, variant = 'tile') {
   });
 }
 
-export function livePanel(a, size = '') {
+export function livePanel(a, size = '', viewer = { role: 'admin' }) {
   const live = a.live;
   const p = live && a.players[live.playerId];
   if (!p) return '';
@@ -51,6 +51,7 @@ export function livePanel(a, size = '') {
   const bidding = live.status === 'bidding';
   const timerTotal = (Number(a.rules.bidTimer) || 0) * 1000;
   return bidPanel({
+    hidden: bidding && !canSeeBid(a.rules, viewer),
     size,
     rules: a.rules,
     base: basePrice(p, a.rules),
@@ -64,9 +65,9 @@ export function livePanel(a, size = '') {
 
 // viewer: { role, team } - decides whose remaining purse and max bid are shown.
 export function purses(a, { viewer = null, size = '' } = {}) {
-  const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
+  const leading = a.live?.status === 'bidding' && canSeeBid(a.rules, viewer) ? a.live.bid?.team : null;
   return Object.entries(a.teams).map(([id, t]) =>
-    teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === viewer?.team, hidePurse: !canSeePurse(a.rules, viewer, id) })).join('');
+    teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === viewer?.team, hidePurse: !canSeePurse(a.rules, viewer, id), hideMax: !canSeeMaxBid(a.rules, viewer, id) })).join('');
 }
 
 export function tickerItems(a, limit = 12) {
@@ -116,14 +117,14 @@ export function squadRows(a, teamId) {
 }
 
 export function squads(a, { viewer = null } = {}) {
-  const leading = a.live?.status === 'bidding' ? a.live.bid?.team : null;
+  const leading = a.live?.status === 'bidding' && canSeeBid(a.rules, viewer) ? a.live.bid?.team : null;
   const mine = viewer?.team;
   // The viewer's own team first.
   const ids = Object.keys(a.teams).sort((x, y) => (y === mine) - (x === mine));
   return `<div class="grid grid-2">${ids.map((id) => `
     <div class="stack">
       ${a.teams[id].bannerData ? `<img class="team-banner" src="${esc(a.teams[id].bannerData)}" alt="${esc(a.teams[id].name)}">` : ''}
-      ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading, hidePurse: !canSeePurse(a.rules, viewer, id) })}
+      ${teamPurse(a.teams[id], teamSummary(a, id), a.rules, { variant: 'card', leading: id === leading, hidePurse: !canSeePurse(a.rules, viewer, id), hideMax: !canSeeMaxBid(a.rules, viewer, id) })}
       ${playerTable(squadRows(a, id), a.rules, { dense: true, columns: ['player', 'role', 'price'] })}
     </div>`).join('')}</div>`;
 }
@@ -226,7 +227,9 @@ export function rulesSummary(a) {
     ...(Number(r.maxPlayerPrice) ? [['Price cap per player', money(r.maxPlayerPrice, r)]] : []),
     ['Bidding', r.bidMode === 'room' ? 'Room paddles; the auctioneer records bids' : 'From phones; the auctioneer confirms every sale'],
     ['Timer', Number(r.bidTimer) ? `${r.bidTimer} seconds after each bid` : 'Off'],
-    ['Remaining purse and max bid shown to', PURSE_VISIBILITY[r.purseVisibility]],
+    ['Remaining budget shown to', PURSE_VISIBILITY[r.purseVisibility]],
+    ['Max bid shown to', PURSE_VISIBILITY[r.maxBidVisibility || r.purseVisibility]],
+    ['Current bid on the stage and audience phones', r.showCurrentBid === false ? 'Hidden (bids are called in the room)' : 'Shown'],
   ];
   const house = r.houseRules.filter((h) => h.a);
   return `<div class="grid grid-2">

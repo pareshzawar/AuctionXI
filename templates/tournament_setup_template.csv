@@ -16,7 +16,9 @@ Captain and vice-captain,leaders,Allotted to each team before the auction (capta
 Captain and vice-captain,captain_price,Captain value (not taken from the purse),200,"e.g. 200. Recorded as the captain's value: if the captain is unavailable next season, this amount is added to the team's mini-auction budget"
 Captain and vice-captain,vc_price,Vice-captain value (not taken from the purse),150,e.g. 150. Same as above for the vice-captain. Ignored with captain only
 Captain and vice-captain,bidders,Who bids for the team (captain / captain_vc),captain_vc,"captain = only the captain bids; captain_vc = captain and vice-captain both bid, each with their own code"
-Captain and vice-captain,purse_visibility,Who sees remaining purse and max bid (own / bidders / everyone),own,own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience. Admins always see all
+Captain and vice-captain,purse_visibility,Who sees each team's remaining budget (own / bidders / everyone),own,own = each captain/VC sees only their team; bidders = all captains/VCs see all teams; everyone = also the audience and the stage. Admins always see all
+Captain and vice-captain,max_bid_visibility,Who sees each team's max bid (own / bidders / everyone; blank = same as the budget),,A captain always sees their own team's max bid
+Captain and vice-captain,show_current_bid,Show the current bid on the stage and audience phones? (yes / no),yes,"no = the room hears the bids but the screens show only who is up, until SOLD. Admins and bidding captains always see it"
 Pools,pool_1_id,Pool 1: short ID used in the players CSV,A,"e.g. A. Pool A = the strongest players, then B, C… Pools come up in this order. Leave a whole pool blank if not needed"
 Pools,pool_1_name,Pool 1: name,Pool A,e.g. Pool A
 Pools,pool_1_base_price,Pool 1: base (starting) price,50,e.g. 50

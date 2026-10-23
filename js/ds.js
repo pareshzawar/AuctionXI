@@ -126,6 +126,14 @@ function fitClass(text) {
 // opts: { base, current (undefined before first bid), leading (team), next, status, size, rules, timer: {until, total} }
 export function bidPanel(o) {
   const stage = o.size === 'stage';
+  if (o.hidden) {
+    // The tournament keeps the bidding off the screens: show the player is up, not the amounts.
+    return `<section class="${cx('ax-bidpanel', stage && 'ax-bidpanel-stage')}" aria-live="polite">`
+      + `<div class="ax-bp-head"><span class="ax-k">${o.status === 'live' ? 'Bidding in the hall' : 'Bidding'}</span>${badge(o.status || 'live', { size: stage ? 'lg' : '' })}</div>`
+      + `<div class="ax-bp-lead"><span class="${cx('ax-muted', stage && 'ax-bp-none')}">${o.status === 'live' ? 'Bids are being called in the room' : 'Bidding closed'}</span></div>`
+      + (o.timer?.until ? `<div data-until="${o.timer.until}" data-total="${o.timer.total}" data-size="${o.size || ''}">${countdown(o.timer.total / 1000, o.timer.total / 1000, { size: o.size })}</div>` : '')
+      + `<div class="ax-bp-row"><div class="ax-kv"><span class="ax-k">Base price</span>${price(o.base, o.rules)}</div></div></section>`;
+  }
   const has = o.current != null;
   const shown = has ? o.current : o.base;
   const p = moneyParts(shown, o.rules);
@@ -157,7 +165,7 @@ export function startCountdowns(now) {
   }, 250);
 }
 
-// opts: { variant 'row'|'card', size 'stage', leading, mine, maxBid, hidePurse }
+// opts: { variant 'row'|'card', size 'stage', leading, mine, maxBid, hidePurse, hideMax }
 // hidePurse: the viewer may not see this team's money; show the squad count only.
 export function teamPurse(team, s, rules, o = {}) {
   const purse = Number(s.purse ?? rules.purse) || 0;
@@ -169,7 +177,7 @@ export function teamPurse(team, s, rules, o = {}) {
   if (o.hidePurse) {
     return `<div class="${cx('ax-purse', o.variant === 'card' && 'ax-purse-card', o.size === 'stage' && 'ax-purse-stage', o.leading && 'ax-purse-lead', o.mine && 'is-mine')}" style="${style}">`
       + `<div class="ax-purse-top">${teamBadge(team, { showName: o.size !== 'stage' })}<span class="ax-purse-count">${s.count}/${rules.squadSize}</span></div>`
-      + `<div class="ax-purse-sub"><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span>${flag}</div></div>`;
+      + `<div class="ax-purse-sub"><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span>${flag || (o.hideMax ? '' : `<span>Max ${esc(moneyText(o.maxBid ?? s.maxBid, rules))}</span>`)}</div></div>`;
   }
   if (o.variant === 'card') {
     const roleMin = rules.roleMin || {};
@@ -178,7 +186,7 @@ export function teamPurse(team, s, rules, o = {}) {
       + `<div class="ax-purse-top">${teamBadge(team, { showName: true })}${o.leading ? flag : `<span class="ax-purse-count">${s.count}/${rules.squadSize}</span>`}</div>`
       + '<div class="row" style="gap:var(--space-5);align-items:flex-end">'
       + `<div class="ax-kv"><span class="ax-k">Purse left</span>${price(s.remaining, rules, { size: 'lg' })}</div>`
-      + `<div class="ax-kv"><span class="ax-k">Max bid</span>${price(o.maxBid ?? s.maxBid, rules, { size: 'lg', tone: 'gold' })}</div>`
+      + (o.hideMax ? '' : `<div class="ax-kv"><span class="ax-k">Max bid</span>${price(o.maxBid ?? s.maxBid, rules, { size: 'lg', tone: 'gold' })}</div>`)
       + '</div>'
       + meter
       + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span></div>`
@@ -193,7 +201,7 @@ export function teamPurse(team, s, rules, o = {}) {
   return `<div class="${cx('ax-purse', o.size === 'stage' && 'ax-purse-stage', o.leading && 'ax-purse-lead', o.mine && 'is-mine')}" style="${style}">`
     + `<div class="ax-purse-top">${teamBadge(team, { showName: o.size !== 'stage' })}${price(s.remaining, rules)}</div>`
     + meter
-    + `<div class="ax-purse-sub"><span>${squad}</span>${o.leading ? flag : `<span>Max ${esc(moneyText(s.maxBid, rules))}</span>`}</div>`
+    + `<div class="ax-purse-sub"><span>${squad}</span>${o.leading ? flag : o.hideMax ? '' : `<span>Max ${esc(moneyText(s.maxBid, rules))}</span>`}</div>`
     + '</div>';
 }
 

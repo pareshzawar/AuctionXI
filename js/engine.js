@@ -21,6 +21,8 @@ export const DEFAULT_RULES = {
   bidders: 'captain_vc', // 'captain' | 'captain_vc'
   // Who sees each team's remaining purse and max bid.
   purseVisibility: 'own', // 'own' | 'bidders' | 'everyone'
+  maxBidVisibility: '', // same choices; '' = like purseVisibility
+  showCurrentBid: true, // false: the stage, members and audience don't see the current bid
   maxPlayerPrice: 0, // 0 = no cap
   // Pools (stored as `categories`): Pool A = the strongest players, then B, C... The admin puts
   // each player in a pool. min/max: per-team limits for the pool (0 = none).
@@ -82,7 +84,7 @@ export const PICK_ORDERS = {
 
 export const BID_MODES = {
   both: 'Captains bid from phones (auctioneer can also record room bids)',
-  room: 'Room paddles only (auctioneer records bids or the final amount)',
+  room: 'Verbal / paddles only: bids are called out in the hall and recorded on the laptop (phones watch)',
 };
 
 // Old auctions stored full role names; accept both.
@@ -121,6 +123,17 @@ export const reserves = (rules) => Math.max(0, Number(rules.squadSize) - (Number
 
 // Can this viewer see `teamId`'s remaining purse and max bid?
 // viewer: { role: 'admin' | 'captain' | 'vc' | 'member' | 'audience' | 'screen', team }
+// Max bid has its own setting (maxBidVisibility); until it is set it follows the purse setting.
+export function canSeeMaxBid(rules, viewer, teamId) {
+  return canSeePurse({ ...rules, purseVisibility: rules.maxBidVisibility || rules.purseVisibility }, viewer, teamId);
+}
+// The current bid and who leads: admins and bidders always; the stage, members and audience unless
+// the tournament hides it (showCurrentBid: false), e.g. a verbal auction that keeps the room guessing.
+export function canSeeBid(rules, viewer) {
+  const role = viewer?.role;
+  return rules.showCurrentBid !== false || role === 'admin' || role === 'captain' || role === 'vc';
+}
+
 export function canSeePurse(rules, viewer, teamId) {
   const role = viewer?.role;
   if (role === 'admin' || rules.purseVisibility === 'everyone') return true;

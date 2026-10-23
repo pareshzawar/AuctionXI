@@ -316,8 +316,12 @@ export function log(aid, entry) {
 }
 
 // Captain (or admin on behalf of a team) raises the bid by one increment.
-export async function placeBid(aid, a, team, source = 'phone') {
-  const amount = nextBid(a.live, a.rules);
+// amount: a jump bid called out in the hall ("150!"); by default the next step up.
+export async function placeBid(aid, a, team, source = 'phone', jump = null) {
+  const next = nextBid(a.live, a.rules);
+  const amount = jump != null ? Number(jump) : next;
+  if (!Number.isFinite(amount)) throw new Error('Enter an amount');
+  if (amount < next) throw new Error(`The next bid must be at least ${money(next, a.rules)}`);
   const why = bidBlocker(a, team, amount);
   if (why) throw new Error(why);
   const timer = Number(a.rules.bidTimer) || 0;
