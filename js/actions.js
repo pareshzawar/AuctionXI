@@ -411,6 +411,56 @@ export async function markUnsold(aid, a) {
   await log(aid, { type: 'unsold', playerId: live.playerId });
 }
 
+// Undo any sale (admins only: the database lets only admins change sales). The player goes back to
+// the pool, to come up again; the team gets the money back.
+export async function undoSale(aid, a, pid) {
+  const s = a.sales[pid];
+  if (!s || s.allotted || s.retained) throw new Error('That player was not bought in the auction');
+  const sales = { ...a.sales };
+  delete sales[pid];
+  await db.update(`auctions/${aid}`, {
+    [`sales/${pid}`]: null,
+    ...(a.live?.playerId === pid ? { live: null } : {}),
+    ...capsUpdate({ ...a, sales }),
+  });
+  await log(aid, { type: 'undo', playerId: pid, team: s.team, amount: s.price });
+}
+
+// Change the team and / or price of any sale. Returns a warning (and changes nothing) when a rule
+// would be broken, unless `force`: the admin may know better (a mistake typed in the hall).
+export async function editSale(aid, a, pid, { team, price }, force = false) {
+  const s = a.sales[pid];
+  const p = a.players[pid];
+  if (!s || s.allotted || s.retained || !p) throw new Error('That player was not bought in the auction');
+  if (!a.teams[team]) throw new Error('Choose the team');
+  const amount = Number(price);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter the price');
+  if (team === s.team && amount === Number(s.price)) return null;
+  const without = { ...a, sales: Object.fromEntries(Object.entries(a.sales).filter(([k]) => k !== pid)), live: null };
+  const lim = bidLimit(without, team, p);
+  const warn = [];
+  if (amount < basePrice(p, a.rules)) warn.push(`below ${p.name}'s base price of ${money(basePrice(p, a.rules), a.rules)}`);
+  if (amount > lim.max) warn.push(`over what ${a.teams[team].name} can pay (${money(lim.max, a.rules)}${lim.why ? `: ${lim.why}` : ''})`);
+  if (warn.length && !force) return `This sale would be ${warn.join(' and ')}.`;
+  const sale = { ...s, team, price: amount, editedAt: db.now(), was: { team: s.team, price: Number(s.price) } };
+  await db.update(`auctions/${aid}`, {
+    [`sales/${pid}`]: sale,
+    ...capsUpdate({ ...a, sales: { ...a.sales, [pid]: sale } }),
+  });
+  await log(aid, { type: 'edit', playerId: pid, team, amount, fromTeam: s.team, fromAmount: Number(s.price) });
+  return null;
+}
+
+// The countdown after each bid is only shown, never acted on: the auctioneer always closes the
+// bidding. It can be switched off and on during the auction (the seconds are remembered).
+export async function setTimer(aid, a, on) {
+  const secs = Number(a.rules.bidTimer) || 0;
+  const upd = on
+    ? { 'rules/bidTimer': secs || Number(a.rules.bidTimerWas) || 30 }
+    : { 'rules/bidTimer': 0, 'rules/bidTimerWas': secs || Number(a.rules.bidTimerWas) || 30, ...(a.live?.status === 'bidding' ? { 'live/bid/until': null } : {}) };
+  await db.update(`auctions/${aid}`, upd);
+}
+
 export async function undoLastSale(aid, a) {
   const last = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained).sort((x, y) => y[1].at - x[1].at)[0];
   if (!last) throw new Error('No sale to undo');

@@ -49,7 +49,8 @@ export function auctionRows(a) {
   }
   // Keep only sales that still stand (the log and the sales must agree).
   const sold = (r) => r.team && a.sales?.[r.pid] && !a.sales[r.pid].allotted && !a.sales[r.pid].retained;
-  const out = rows.filter((r) => !r.team || sold(r));
+  // A sale corrected later (Edit sale) shows its current team and price.
+  const out = rows.filter((r) => !r.team || sold(r)).map((r) => (r.team ? { ...r, team: a.teams[a.sales[r.pid].team]?.name || r.team, price: Number(a.sales[r.pid].price) || r.price } : r));
   out.filter((r) => r.team).forEach((r) => seen.add(r.pid));
   for (const [pid, sale] of Object.entries(a.sales || {}).sort((x, y) => (x[1].at || 0) - (y[1].at || 0))) {
     if (sale.allotted || sale.retained || seen.has(pid) || !a.players?.[pid]) continue;
