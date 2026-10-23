@@ -34,6 +34,30 @@ const sheetName = (name, used) => {
   return n;
 };
 
+// What has happened so far, as Auction rows in order: [player, team, price] for a sale and
+// [player, '', ''] for unsold. Built from the log (an undone sale drops out); sales the log doesn't
+// know about are added at the end, so nothing sold is ever missing.
+export function auctionRows(a) {
+  const rows = [];
+  const seen = new Set();
+  for (const e of Object.values(a.log || {}).sort((x, y) => x.at - y.at)) {
+    const p = a.players?.[e.playerId];
+    if (!p) continue;
+    if (e.type === 'sold') rows.push({ pid: e.playerId, name: p.name, team: a.teams[e.team]?.name || '', price: Number(e.amount) || 0 });
+    else if (e.type === 'unsold') rows.push({ pid: e.playerId, name: p.name, team: '', price: '' });
+    else if (e.type === 'undo') { const i = rows.map((r) => r.pid).lastIndexOf(e.playerId); if (i >= 0) rows.splice(i, 1); }
+  }
+  // Keep only sales that still stand (the log and the sales must agree).
+  const sold = (r) => r.team && a.sales?.[r.pid] && !a.sales[r.pid].allotted && !a.sales[r.pid].retained;
+  const out = rows.filter((r) => !r.team || sold(r));
+  out.filter((r) => r.team).forEach((r) => seen.add(r.pid));
+  for (const [pid, sale] of Object.entries(a.sales || {}).sort((x, y) => (x[1].at || 0) - (y[1].at || 0))) {
+    if (sale.allotted || sale.retained || seen.has(pid) || !a.players?.[pid]) continue;
+    out.push({ pid, name: a.players[pid].name, team: a.teams[sale.team]?.name || '', price: Number(sale.price) || 0 });
+  }
+  return out;
+}
+
 // ExcelJS is passed in: the browser loads vendor/exceljs.min.js, the checks use the npm package.
 // opts.placeholders: rule keys (purse, squadSize, playersPerSide) still to be decided; marked in red.
 export function buildTracker(ExcelJS, auction, opts = {}) {
@@ -51,7 +75,8 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
   const leader = (tid, as) => all.find(([, p]) => p.allottedTeam === tid && p.allottedAs === as)?.[1]?.name || '';
   const kept = (tid) => all.filter(([, p]) => p.allottedTeam === tid && p.allottedAs === 'R');
   const POOL_ROWS = Math.max(pool.length + 30, 100); // room to add names in Excel
-  const LOTS = Math.max(pool.length * 3, 150);
+  const done = auctionRows(a); // sales and unsold players so far, when downloaded mid-auction
+  const LOTS = Math.max(pool.length * 3, done.length + pool.length * 2, 150);
   const slabs = [...r.increments].sort((x, y) => (x.upto || Infinity) - (y.upto || Infinity));
   const from = slabs.map((s, i) => (i === 0 ? 0 : Number(slabs[i - 1].upto) || 0));
   const TS = ref('Teams Summary');
@@ -75,6 +100,7 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
   [
     [`${a.meta.name || 'Auction'}: offline tracker`, { bold: true, size: 16 }],
     [[a.meta.tournament, a.meta.season && `Season ${a.meta.season}`, a.meta.date, a.meta.time, a.meta.venue].filter(Boolean).join(' · ')],
+    ...(done.length ? [[`Downloaded from the app on ${new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} with ${done.filter((r) => r.team).length} sold and ${done.filter((r) => !r.team).length} unsold so far (Auction, rows 2-${done.length + 1}). To carry on by hand, type the next player in row ${done.length + 2}.`, { bold: true, color: { argb: 'FFB45309' } }]] : []),
     [''],
     ['Run the auction by hand, or follow along beside the app. No internet needed.', { bold: true }],
     ['Auction: one row per player brought up. Pick the Player Name and, if sold, the Winning Team and the Sold Price. STATUS fills in by itself.'],
@@ -207,6 +233,12 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
     [' ', 2], [' ', 2], [' ', 2], [' ', 2], [' ', 2], [' ', 2], [' ', 2], ['key', 4], ['squad key', 4], ['left before', 4], ['to buy before', 4]]);
   for (let n = 2; n <= LOTS + 1; n++) {
     const p = n - 1;
+    const row = done[n - 2];
+    if (row) {
+      K.getCell(`A${n}`).value = row.name;
+      if (row.team) { K.getCell(`B${n}`).value = row.team; K.getCell(`C${n}`).value = row.price; }
+      K.getCell(`O${n}`).value = 'app';
+    }
     K.getCell(`A${n}`).dataValidation = { type: 'list', allowBlank: true, formulae: [names], showErrorMessage: false };
     K.getCell(`B${n}`).dataValidation = { type: 'list', allowBlank: true, formulae: [teamNames] };
     K.getCell(`D${n}`).value = f(`IF(A${n}="","",IF(AND(B${n}<>"",N(C${n})>0),"SOLD","UNSOLD"))`);
@@ -215,10 +247,11 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
     K.getCell(`R${n}`).value = f(`IF(B${n}="","",IFERROR(INDEX(${TS}!$F:$F,MATCH(B${n},${TS}!$A:$A,0))-SUMIFS(C$1:C${p},B$1:B${p},B${n},D$1:D${p},"SOLD",H$1:H${p},"OK"),""))`);
     K.getCell(`S${n}`).value = f(`IF(B${n}="","",IFERROR(Rules!$B$5-INDEX(${TS}!$O:$O,MATCH(B${n},${TS}!$A:$A,0))-COUNTIFS(B$1:B${p},B${n},D$1:D${p},"SOLD",H$1:H${p},"OK"),""))`);
     K.getCell(`G${n}`).value = f(`IF(OR(B${n}="",R${n}=""),"",IF(S${n}<=0,0,MAX(0,MIN(R${n},R${n}-(S${n}-1)*Rules!$B$10,IF(Rules!$B$9>0,Rules!$B$9,R${n})))))`);
-    K.getCell(`H${n}`).value = f(`IF(A${n}="","",IF(COUNTIFS(A$1:A${p},A${n},D$1:D${p},"SOLD",H$1:H${p},"OK")>0,"Already sold in an earlier row",`
+    // Rows filled from the app (hidden O = "app") are what really happened: they always count.
+    K.getCell(`H${n}`).value = f(`IF(A${n}="","",IF($O${n}="app","OK",IF(COUNTIFS(A$1:A${p},A${n},D$1:D${p},"SOLD",H$1:H${p},"OK")>0,"Already sold in an earlier row",`
       + `IF(D${n}="UNSOLD",IF(OR(B${n}<>"",C${n}<>""),"Sold? Enter both the team and the price","OK"),`
       + `IF(C${n}<E${n},"Below the base price",IF(S${n}<=0,"Squad already full",IF(C${n}>G${n},"Over the team's max bid of "&G${n},`
-      + `IF(AND(COUNTIF(Ladder!$A:$A,C${n})=0,C${n}<>E${n}),"Not a valid bid step","OK")))))))`);
+      + `IF(AND(COUNTIF(Ladder!$A:$A,C${n})=0,C${n}<>E${n}),"Not a valid bid step","OK"))))))))`);
     K.getCell(`P${n}`).value = f(`IF(A${n}="","",A${n}&"|"&IF(H${n}="OK",D${n},"check"))`);
     K.getCell(`Q${n}`).value = f(`IF(AND(D${n}="SOLD",H${n}="OK"),B${n}&"#"&COUNTIFS(B$2:B${n},B${n},D$2:D${n},"SOLD",H$2:H${n},"OK"),"")`);
     for (const col of 'ABC') K.getCell(`${col}${n}`).fill = fill(INPUT);
@@ -353,6 +386,19 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
 }
 
 // In the browser: load the bundled ExcelJS once and download the workbook.
+// Load the Excel library ahead of time (the control room does this once the auction is live), so a
+// tracker can still be made if the internet drops later.
+export async function preloadExcel() {
+  if (window.ExcelJS) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = new URL('../vendor/exceljs.min.js', import.meta.url).href;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the Excel library'));
+    document.head.append(s);
+  });
+}
+
 export async function downloadTracker(auction, fileName) {
   if (!window.ExcelJS) {
     await new Promise((resolve, reject) => {

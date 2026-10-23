@@ -12,6 +12,7 @@ import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl,
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
 import { seasonsOf } from './history.js';
+import { armSound, soundReady, gavel, confetti } from './celebrate.js';
 
 const aid = (param('a') || '').toUpperCase();
 const stage = param('screen') === '1';
@@ -95,6 +96,7 @@ async function boot() {
 /* ---------------- stage ---------------- */
 
 // A board of players longer than one screen turns its pages every 10 seconds.
+armSound(() => { if (stage && A) renderStage(); });
 let boardPage = 0;
 if (stage) setInterval(() => { if (A?.meta.stageView?.type === 'list') { boardPage++; renderStage(); } }, 10000);
 
@@ -148,6 +150,7 @@ function renderStage() {
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
+      ${A.meta.sfx !== false && !soundReady() ? '<div class="stage-sound-hint">Click anywhere once to turn on the gavel sound</div>' : ''}
       ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm${commIsNew('stage')}"><span class="stage-label"><span class="comm-mic"></span>Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
       <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
@@ -331,6 +334,15 @@ function showResult() {
     amount: sold ? live.bid.amount : null, rules: A.rules, size: stage ? '' : 'ui',
   })}</div>`;
   if (!stage && sold && live.bid.team === myTeam) navigator.vibrate?.(120);
+  // Gavel and confetti (Control room → "Gavel and confetti on SOLD"); phones play the gavel only
+  // when they have the commentary read aloud.
+  if (sold && A.meta.sfx !== false) {
+    const t = A.teams[live.bid.team];
+    const others = Object.entries(A.sales).filter(([pid, x]) => pid !== live.playerId && !x.allotted && !x.retained).map(([, x]) => Number(x.price) || 0);
+    const record = others.length > 0 && Number(live.bid.amount) > Math.max(...others);
+    confetti({ colors: [t?.color || '#f2b84b'], count: stage ? 160 : 70, big: record });
+    if (stage || voice.on) gavel({ record });
+  }
   setTimeout(() => { $('#overlay').innerHTML = ''; }, sold ? 4000 : 3000);
 }
 

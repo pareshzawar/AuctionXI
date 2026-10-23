@@ -235,3 +235,15 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
     && past?.finish === 'Champion' && past.won === 3 && H.sameTeam('Lakeview Lions', 'Lakevew Lions') && !H.sameTeam('Rockport Rangers', 'Rockford Yetis'),
   `past seasons: champion ${past?.finish}, top buy ${h.auction.topBuys[0]?.price}, MVP ${h.top.mvp[0]?.name}`);
 }
+{
+  // Offline pack: the tracker's Auction rows follow the log; an undone sale drops out; nothing sold is missing.
+  const { auctionRows } = await import(root + '/js/tracker.js');
+  const a = E.normalize({ meta: {}, rules: {}, teams: { T1: { name: 'One' }, T2: { name: 'Two' } },
+    players: { P1: { name: 'A' }, P2: { name: 'B' }, P3: { name: 'C' }, P4: { name: 'D' } },
+    sales: { P1: { team: 'T1', price: 80, at: 10 }, P3: { team: 'T2', price: 120, at: 60 }, P4: { team: 'T2', price: 50, at: 70 } },
+    log: { a: { type: 'sold', playerId: 'P1', team: 'T1', amount: 80, at: 10 }, b: { type: 'unsold', playerId: 'P2', at: 20 },
+      c: { type: 'sold', playerId: 'P3', team: 'T1', amount: 100, at: 30 }, d: { type: 'undo', playerId: 'P3', team: 'T1', at: 40 },
+      e: { type: 'sold', playerId: 'P3', team: 'T2', amount: 120, at: 60 } } });
+  const rows = auctionRows(a).map((r) => `${r.name}:${r.team || '-'}:${r.price}`).join(',');
+  ok(rows === 'A:One:80,B:-:,C:Two:120,D:Two:50', `offline pack rows: ${rows}`);
+}
