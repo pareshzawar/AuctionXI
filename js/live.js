@@ -95,6 +95,24 @@ async function boot() {
 let boardPage = 0;
 if (stage) setInterval(() => { if (A?.meta.stageView?.type === 'list') { boardPage++; renderStage(); } }, 10000);
 
+// Commentary animates only when a new line arrives, plus one gold shine every 90 seconds.
+const COMM_SHINE = 90000;
+let commSeen = { stage: null, phone: null };
+const commIsNew = (where) => {
+  const l = commentator.lines[0];
+  const key = l ? `${l.at}|${l.text}` : null;
+  const fresh = key && commSeen[where] !== null && key !== commSeen[where];
+  if (commSeen[where] === null || key) commSeen[where] = key || '';
+  return fresh ? ' is-new' : '';
+};
+setInterval(() => {
+  const el = document.querySelector('.stage-comm');
+  if (!el || document.hidden) return;
+  el.classList.remove('is-shine');
+  void el.offsetWidth;
+  el.classList.add('is-shine');
+}, COMM_SHINE);
+
 function renderStage() {
   const { meta, live, rules } = A;
   const { lot, total } = lotInfo(A);
@@ -125,7 +143,7 @@ function renderStage() {
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
-      ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm"><span class="stage-label">Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
+      ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm${commIsNew('stage')}"><span class="stage-label"><span class="comm-mic"></span>Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
       <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
     </div></div>`;
@@ -191,7 +209,7 @@ function renderPhone() {
       <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
       ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
-      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
+      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l, i) => `<div${i ? '' : ` class="comm-latest${commIsNew('phone')}"`}>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
