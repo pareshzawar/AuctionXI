@@ -1,4 +1,6 @@
 import { db, isLocal } from './db.js';
+import { qrSvg } from './qr.js';
+import { historyFromRecord, seasonsOf } from './history.js';
 import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, searchPlayers, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
@@ -21,7 +23,7 @@ import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { downloadTracker } from './tracker.js';
 import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
-import { watchMedia, applyMedia, setPlayerPhoto, setBrand, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
+import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -150,7 +152,7 @@ const numIn = (id, v) => `<input id="${id}" inputmode="numeric" value="${esc(v ?
 function setup(el) {
   const { meta, rules } = A;
   const house = Object.fromEntries(rules.houseRules.map((h) => [h.key, h.a]));
-  el.innerHTML = `${brandingCard()}<div class="card" id="ai-card" style="margin-bottom:var(--space-4)"></div>
+  el.innerHTML = `${brandingCard()}${pastSeasonsCard()}<div class="card" id="ai-card" style="margin-bottom:var(--space-4)"></div>
     <div class="card" style="margin-bottom:var(--space-4)">
       <div class="section-title"><h2>Fill the setup from a questionnaire</h2></div>
       <p>Every tournament is different. Download the questionnaire (it already has this auction's current answers), fill in the
@@ -228,6 +230,7 @@ function setup(el) {
         ${field('Order players come up', `<select id="r-order">${Object.entries(PICK_ORDERS).map(([k, v]) => `<option value="${k}" ${k === rules.pickOrder ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Allotted captains and vice-captains are never auctioned.')}
         <label class="check" style="margin-top:var(--space-3)"><input type="checkbox" id="r-comm" ${rules.commentary === false ? '' : 'checked'}> Live commentary on the stage, phones and here</label>
         ${field('Commentary language', `<select id="r-commlang">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === rules.commentaryLang ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'The default for this tournament. Every phone can switch for itself.')}
+        ${field('Commentary humour', `<select id="r-humour"><option value="high" ${rules.humour !== 'normal' ? 'selected' : ''}>High: punchlines and jokes</option><option value="normal" ${rules.humour === 'normal' ? 'selected' : ''}>Normal: just the facts</option></select>`, 'Jokes are about the auction and the money, never about a person.')}
       </div>
       <div class="card">
         <h2>House rules</h2>
@@ -239,6 +242,7 @@ function setup(el) {
     <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="save-setup">Save setup</button></p>`;
 
   wireBranding(el);
+  wirePastSeasons(el);
   aiSettingsCard($('#ai-card', el));
   $('#add-cat').onclick = () => $('#cats').insertAdjacentHTML('beforeend', catRow({ id: '', label: '', base: '', min: '', max: '' }));
   $('#add-inc').onclick = () => $('#incs').insertAdjacentHTML('beforeend', incRow({ upto: '', step: '' }));
@@ -294,6 +298,7 @@ async function saveSetup() {
     pickOrder: $('#r-order').value,
     commentary: $('#r-comm').checked,
     commentaryLang: $('#r-commlang').value,
+    humour: $('#r-humour').value,
     bidMode: $('#r-mode').value,
     roleMin: Object.fromEntries(Object.keys(ROLES).map((k) => [k, n(`#role-${k}`)])),
     categories,
@@ -364,7 +369,9 @@ function teams(el) {
       <datalist id="player-names">${Object.values(A.players).map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
       <span class="hint">Only the name is required. Three-letter codes appear on the stage and phones. Type the captain${hasVC(A.rules) ? ' and vice-captain' : ''} here or in the teams CSV:
         they are matched to the player list, and anyone not in it yet is added, allotted to the team and never auctioned. Each team gets secret codes under Access and sharing.</span>
-    </div>`;
+    </div>
+    ${entries.length ? teamBannersCard(entries) : ''}`;
+  wireTeamBanners(el);
 
   $('#t-template').onclick = () => download('teams_template.csv', teamTemplate());
   $('#t-add').onclick = run(async () => {
@@ -655,6 +662,37 @@ async function aiScouting() {
 
 const fileButton = (label, attrs, multiple = false) => `<label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">${label}<input type="file" accept="image/*" ${attrs} ${multiple ? 'multiple' : ''} hidden></label>`;
 
+// Past seasons: the record of an earlier season (an AuctionXI record file, optionally with its
+// results) is summarised and kept in this auction, for phones and the stage (js/history.js).
+function pastSeasonsCard() {
+  const seasons = seasonsOf(A);
+  return `<div class="card" style="margin-bottom:var(--space-4)">
+    <div class="section-title"><h2>Past seasons</h2><small class="muted">optional · team records and top performers</small><span class="spacer"></span>
+      <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Add a season's record<input type="file" accept=".json,application/json" id="hs-upload" hidden></label></div>
+    ${seasons.length ? `<ul class="stack" style="list-style:none;padding:0;margin:0;gap:var(--space-2)">${seasons.map((h) => `<li class="row"><b>Season ${esc(h.season)}</b>
+      <small class="muted">${esc([h.champion && `Champion ${h.champion}`, `${h.auction?.teams?.length || 0} teams`, `${h.auction?.sold || 0} players sold`, h.standings?.length ? 'standings' : '', h.top?.mvp?.length ? 'top performers' : ''].filter(Boolean).join(' · '))}</small>
+      <span class="spacer"></span><button class="btn-sm btn-ghost" data-hs-del="${esc(h.season)}">Remove</button></li>`).join('')}</ul>`
+      : '<p class="muted" style="margin:0">None yet.</p>'}
+    <span class="hint">Use the record file of an earlier season (Results → Download JSON, or a past auction you added as a record). Add a <code>results</code> block for the standings, knockouts and top performers; see README. Phones get a Past seasons tab, and the control room can put a season or a team's profile on the stage.</span>
+  </div>`;
+}
+
+function wirePastSeasons(el) {
+  $('#hs-upload', el).onchange = run(async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    let rec;
+    try { rec = JSON.parse(await readFile(f)); } catch { throw new Error('That file is not JSON'); }
+    const h = historyFromRecord(rec);
+    if (!h.season) throw new Error('The record has no season number (meta.season)');
+    await db.set(`${P}/history/s${h.season.replace(/[^A-Za-z0-9]/g, '')}`, h);
+    toast(`Season ${h.season} added${h.standings.length ? ', with standings' : ''}${h.top.mvp.length ? ' and top performers' : ''}`, 'ok');
+  });
+  $$('[data-hs-del]', el).forEach((b) => (b.onclick = run(async () => {
+    if (confirm(`Remove season ${b.dataset.hsDel} from this auction?`)) await db.set(`${P}/history/s${b.dataset.hsDel.replace(/[^A-Za-z0-9]/g, '')}`, null);
+  })));
+}
+
 function brandingCard() {
   const m = A.media || {};
   return `<div class="card" style="margin-bottom:var(--space-4)">
@@ -676,6 +714,48 @@ function brandingCard() {
       </div>
     </div>
   </div>`;
+}
+
+// A banner per team (the team's poster or logo strip): shown on its squad on phones, on the stage
+// when the team is shown, and with its past seasons.
+function teamBannersCard(entries) {
+  return `<div class="card" style="margin-top:var(--space-4)">
+    <div class="section-title"><h2>Team banners</h2><small class="muted">optional · any shape, nothing is cropped</small><span class="spacer"></span>
+      ${fileButton('Upload many', 'id="tb-bulk"', true)}</div>
+    <div class="grid grid-2">${entries.map(([id, t]) => `
+      <div class="row" style="gap:var(--space-3);align-items:center">
+        <span class="team-banner-thumb" style="border-left:4px solid ${esc(t.color || '#888')}">${t.bannerData ? `<img src="${esc(t.bannerData)}" alt="">` : '<small class="muted">No banner</small>'}</span>
+        <span style="flex:1;min-width:0"><b>${esc(t.name)}</b><br><small class="muted">${esc(t.short || id)}</small></span>
+        ${fileButton(t.bannerData ? 'Change' : 'Upload', `data-tbanner="${esc(id)}"`)}${t.bannerData ? `<button class="btn-sm btn-ghost" data-tbanner-del="${esc(id)}">Remove</button>` : ''}
+      </div>`).join('')}</div>
+    <span class="hint">Upload many at once: name each file by the team's code (TIG.jpg), ID (T5.jpg) or name (Rockport Rangers.jpg).</span>
+  </div>`;
+}
+
+function wireTeamBanners(el) {
+  $$('[data-tbanner]', el).forEach((inp) => (inp.onchange = run(async (e) => {
+    e.stopPropagation();
+    const f = inp.files[0]; inp.value = '';
+    if (f) { await setTeamBanner(aid, inp.dataset.tbanner, await resizeImage(f, BANNER)); toast(`Banner saved for ${A.teams[inp.dataset.tbanner]?.name}`, 'ok'); }
+  })));
+  $$('[data-tbanner-del]', el).forEach((b) => (b.onclick = run(async (e) => {
+    e.stopPropagation();
+    if (confirm(`Remove the banner of ${A.teams[b.dataset.tbannerDel]?.name}?`)) await setTeamBanner(aid, b.dataset.tbannerDel, null);
+  })));
+  const bulk = $('#tb-bulk', el);
+  if (bulk) bulk.onchange = run(async (e) => {
+    e.stopPropagation();
+    const files = [...bulk.files]; bulk.value = '';
+    const key = (s) => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]/g, '');
+    let n = 0; const missed = [];
+    for (const f of files) {
+      const k = key(f.name);
+      const hit = Object.entries(A.teams).find(([id, t]) => [id, t.short, t.name].some((x) => x && key(x) === k));
+      if (!hit) { missed.push(f.name); continue; }
+      await setTeamBanner(aid, hit[0], await resizeImage(f, BANNER)); n++;
+    }
+    toast(`${n} team banner${n === 1 ? '' : 's'} saved${missed.length ? `; not matched: ${missed.join(', ')}` : ''}`, missed.length ? 'error' : 'ok');
+  });
 }
 
 function wireBranding(el) {
@@ -769,6 +849,7 @@ function access(el) {
             ${field('Stage screen (projector)', `<input readonly value="${esc(screenUrl)}" onclick="this.select()">`)}
           </div>
         </div>
+        <p class="row" style="margin-bottom:0"><a class="btn btn-sm" href="${esc(pageUrl('poster.html', { a: aid }))}" target="_blank" rel="noopener">Print QR poster</a><small class="muted">A4 or A3 for the club house: banner, date, venue and a big QR code to join.</small></p>
       </div>
       <div class="card">
         <h2>Admin code</h2>
@@ -812,7 +893,7 @@ function access(el) {
       </div>
     </div>`;
 
-  if (window.QRCode) new window.QRCode($('#qr'), { text: joinUrl, width: 150, height: 150 });
+  $('#qr').innerHTML = qrSvg(joinUrl);
   $$('[data-vis]', el).forEach((b) => (b.onclick = run(async () => {
     if (b.dataset.vis === 'listed' && !confirm('List this auction on the AuctionXI home page? Anyone who opens the site can watch it (purses and codes stay private).')) return;
     await setVisibility(aid, A.meta, b.dataset.vis);
@@ -1055,13 +1136,17 @@ function stagePanel(bidding) {
   const { available, waiting } = profileGroups(A);
   const v = A.meta.stageView;
   const now = v?.type === 'list' ? (v.which === 'waiting' ? 'the waiting list' : 'the players up for auction')
-    : v?.type === 'player' ? `${A.players[v.id]?.name || 'a player'}'s profile` : (bidding ? 'the bidding' : 'the auction');
+    : v?.type === 'player' ? `${A.players[v.id]?.name || 'a player'}'s profile`
+    : v?.type === 'history' ? `season ${v.season}` : v?.type === 'team' ? `${A.teams[v.id]?.name || 'a team'}'s profile` : (bidding ? 'the bidding' : 'the auction');
+  const seasons = seasonsOf(A);
   return `<div class="card" style="margin-top:var(--space-4)">
     <div class="section-title"><h2 style="margin:0">On the stage</h2><small>Now showing ${esc(now)}</small><span class="spacer"></span>
       ${v ? '<button class="btn-sm btn-primary" id="sv-back">Back to the auction</button>' : ''}</div>
     <p class="row">
       <button class="btn-sm" data-sv="available" ${bidding ? 'disabled title="Finish the player on the block first"' : ''}>Show players up for auction (${available.length})</button>
       <button class="btn-sm" data-sv="waiting" ${bidding || !waiting.length ? 'disabled' : ''}>Show the waiting list (${waiting.length})</button>
+      ${seasons.map((h) => `<button class="btn-sm" data-svh="${esc(h.season)}" ${bidding ? 'disabled' : ''}>Season ${esc(h.season)} record</button>`).join('')}
+      <select id="sv-team" style="width:auto" ${bidding ? 'disabled' : ''}><option value="">A team's profile…</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}">${esc(t.name)}</option>`).join('')}</select>
     </p>
     <div style="max-width:560px">
       <input id="sv-search" placeholder="Show a player's profile: type the name, the number, or both" autocomplete="off" ${bidding ? 'disabled' : ''}>
@@ -1074,6 +1159,8 @@ function stagePanel(bidding) {
 function wireStagePanel(el) {
   const set = run((view) => db.set(`${P}/meta/stageView`, view));
   $$('[data-sv]', el).forEach((b) => (b.onclick = () => set({ type: 'list', which: b.dataset.sv })));
+  $$('[data-svh]', el).forEach((b) => (b.onclick = () => set({ type: 'history', season: b.dataset.svh })));
+  if ($('#sv-team', el)) $('#sv-team', el).onchange = (e) => { if (e.target.value) set({ type: 'team', id: e.target.value }); };
   const input = $('#sv-search', el);
   if (input) {
     const { available, waiting } = profileGroups(A);

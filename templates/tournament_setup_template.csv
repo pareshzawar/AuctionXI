@@ -68,6 +68,7 @@ Bidding,bid_timer_seconds,"Countdown after each bid, in seconds (0 = off)",30,e.
 Bidding,pick_order,Order players come up (category-random / random / category-sequence / manual),category-random,"category-random = random draw, Pool A first. The control room can always also draw from one pool or bring up a chit"
 Bidding,live_commentary,Show live commentary on the stage and phones? (yes / no),yes,Generated from the auction itself; it can also be read aloud on any device
 Bidding,commentary_language,Commentary language (english / hinglish / marathi),english,Each phone can still switch for itself
+Bidding,commentary_humour,Commentary humour (high / normal),high,high = punchlines and jokes about the auction and the money; normal = just the facts
 Bidding,unsold_rounds,How many times unsold players come back for another round,1,e.g. 1
 House rules,hr_eligibility,Who can register to play?,,"e.g. Residents of the society only, age 16+, max 2 guest players per team"
 House rules,hr_captains,How are captains and vice-captains chosen?,,"e.g. Chosen by the sports committee. Their prices are set above; mark them in the players CSV (allotted_team, allotted_as)"

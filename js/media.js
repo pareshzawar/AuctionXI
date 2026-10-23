@@ -21,11 +21,13 @@ export function applyMedia(a, m) {
   if (!a) return a;
   a.media = m || {};
   for (const [pid, p] of Object.entries(a.players)) p.photoData = a.media.players?.[pid] || null;
+  for (const [tid, t] of Object.entries(a.teams || {})) t.bannerData = a.media.teams?.[tid] || null;
   return a;
 }
 
 export const setPlayerPhoto = (aid, pid, data) => db.set(`media/${aid}/players/${pid}`, data || null);
 export const setBrand = (aid, key, data) => db.set(`media/${aid}/${key}`, data || null);
+export const setTeamBanner = (aid, tid, data) => db.set(`media/${aid}/teams/${tid}`, data || null);
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {

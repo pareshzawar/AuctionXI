@@ -143,6 +143,7 @@ export async function importAuction(snap) {
     sales: snap.sales || null,
     unsold: snap.unsold || null,
     log: snap.log || null,
+    results: snap.results || null, // how the season went (js/history.js)
   });
   const codes = { teamCodes: {}, vcCodes: {} };
   for (const id of Object.keys(teams)) { codes.teamCodes[id] = randomCode(6); codes.vcCodes[id] = randomCode(6); }
@@ -390,5 +391,5 @@ export function exportSnapshot(a) {
   const { meta, rules, teams, players, sales, unsold, log: history } = a;
   const { ownerUid, ...publicMeta } = meta;
   const plain = Object.fromEntries(Object.entries(players).map(([id, { photoData, ...p }]) => [id, p]));
-  return { format: 'auctionxi/1', exportedAt: new Date().toISOString(), meta: publicMeta, rules, teams, players: plain, sales, unsold, log: history, media: a.media || null };
+  return { format: 'auctionxi/1', exportedAt: new Date().toISOString(), meta: publicMeta, rules, teams, players: plain, sales, unsold, log: history, ...(a.results ? { results: a.results } : {}), media: a.media || null };
 }

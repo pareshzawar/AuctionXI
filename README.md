@@ -21,7 +21,7 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 🧢 **Captain & vice-captain** | Allotted to their team before the auction with a value (e.g. ₹200 / ₹150) that is *not* taken from the purse. It's their budget for next season's mini auction if they're unavailable. Captain-only tournaments too. Choose whether only the captain or both can bid |
 | 🪑 **Squad size with reserves** | E.g. 8-a-side with squads of 10: every team must buy exactly 10. Max bid = purse left − (players still to buy − 1) × base price |
 | 🎲 **Pools, random draw or chits** | Players are grouped by role (BAT / BOWL / AR / WK) and pool (Pool A = strongest, B, C…). Next player by a built-in random draw (pool by pool, or from one pool or role), or draw a chit in the hall and search by name, player number or both (e.g. `24 arjun`). The stage profile picker and the phones' Players tab search the same way |
-| 🎙️ **Live commentary** | In English, Hinglish or Marathi, written from the auction itself: player intros with pool, role and stats, opening bids, bidding wars, record prices, sales and squad progress. On the stage, phones and console; any device can read it aloud with the browser's own voice (free, no AI service). Keeps purses private |
+| 🎙️ **Live commentary** | In English, Hinglish or Marathi, written from the auction itself: player intros with pool, role and stats, opening bids, bidding wars, record prices, sales and squad progress, with **punchlines** (humour *high* by default, or *normal* for just the facts; jokes are about the auction and the money, never a person). The stage shows it in a gold box that animates when a new line arrives and every 90 seconds. On the stage, phones and console; any device can read it aloud with the browser's own voice (free, no AI service). Keeps purses private |
 | 🔐 **Private until you open it** | New auctions are private: only admins can see them while you set up. Then open them to anyone with the link, or list them on the home page so attendees tap to watch. Enforced by the database rules, not just hidden |
 | 📊 **Offline Excel tracker** | One click downloads an Excel workbook laid out like the sheets organisers already use: Auction (player, winning team, sold price, status), Live Auction for the big screen, Find Player (type a name or a player number), Ranking Board, Teams Summary, Players and one sheet per team. It applies the tournament's rules as sales are typed (points left, still to buy, max bid) and flags wrong entries (below base, over max bid, not a valid bid step, squad full). Works with no app and no internet, in Excel or Google Sheets |
 | 🗂️ **Past auctions as records** | *Add a past auction (record)* on the home page saves an earlier auction (an AuctionXI `auction.json`) as a finished, private auction with its squads, prices and photos, grouped under its tournament |
@@ -30,6 +30,9 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | ⏳ **Waiting list and profiles** | Each player is in the auction, on the waiting list, or registration cancelled (CSV `list` column or the Players tab, also after locking, to bring in a replacement). From the control room the stage shows the players still up for auction, the waiting list, or one player's full profile, at any time; phones have both lists under Players |
 | 🧪 **Mock auction** | One click in the control room makes a practice copy (same rules, teams, players, photos, its own codes). Run it end to end with the captains, reset it, run it again; the real auction is never touched |
 | 🖼️ **Photos, logo and banner** | Upload each player's photo from a phone or laptop (one at a time, or many at once named `P001.jpg` / `Rohan Patil.jpg`), plus the league's logo and a banner or poster of any shape (never cropped). They appear on the stage, phones, player cards and results. Pictures are shrunk on the device (about 8 KB a photo) and kept in the free database, so no paid storage is needed. A `photo_url` column still works |
+| 🏆 **Past seasons and team profiles** | Add an earlier season's record (Setup → *Past seasons*) and everyone gets its final table, knockouts, champion, top performers (MVP, runs, wickets) and that auction's top buys, plus each of this season's teams with what it did before (team names are matched across spellings). Phones get a *Past seasons* tab; the control room can put a season or a team's profile (banner, captain, vice-captain, squad, past record) on the stage |
+| 🚩 **Team banners** | One banner per team (Teams tab, one at a time or many at once named by team code). Shown above the team's squad on phones and on its profile on the stage |
+| 🔳 **QR poster** | *Access and sharing → Print QR poster*: an A4 or A3 poster for the club house with the banner, logo, date, venue, teams, auction code and a big QR code (drawn on the device, works offline), dark or light (saves ink) |
 | 📓 **Captain's workbook** | Each captain and vice-captain gets a private **My workbook** tab. **My plan**: their targets in order with their max bid for each, what each buy leaves (points, still to buy, max bid after), what is left for the rest of the squad, a *what if I buy this player at this price* calculator, and, while a player is up, what winning at the next bid or at their max would leave and which targets would no longer fit. Also every player still available, a favourites list, *their own* max bid and note per player, a manual record of what other teams buy (with estimated purse left and max bid), and a scratch pad with a calculator. The BID button warns when the price passes their limit. Encrypted on the phone with their own PIN, so not even the admin can read it |
 | 🎥 **Zoom / Google Meet** | Share the stage screen, with commentary and voice, in a video call for people who can't come. Step-by-step under *Access and sharing* |
 | 🔁 **Mini auction next season** | Tick who each team keeps; budget = remaining purse + value of released players (C/VC value or price paid). Kept players start in their team; released and new players go into the pool |
@@ -123,6 +126,21 @@ Players columns:
 
 > ⚠️ Auction data is publicly readable by anyone with the auction code. **Do not put phone numbers or other private data in the CSV.**
 
+## Past seasons: the record file
+
+Any AuctionXI record (Results → *Download JSON*, or a past auction added as a record) can be added under Setup → *Past seasons*. The auction gives the teams, squads and prices; for the table and the top performers add a `results` block to the file:
+
+```json
+"results": {
+  "champion": "Hilltop Hawks", "runnerUp": "Rockford Yetis", "dates": "18-19 Apr 2026", "venue": "Society ground", "source": "https://cricheroes.com/tournament/...",
+  "standings": [{ "team": "Rockford Yetis", "played": 4, "won": 4, "lost": 0, "points": 8, "nrr": 6.09, "finish": "Runner-up" }],
+  "knockouts": [{ "stage": "Final", "result": "Hilltop Hawks beat Rockford Yetis by 3 wickets" }],
+  "performers": [{ "name": "Vikram Rao", "team": "Hilltop Hawks", "runs": 171, "sr": 329, "wickets": 3, "economy": 9.5, "mvpRank": 1, "mvpPoints": 27 }]
+}
+```
+
+Only a summary is stored (no photos), inside the auction, so it is seen by exactly the people who can see the auction.
+
 ## Archiving results permanently
 
 1. Admin → **Results → Full auction JSON**.
@@ -146,6 +164,8 @@ js/actions.js     database writes (bid, sell, undo, rounds…)
 js/commentary.js  live commentary (English, Hinglish, Marathi) and voice
 js/workbook.js    the captain's private workbook; js/vault.js encrypts it; js/plan.js works out the budget plan
 js/ai.js          optional AI with the user's own key (commentary, scouting notes, workbook advice)
+js/history.js     past seasons: record summaries, team records across seasons
+js/poster.js      the printable QR poster (poster.html); js/qr.js draws QR codes (vendor/qrcode-generator.js)
 js/tracker.js     the offline Excel tracker (vendor/exceljs.min.js builds it in the browser)
 js/deck.js        the offline PowerPoint (vendor/pptxgen.bundle.js)
 js/media.js       player photos, league logo and banner (shrunk on the device, stored at media/)
@@ -156,7 +176,7 @@ fonts/            Barlow, Barlow Condensed, Teko (SIL OFL)
 design/           the design-system source: tokens.json and notes
 templates/        setup questionnaire, player & team templates, sample data
 archive/          permanently archived auctions
-tournaments/      filled templates for real tournaments (e.g. tournaments/cpl)
+local/            your own tournaments' filled files: ignored by git, never published
 docs/             setup, rules guide, auction-day checklist; docs/guide/ the organiser and captain guide (PDF, PowerPoint)
 ```
 

@@ -307,6 +307,8 @@ function setupFields() {
   f.push(['Bidding', 'commentary_language', 'Commentary language (english / hinglish / marathi)', 'Each phone can still switch for itself',
     (m, r) => ({ hi: 'hinglish', mr: 'marathi' }[r.commentaryLang] || 'english'),
     (m, r, v, warn) => { const l = /hing|hindi/i.test(v) ? 'hi' : /mar|मराठी/i.test(v) ? 'mr' : /eng/i.test(v) || !v ? 'en' : null; if (l) r.commentaryLang = l; else warn(`commentary_language: "${v}" should be english, hinglish or marathi`); }]);
+  f.push(['Bidding', 'commentary_humour', 'Commentary humour (high / normal)', 'high = punchlines and jokes about the auction and the money; normal = just the facts',
+    (m, r) => (r.humour === 'normal' ? 'normal' : 'high'), (m, r, v) => { r.humour = /^(n|normal|plain|off|no)/i.test(v) ? 'normal' : 'high'; }]);
   number('Bidding', 'unsold_rounds', 'How many times unsold players come back for another round', 'e.g. 1', 'unsoldRounds');
 
   for (const [key, q, help] of HOUSE_RULE_QUESTIONS) {
