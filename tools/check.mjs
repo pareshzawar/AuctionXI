@@ -41,7 +41,8 @@ const t1 = E.teamSummary(a, 'T1');
 ok(t1.remaining === 1000 && t1.toBuy === 8 && t1.maxBid === 650 && t1.allottedValue === 350, `example: full ₹1000 purse (C ₹200 + VC ₹150 = ₹350 recorded separately), 8 to buy → max bid 1000 − 7 × 50 = ₹650 (got ${t1.remaining}, ${t1.toBuy}, ${t1.maxBid}, ${t1.allottedValue})`);
 const anyone = Object.values(players).find((p) => !p.allottedTeam && E.roleId(p.role) !== 'wk');
 ok(E.bidLimit(a, 'T1', anyone).max === 650, 'bidLimit agrees: ₹650');
-ok(E.pool(a).every((p) => !p.allottedTeam) && E.pool(a).length === 36, 'allotted players are never auctioned');
+ok(E.pool(a).every((p) => !p.allottedTeam) && E.pool(a).length === 34, 'allotted players are never auctioned');
+ok(Object.values(players).filter((p) => p.list === 'waiting').length === 2 && E.pool(a).every((p) => p.list !== 'waiting'), 'waiting-list players are not in the auction until moved in');
 // fill T1 to 9 with non-keepers who cost 50 → last slot must be a WK (T1's VC is a WK, so use T2: C batter, VC bowler)
 const plain = Object.entries(players).filter(([, p]) => !p.allottedTeam && E.roleId(p.role) !== 'wk');
 plain.slice(0, 7).forEach(([id]) => { a.sales[id] = { team: 'T2', price: 50 }; });

@@ -3,7 +3,7 @@ import {
   normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, pickNext, pool, poolCounts, searchPool, capsUpdate, basePrice, withDefaults,
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
-  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf,
+  BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, inAuction,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
@@ -16,9 +16,10 @@ import {
 } from './csv.js';
 import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
-import { cardFor, livePanel, purses, feed, maxBidExplainer } from './views.js';
+import { cardFor, livePanel, purses, feed, maxBidExplainer, profileGroups } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { downloadTracker } from './tracker.js';
+import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
 import { watchMedia, applyMedia, setPlayerPhoto, setBrand, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
 
@@ -38,7 +39,33 @@ let drawRole = '';
 let miniKeep = null;
 const voice = createVoice();
 const commLang = () => deviceCommLang() || A?.rules.commentaryLang || 'en';
-const makeCommentator = () => createCommentator({ lang: commLang, onLine: (line) => { voice.say(line); if (tab === 'control') renderCommentary(); } });
+const makeCommentator = () => createCommentator({ lang: commLang, onLog: aiOnEvent, onLine: (line) => { voice.say(line); if (tab === 'control') renderCommentary(); } });
+
+// AI commentary: this laptop writes a line for each player up / sold / unsold with its own AI key,
+// and saves it in the auction so every screen shows (and can read out) the same line.
+let aiBusy = false;
+let aiNext = null;
+function aiOnEvent(e) {
+  if (!A?.meta.aiCommentary || !aiReady() || !['up', 'sold', 'unsold'].includes(e.type)) return;
+  aiNext = e;
+  if (!aiBusy) aiRun();
+}
+async function aiRun() {
+  const e = aiNext;
+  aiNext = null;
+  if (!e) return;
+  aiBusy = true;
+  try {
+    const lang = A.rules.commentaryLang || 'en';
+    const text = await aiCommentLine(A, e, lang, money);
+    if (text) await db.push(`${P}/aicomm`, { text: text.slice(0, 400), lang, kind: e.type, event: e.at, at: db.now() });
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    aiBusy = false;
+    if (aiNext) aiRun();
+  }
+}
 let commentator = makeCommentator();
 // Arriving from "Create → Mini" on the home page: open the mini-auction builder pre-filled.
 const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
@@ -123,7 +150,7 @@ const numIn = (id, v) => `<input id="${id}" inputmode="numeric" value="${esc(v ?
 function setup(el) {
   const { meta, rules } = A;
   const house = Object.fromEntries(rules.houseRules.map((h) => [h.key, h.a]));
-  el.innerHTML = `${brandingCard()}
+  el.innerHTML = `${brandingCard()}<div class="card" id="ai-card" style="margin-bottom:var(--space-4)"></div>
     <div class="card" style="margin-bottom:var(--space-4)">
       <div class="section-title"><h2>Fill the setup from a questionnaire</h2></div>
       <p>Every tournament is different. Download the questionnaire (it already has this auction's current answers), fill in the
@@ -212,6 +239,7 @@ function setup(el) {
     <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="save-setup">Save setup</button></p>`;
 
   wireBranding(el);
+  aiSettingsCard($('#ai-card', el));
   $('#add-cat').onclick = () => $('#cats').insertAdjacentHTML('beforeend', catRow({ id: '', label: '', base: '', min: '', max: '' }));
   $('#add-inc').onclick = () => $('#incs').insertAdjacentHTML('beforeend', incRow({ upto: '', step: '' }));
   el.onclick = (e) => { if (e.target.matches('[data-del-row]')) e.target.closest('tr').remove(); };
@@ -434,7 +462,8 @@ function players(el) {
   const dis = locked ? 'disabled' : '';
   const handOpts = (v, right, left, none = '—') => `<option value="">${none}</option><option value="R" ${v === 'R' ? 'selected' : ''}>${right}</option><option value="L" ${v === 'L' ? 'selected' : ''}>${left}</option>`;
   const allotted = list.filter(([, p]) => isAllotted(p)).length;
-  const counts = [`${list.length - allotted} to auction`, `${allotted} captains / vice-captains allotted`].join(' · ');
+  const waiting = list.filter(([, p]) => isWaiting(p)).length;
+  const counts = [`${list.length - allotted - waiting} to auction`, waiting ? `${waiting} on the waiting list` : '', `${allotted} captains / vice-captains allotted`].filter(Boolean).join(' · ');
 
   el.innerHTML = `
     ${locked
@@ -445,6 +474,7 @@ function players(el) {
         <h2>Players (${list.length})</h2><small>${esc(counts)}</small><span class="spacer"></span>
         <button class="btn-sm" id="p-template">Download players template</button>
         <button class="btn-sm" id="p-deck" title="PowerPoint to present the auction by hand: rules, bid steps, teams, a clickable players list and one slide per player">Slides (PowerPoint)</button>
+        <button class="btn-sm" id="p-ai" title="Write a short scouting note for each player from their stats, with your AI key. You review them before saving">AI scouting notes</button>
         <button class="btn-sm" id="p-tracker" title="Excel workbook to run or follow the auction by hand: teams, captains, purses, players and a tracker that applies the rules">Offline tracker (Excel)</button>
         <button class="btn-sm" id="p-export">Export current list</button>
         ${locked ? '' : `
@@ -454,7 +484,7 @@ function players(el) {
           <button class="btn-sm btn-primary" id="p-lock">Lock player list</button>`}
       </div>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Pool</th><th>Bats</th><th>Bowls</th><th>Bowling</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Pool</th><th>Bats</th><th>Bowls</th><th>Bowling</th><th>Base</th><th>Locality</th><th>Photo URL</th><th>Allotted to</th><th>As</th><th>List</th><th></th></tr></thead>
         <tbody>${list.map(([id, p]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
@@ -469,8 +499,9 @@ function players(el) {
             <td><input data-f="photoUrl" value="${esc(p.photoUrl || '')}" ${dis}></td>
             <td><select data-f="allottedTeam" ${dis}>${teamOpts(p.allottedTeam)}</select></td>
             <td><select data-f="allottedAs" ${dis}>${asOpts(p.allottedAs)}</select>${isAllotted(p) ? `<span class="hint">${esc(money(allottedPrice(p, A.rules), A.rules))}</span>` : ''}</td>
+            <td>${isAllotted(p) ? '' : A.sales[id] ? '<small class="muted">Sold</small>' : `<select data-list="${esc(id)}" title="In the auction, or on the waiting list (can be changed at any time)"><option value="">Auction</option><option value="waiting" ${isWaiting(p) ? 'selected' : ''}>Waiting list</option></select>`}</td>
             <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
-          </tr>`).join('') || '<tr><td colspan="13" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
+          </tr>`).join('') || '<tr><td colspan="14" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
       <span class="hint">Base blank = the pool's base price. "Allotted to" + "As" make a player that team's captain or vice-captain:
         they join the team at the captain / vice-captain price when the auction starts and are never auctioned.
@@ -482,7 +513,16 @@ function players(el) {
   $('#p-template').onclick = () => download('players_template.csv', playerTemplate());
   $('#p-export').onclick = () => download(`${aid}_players.csv`, playersToCSV(A.players));
   $('#p-tracker').onclick = run(saveTracker);
+  // Auction / waiting list: allowed even after locking, e.g. to bring in a replacement mid-auction.
+  $$('[data-list]', el).forEach((s) => (s.onchange = run(async (e) => {
+    e.stopPropagation();
+    const id = s.dataset.list;
+    if (A.live?.playerId === id && A.live.status === 'bidding') { render(true); throw new Error('This player is up for bidding now'); }
+    await db.set(`${P}/players/${id}/list`, s.value || null);
+    toast(`${A.players[id].name}: ${s.value ? 'moved to the waiting list' : 'in the auction'}`, 'ok');
+  })));
   $('#p-deck').onclick = run(saveDeck);
+  $('#p-ai').onclick = run(aiScouting);
   if (locked) {
     $('#p-unlock') && ($('#p-unlock').onclick = run(() => db.set(`${P}/meta/locked`, false)));
     return;
@@ -570,6 +610,44 @@ async function saveTracker() {
 async function saveDeck() {
   toast('Preparing the slides…');
   await downloadDeck(A, `${slug(A.meta.name) || aid}_slides.pptx`);
+}
+
+// AI scouting notes: one short note per player from their stats, reviewed before saving (field `scout`).
+async function aiScouting() {
+  if (!aiReady()) { tab = 'setup'; render(true); throw new Error('Add an AI key first (Setup → AI assistant)'); }
+  const list = Object.entries(A.players).filter(([, p]) => p.matches || p.runs || p.wickets || p.notes);
+  if (!list.length) throw new Error('No player has stats or notes to write from');
+  if (!confirm(`Write scouting notes for ${list.length} players with your AI key? Their names and stats are sent to the AI provider. You can edit every note before saving.`)) return;
+  const drafts = {};
+  const batches = [];
+  for (let i = 0; i < list.length; i += 12) batches.push(list.slice(i, i + 12));
+  for (const [n, batch] of batches.entries()) {
+    toast(`Writing notes… ${n * 12 + 1}-${n * 12 + batch.length} of ${list.length}`);
+    const text = await askAI({
+      system: 'You scout players for a friendly society cricket auction. For each player write one scouting note of at most 20 words: their strength and how a captain might use them, from the given stats only. Never invent facts. Plain English, no emoji. Reply with a JSON object mapping each player ID to its note, and nothing else.',
+      prompt: batch.map(([id, p]) => `ID ${id}\n${playerFacts(p, A, money)}`).join('\n\n'),
+      maxTokens: 1500,
+      json: true,
+    });
+    Object.assign(drafts, parseJSON(text));
+  }
+  const dlg = document.createElement('dialog');
+  dlg.className = 'card';
+  dlg.style.cssText = 'max-width:820px;width:calc(100% - 32px);max-height:85vh;overflow:auto;color:var(--ink);background:var(--surface);border:1px solid var(--line)';
+  dlg.innerHTML = `<h2>Scouting notes</h2><p class="muted">Check and edit. Saved notes show on the player cards, phones and slides. Leave a box empty to skip that player.</p>
+    <div class="stack" style="gap:var(--space-2)">${list.filter(([id]) => drafts[id]).map(([id, p]) => `<label style="margin:0"><b>${esc(p.name)}</b> <small class="muted">${esc(id)}</small>
+      <textarea data-scout="${esc(id)}" rows="2">${esc(String(drafts[id]).slice(0, 300))}</textarea></label>`).join('')}</div>
+    <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary" data-save>Save notes</button><button class="btn-ghost" data-cancel>Cancel</button></p>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  dlg.querySelector('[data-cancel]').onclick = () => dlg.remove();
+  dlg.querySelector('[data-save]').onclick = run(async () => {
+    const upd = {};
+    dlg.querySelectorAll('[data-scout]').forEach((t) => { upd[`players/${t.dataset.scout}/scout`] = t.value.trim() || null; });
+    await db.update(P, upd);
+    dlg.remove();
+    toast(`${Object.values(upd).filter(Boolean).length} scouting notes saved`, 'ok');
+  });
 }
 
 /* Pictures: league logo and banner (Setup tab), player photos (Players tab) */
@@ -778,6 +856,7 @@ function control(el) {
   el.innerHTML = `
     ${meta.status === 'completed' ? '<div class="notice notice-ok">Auction completed. Export and archive the results from the Results tab.</div>' : ''}
     ${nextPlayerPanel(bidding, remaining)}
+    ${stagePanel(bidding)}
     <div class="live-grid">
       <div>${player ? cardFor(A, live.playerId) : '<div class="card"><h2>No player on the block</h2><p class="muted">Press Next player or pick one.</p></div>'}</div>
       <div>${player ? livePanel(A) : ''}</div>
@@ -819,14 +898,17 @@ function control(el) {
           <select id="c-lang" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
           ${voice.supported ? `<button class="btn-sm" id="c-voice">${voice.on ? 'Stop reading aloud' : 'Read aloud on this laptop'}</button>` : ''}</div>
           ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This laptop has no Marathi or Hindi voice, so lines are shown but not read. Install one in the system language settings.</p>' : ''}
+          <label class="check" style="margin:0 0 var(--space-2)"><input type="checkbox" id="c-ai" ${A.meta.aiCommentary ? 'checked' : ''} ${aiReady() ? '' : 'disabled'}> AI commentary${aiReady() ? ' (uses this laptop\'s AI key; every screen shows the lines)' : ': add an AI key in Setup first'}</label>
           <div id="c-comm" class="feed"></div></div>`}
         <div class="card"><h2>Activity</h2>${feed(A)}</div>
       </div>
     </div>`;
 
   wireNextPlayerPanel(el);
+  wireStagePanel(el);
   renderCommentary();
   if ($('#c-voice')) $('#c-voice').onclick = () => { voice.toggle(commLang()); render(true); };
+  if ($('#c-ai')) $('#c-ai').onchange = run(async (e) => { await db.set(`${P}/meta/aiCommentary`, e.target.checked || null); });
   if ($('#c-lang')) $('#c-lang').onchange = (e) => { setDeviceCommLang(e.target.value === A.rules.commentaryLang ? '' : e.target.value); commentator = makeCommentator(); commentator.update(A); e.target.blur(); render(true); };
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
@@ -921,7 +1003,7 @@ function controlStart(el) {
   const { meta, rules } = A;
   const teamIds = Object.keys(A.teams);
   const teamN = teamIds.length;
-  const toAuction = Object.values(A.players).filter((p) => !isAllotted(p)).length;
+  const toAuction = Object.values(A.players).filter(inAuction).length;
   // Players each team still has to buy (a mini auction's teams already keep some).
   const toBuyOf = (id) => Math.max(0, rules.squadSize - Object.values(A.players).filter((p) => p.allottedTeam === id && (p.allottedAs !== 'VC' || hasVC(rules))).length);
   const needed = teamIds.reduce((t, id) => t + toBuyOf(id), 0);
@@ -943,7 +1025,9 @@ function controlStart(el) {
       <p>Starting locks the player list, puts each captain${hasVC(rules) ? ' and vice-captain' : ''} in their team (value ${esc(money(rules.captainPrice, rules))}${hasVC(rules) ? ` / ${esc(money(rules.vcPrice, rules))}` : ''}, not taken from the purse), and opens bidding.</p>
       <button class="btn-primary btn-lg" id="c-start" ${teamN >= 2 && toAuction ? '' : 'disabled'}>Start ${meta.mock ? 'mock ' : ''}auction</button>
     </div>
+    <div style="max-width:760px">${stagePanel(false)}</div>
     ${mockCard()}`;
+  wireStagePanel(el);
   if ($('#c-mock')) $('#c-mock').onclick = run(openMock);
   $('#c-start').onclick = run(async () => {
     if (missing.length && !confirm(`${missing.length} team(s) have no ${hasVC(rules) ? 'captain or vice-captain' : 'captain'} set. Start anyway?`)) return;
@@ -960,10 +1044,38 @@ function renderCommentary() {
   const box = $('#c-comm');
   if (!box) return;
   const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  box.innerHTML = commentator.lines.slice(0, 12).map((l) => `<div><span>${esc(l.text)}</span><time>${time(l.at)}</time></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>';
+  box.innerHTML = commentator.lines.slice(0, 12).map((l) => `<div>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span><time>${time(l.at)}</time></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>';
 }
 
 // The "Next player" panel: random draw with the built-in logic, or a chit searched by name.
+// What the stage shows besides bidding: the players still up for auction, the waiting list, or
+// one player's profile. Bringing up the next player switches the stage back to the auction.
+function stagePanel(bidding) {
+  const { available, waiting } = profileGroups(A);
+  const v = A.meta.stageView;
+  const now = v?.type === 'list' ? (v.which === 'waiting' ? 'the waiting list' : 'the players up for auction')
+    : v?.type === 'player' ? `${A.players[v.id]?.name || 'a player'}'s profile` : (bidding ? 'the bidding' : 'the auction');
+  const opts = (list) => list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  return `<div class="card" style="margin-top:var(--space-4)">
+    <div class="section-title"><h2 style="margin:0">On the stage</h2><small>Now showing ${esc(now)}</small><span class="spacer"></span>
+      ${v ? '<button class="btn-sm btn-primary" id="sv-back">Back to the auction</button>' : ''}</div>
+    <p class="row">
+      <button class="btn-sm" data-sv="available" ${bidding ? 'disabled title="Finish the player on the block first"' : ''}>Show players up for auction (${available.length})</button>
+      <button class="btn-sm" data-sv="waiting" ${bidding || !waiting.length ? 'disabled' : ''}>Show the waiting list (${waiting.length})</button>
+      <select id="sv-player" style="width:auto" ${bidding ? 'disabled' : ''}><option value="">A player's profile…</option>
+        ${available.length ? `<optgroup label="Up for auction">${opts(available)}</optgroup>` : ''}${waiting.length ? `<optgroup label="Waiting list">${opts(waiting)}</optgroup>` : ''}</select>
+    </p>
+    <span class="hint">Phones always have these under the Players tab. Bringing up the next player puts the stage back on the auction.</span>
+  </div>`;
+}
+
+function wireStagePanel(el) {
+  const set = run((view) => db.set(`${P}/meta/stageView`, view));
+  $$('[data-sv]', el).forEach((b) => (b.onclick = () => set({ type: 'list', which: b.dataset.sv })));
+  if ($('#sv-player', el)) $('#sv-player', el).onchange = (e) => { if (e.target.value) set({ type: 'player', id: e.target.value }); };
+  if ($('#sv-back', el)) $('#sv-back', el).onclick = () => set(null);
+}
+
 function nextPlayerPanel(bidding, remaining) {
   const { rules, meta } = A;
   drawMode ||= rules.pickOrder === 'manual' ? 'chit' : 'random';

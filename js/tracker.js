@@ -4,7 +4,7 @@
 // rules: every total, max bid and check is a formula driven by the Rules sheet, so it recalculates
 // as sales are typed. Works in Excel 2010+, Excel online, Google Sheets and LibreOffice.
 
-import { withDefaults, isAllotted, ROLES, roleId, battingLabel, bowlingLabel } from './engine.js';
+import { withDefaults, isAllotted, ROLES, roleId, battingLabel, bowlingLabel, inAuction, isWaiting } from './engine.js';
 
 const GOLD = 'FFF2B84B';
 const INK = 'FF14171B';
@@ -46,7 +46,8 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
 
   const teams = Object.entries(a.teams);
   const all = Object.entries(a.players);
-  const pool = all.filter(([, p]) => !isAllotted(p));
+  // The auction pool, then the waiting list (marked in Notes, so a replacement can be picked in Auction).
+  const pool = [...all.filter(([, p]) => inAuction(p)), ...all.filter(([, p]) => isWaiting(p))];
   const leader = (tid, as) => all.find(([, p]) => p.allottedTeam === tid && p.allottedAs === as)?.[1]?.name || '';
   const kept = (tid) => all.filter(([, p]) => p.allottedTeam === tid && p.allottedAs === 'R');
   const POOL_ROWS = Math.max(pool.length + 30, 100); // room to add names in Excel
@@ -182,7 +183,7 @@ export function buildTracker(ExcelJS, auction, opts = {}) {
       P.getCell(`I${n}`).value = battingLabel(p);
       P.getCell(`J${n}`).value = bowlingLabel(p);
       P.getCell(`K${n}`).value = p.locality || '';
-      P.getCell(`L${n}`).value = p.notes || '';
+      P.getCell(`L${n}`).value = isWaiting(p) ? `Waiting list${p.notes ? `. ${p.notes}` : ''}` : (p.notes || '');
       P.getCell(`M${n}`).value = id;
     }
     P.getCell(`B${n}`).value = f(`IF(A${n}="","",IF(H${n}<>"",H${n},IFERROR(VLOOKUP(G${n},${poolRange},3,FALSE),Rules!$B$10)))`);

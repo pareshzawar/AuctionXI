@@ -197,11 +197,18 @@ function lineForBid(a, lot, bid, key, lang) {
 // Keeps the commentary for one page. Call update(auction) on every change; it calls onLine(line)
 // for each new line ({ at, text, kind }) and keeps the history in .lines (newest first).
 // lang: 'en' | 'hi' (Hinglish) | 'mr' (Marathi), or a function returning one.
-export function createCommentator({ onLine = () => {}, lang = 'en' } = {}) {
+// onLog(entry, auction): each new auction event (not the history), e.g. to ask the AI for a line.
+// AI lines (auction.aicomm, written by the control room) join the commentary as kind 'ai'. While
+// AI commentary is on, a built-in line for a player coming up, sold or unsold is shown but not
+// read aloud; the AI line is read instead, or the built-in one after AI_WAIT if none arrives.
+const AI_KINDS = ['up', 'sold', 'unsold'];
+const AI_WAIT = 8000;
+export function createCommentator({ onLine = () => {}, onLog = () => {}, lang = 'en' } = {}) {
   const seen = new Set();
   let ready = false;
   let lotId = null;
   let lot = []; // bids seen on the current player
+  let lastAi = 0; // time of the newest AI line
   const language = () => { const l = typeof lang === 'function' ? lang() : lang; return PHRASES[l] ? l : 'en'; };
   const self = {
     lines: [],
@@ -221,7 +228,29 @@ export function createCommentator({ onLine = () => {}, lang = 'en' } = {}) {
       const fresh = entries.filter(([k]) => !seen.has(k));
       const history = ready ? fresh : fresh.slice(-8);
       fresh.forEach(([k]) => seen.add(k));
-      for (const [k, e] of history) add(lineForLog(a, e, k, lg), e.at, e.type, !ready);
+      const aiOn = !!a.meta?.aiCommentary;
+      for (const [k, e] of history) {
+        const waitForAi = ready && aiOn && AI_KINDS.includes(e.type);
+        const text = lineForLog(a, e, k, lg);
+        add(text, e.at, e.type, !ready || waitForAi);
+        if (waitForAi && text) {
+          const line = self.lines.find((x) => x.text === text && x.at === e.at);
+          setTimeout(() => { if (lastAi < e.at && line) onLine(line); }, AI_WAIT);
+        }
+        if (ready) onLog(e, a);
+      }
+      // AI lines.
+      const ai = Object.entries(a.aicomm || {}).sort((x, y) => x[1].at - y[1].at).filter(([k]) => !seen.has(`ai:${k}`));
+      for (const [k, x] of (ready ? ai : ai.slice(-4))) {
+        seen.add(`ai:${k}`);
+        if (!x?.text) continue;
+        lastAi = Math.max(lastAi, Number(x.event) || Number(x.at) || 0);
+        const line = { at: x.at, text: String(x.text), kind: 'ai', lang: x.lang || lg };
+        self.lines.unshift(line);
+        self.lines.length = Math.min(self.lines.length, MAX_LINES);
+        if (ready) onLine(line);
+      }
+      self.lines.sort((x, y) => y.at - x.at);
       // Bids on the player on the block.
       const live = a.live;
       if (live?.playerId !== lotId) { lotId = live?.playerId || null; lot = []; }

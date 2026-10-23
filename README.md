@@ -26,6 +26,8 @@ The admin uploads players from a CSV template, sets the rules (purse, squad size
 | 📊 **Offline Excel tracker** | One click downloads an Excel workbook laid out like the sheets organisers already use: Auction (player, winning team, sold price, status), Live Auction for the big screen, Ranking Board, Teams Summary, Players and one sheet per team. It applies the tournament's rules as sales are typed (points left, still to buy, max bid) and flags wrong entries (below base, over max bid, not a valid bid step, squad full). Works with no app and no internet, in Excel or Google Sheets |
 | 🗂️ **Past auctions as records** | *Add a past auction (record)* on the home page saves an earlier auction (an AuctionXI `auction.json`) as a finished, private auction with its squads, prices and photos, grouped under its tournament |
 | 🎞️ **Offline slides** | One click downloads a PowerPoint of the auction: cover with your banner and logo, rules, bid steps, house rules, teams with captains, a clickable players list (jump to whoever the chit names) and one slide per player with photo, stats, base price and the next bids. Squad slides are added once players are sold. Present it in manual mode with no app or internet |
+| 🤖 **AI (optional, your own key)** | Free keys work: Google Gemini (AI Studio), Groq, OpenRouter's free models; also Claude or any OpenAI-compatible service. **AI commentary** for each player up, sold or unsold, shown on every screen and read aloud; **scouting notes** for every player from their stats (reviewed before saving); **Ask AI** in a captain's private workbook. The key stays only in that browser, never in the database or the repo |
+| ⏳ **Waiting list and profiles** | Each player is in the auction or on the waiting list (CSV `list` column or the Players tab, also after locking, to bring in a replacement). From the control room the stage shows the players still up for auction, the waiting list, or one player's full profile, at any time; phones have both lists under Players |
 | 🧪 **Mock auction** | One click in the control room makes a practice copy (same rules, teams, players, photos, its own codes). Run it end to end with the captains, reset it, run it again; the real auction is never touched |
 | 🖼️ **Photos, logo and banner** | Upload each player's photo from a phone or laptop (one at a time, or many at once named `P001.jpg` / `Rohan Patil.jpg`), plus the league's logo and a banner or poster of any shape (never cropped). They appear on the stage, phones, player cards and results. Pictures are shrunk on the device (about 8 KB a photo) and kept in the free database, so no paid storage is needed. A `photo_url` column still works |
 | 📓 **Captain's workbook** | Each captain and vice-captain gets a private **My workbook** tab: every player still available, a favourites list, *their own* max bid and note per player, a manual record of what other teams buy (with estimated purse left and max bid), and a scratch pad with a calculator. The BID button warns when the price passes their limit. Encrypted on the phone with their own PIN, so not even the admin can read it |
@@ -113,6 +115,7 @@ Players columns:
 | `age`, `locality`, `matches`, `runs`, `wickets`, `notes` | no | Shown on the player card |
 | `strike_rate`, `highest_score`, `economy` | no | Shown with matches, runs and wickets (e.g. from CricHeroes). `highest_score` may be `82*` |
 | `cricheroes_url` | no | Link to the player's CricHeroes profile, shown on phones and the slides |
+| `list` | no | `waiting` puts the player on the waiting list (not auctioned unless moved in). Blank = in the auction |
 | `photo_url` | no | Direct image link. Google Drive share links are converted automatically (share as "Anyone with the link"). Easier: leave it blank and upload photos in *Players → Player photos* |
 | `allotted_team`, `allotted_as` | no | Another way to set captains (the teams template is easier): the team ID and `C` or `VC`. They join that team when the auction starts, with the captain / vice-captain value (not taken from the purse), and are never auctioned |
 
@@ -140,6 +143,7 @@ js/views.js       screen sections built from those components
 js/actions.js     database writes (bid, sell, undo, rounds…)
 js/commentary.js  live commentary (English, Hinglish, Marathi) and voice
 js/workbook.js    the captain's private workbook; js/vault.js encrypts it
+js/ai.js          optional AI with the user's own key (commentary, scouting notes, workbook advice)
 js/tracker.js     the offline Excel tracker (vendor/exceljs.min.js builds it in the browser)
 js/deck.js        the offline PowerPoint (vendor/pptxgen.bundle.js)
 js/media.js       player photos, league logo and banner (shrunk on the device, stored at media/)

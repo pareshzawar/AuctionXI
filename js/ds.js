@@ -18,7 +18,7 @@ export function price(amount, rules, { size = 'md', tone = '', cls = '' } = {}) 
     + '</span>';
 }
 
-const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained' };
+const STATUS = { upcoming: 'Upcoming', live: 'Live', paused: 'Paused', sold: 'Sold', unsold: 'Unsold', retained: 'Retained', waiting: 'Waiting list' };
 
 export function badge(status, { size = '', text = '' } = {}) {
   const cls = status;
@@ -76,7 +76,7 @@ export function playerCard(p, o) {
   const status = o.status || 'upcoming';
   const cat = [o.category?.label, o.lot != null ? `Lot ${o.lot}` : null].filter(Boolean).join(' · ');
   const catEl = cat ? `<span class="${cx('ax-card-cat', o.category?.featured && 'is-featured')}">${esc(cat)}</span>` : '<span></span>';
-  const notes = p.notes ? `<div class="ax-feat"><span>${esc(p.notes)}</span></div>` : '';
+  const notes = [p.notes, p.scout && `Scout: ${p.scout}`].filter(Boolean).map((t) => `<div class="ax-feat"><span>${esc(t)}</span></div>`).join('');
 
   if (o.variant === 'stage') {
     return `<article class="${cx('ax-card', 'ax-card-stage', status === 'live' && 'ax-card-live')}">`
@@ -85,7 +85,8 @@ export function playerCard(p, o) {
       + `<div class="ax-card-top">${catEl}${status !== 'live' ? badge(status, { size: 'lg' }) : ''}</div>`
       + `<div><h2 class="ax-stage-name">${esc(p.name)}</h2><p class="ax-stage-meta">${esc(metaLine(p))}</p></div>`
       + `<div class="ax-chips">${roleChip(p.role, { size: 'lg', showName: true })}</div>`
-      + notes
+      // One box on the projector, at most two lines, so the stats always fit.
+      + (p.notes || p.scout ? `<div class="ax-feat ax-feat-clamp"><span>${esc([p.notes, p.scout && `Scout: ${p.scout}`].filter(Boolean).join(' · '))}</span></div>` : '')
       + statGrid(playerStats(p), { size: 'stage', columns: 3 })
       + '</div></article>';
   }
