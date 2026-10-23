@@ -1,5 +1,5 @@
 import { db, isLocal } from './db.js';
-import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction } from './actions.js';
+import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction, organiserStatus, claimSite, listOrganisers, addOrganiser, removeOrganiser } from './actions.js';
 import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
 import { badge } from './ds.js';
 import { vcCanBid, withDefaults, normalize, visibilityOf } from './engine.js';
@@ -150,8 +150,53 @@ if (!isLocal) {
   };
   who();
   $('#google-btn').addEventListener('click', async () => {
-    try { await db.signInGoogle(); who(); } catch (e) { toast(e.message, 'error'); }
+    try { await db.signInGoogle(); who(); await refreshOrganiser(); } catch (e) { toast(e.message, 'error'); }
   });
+  refreshOrganiser();
+}
+
+// Who may create auctions here: approved organisers only (the database rules enforce it).
+async function refreshOrganiser() {
+  const st = await organiserStatus().catch(() => ({ can: false, why: 'error' }));
+  $('#c-submit').disabled = !st.can;
+  $('#c-record').disabled = !st.can;
+  const box = $('#org-status');
+  box.innerHTML = st.can
+    ? `<p class="notice notice-ok" style="margin:0">✓ ${esc(st.email)} can create auctions${st.owner ? ' and manage the organisers list (below)' : ''}.</p>`
+    : st.why === 'signin' ? '<p class="notice notice-info" style="margin:0">Only approved organisers can create auctions here. <b>Sign in with Google</b> to check. Watching, joining with a code and bidding need no sign-in.</p>'
+      : st.why === 'no-owner' ? `<p class="notice notice-warn" style="margin:0">Nobody runs this site yet. If it's yours, claim it: you become the site owner and decide who can create auctions. <button type="button" class="btn-sm btn-primary" id="claim-site">Become the site owner</button></p>`
+        : st.why === 'not-listed' ? `<p class="notice notice-warn" style="margin:0"><b>${esc(st.email)}</b> isn't on the organisers list. Ask the site owner to add this Gmail; you can still watch and join auctions with a code.</p>`
+          : '<p class="notice notice-warn" style="margin:0">Could not check the organisers list. Try again in a moment.</p>';
+  if ($('#claim-site')) $('#claim-site').onclick = async () => {
+    if (!confirm(`Make ${st.email} the owner of this AuctionXI site? Only you (and anyone you add) will be able to create auctions.`)) return;
+    try { await claimSite(); toast('You are the site owner. Add the other organisers below.', 'ok'); await refreshOrganiser(); } catch (e) { toast(e.message, 'error'); }
+  };
+  await renderOrganisers(st);
+}
+
+async function renderOrganisers(st) {
+  const card = $('#org-card');
+  card.classList.toggle('hidden', !st.owner);
+  if (!st.owner) return;
+  const list = await listOrganisers().catch(() => []);
+  card.innerHTML = `<h3 style="margin-top:0">Organisers who can create auctions</h3>
+    <div class="stack" style="gap:var(--space-2)">${list.map((o) => `<div class="row" style="padding:var(--space-2) var(--space-3);border:1px solid var(--line);border-radius:var(--radius-sm)">
+      <b style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(o.email)}</b>${o.owner ? badge('live', { text: 'Site owner' }) : ''}
+      ${o.email === st.email ? '<small class="muted">you</small>' : `<button type="button" class="btn-sm btn-ghost" data-org-del="${esc(o.key)}" data-org-owner="${o.owner ? 1 : ''}">Remove</button>`}</div>`).join('')}</div>
+    <form id="org-add" class="row" style="margin-top:var(--space-3)">
+      <input id="org-email" type="email" placeholder="name@gmail.com" required style="flex:1;min-width:200px">
+      <label class="check" style="margin:0"><input type="checkbox" id="org-owner"> Also a site owner (can add others)</label>
+      <button class="btn-sm btn-primary">Add</button>
+    </form>
+    <p class="hint">They sign in with this Google account on the home page to create auctions. Removing someone doesn't touch the auctions they already made.</p>`;
+  $('#org-add').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await addOrganiser($('#org-email').value, { owner: $('#org-owner').checked }); toast('Organiser added', 'ok'); await renderOrganisers(st); } catch (err) { toast(err.message, 'error'); }
+  };
+  $$('[data-org-del]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('Remove this organiser? They will no longer be able to create auctions.')) return;
+    try { await removeOrganiser(b.dataset.orgDel, { owner: !!b.dataset.orgOwner }); await renderOrganisers(st); } catch (err) { toast(err.message, 'error'); }
+  }));
 }
 
 document.querySelectorAll('[data-kind]').forEach((b) => (b.onclick = () => { kind = b.dataset.kind; renderCreateOptions(); }));
@@ -195,7 +240,7 @@ $('#create-form').addEventListener('submit', async (e) => {
     rememberAuction(aid, name, 'admin');
     location.href = pageUrl('admin.html', { a: aid, created: adminCode });
   } catch (err) {
-    toast(err.message, 'error');
+    toast(/permission/i.test(err.message) ? 'Only approved organisers can create auctions: sign in with Google with an approved Gmail (see above).' : err.message, 'error');
     btn.disabled = false;
   }
 });

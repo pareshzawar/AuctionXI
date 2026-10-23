@@ -3,7 +3,7 @@
     "auctions": {
       "$aid": {
         ".read": "data.child('meta/visibility').val() !== 'private' || (auth != null && (data.child('meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))",
-        ".write": "auth != null && ((!data.exists() && newData.child('meta/ownerUid').val() === auth.uid) || data.child('meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        ".write": "auth != null && ((!data.exists() && newData.child('meta/ownerUid').val() === auth.uid && auth != null && auth.token.email_verified == true && (root.child('organisers/' + auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists())) || data.child('meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
         "meta": {
           "ownerUid": {
             ".validate": "!data.exists() || newData.val() === data.val()"
@@ -62,6 +62,29 @@
           ".read": "auth != null && auth.uid === $uid",
           ".write": "auth != null && auth.uid === $uid && newData.exists() && newData.child('code').isString() && newData.child('code').val() === root.child('secrets/' + $aid + '/adminCode').val()"
         }
+      }
+    },
+    "siteOwners": {
+      ".read": "auth != null && auth.token.email_verified == true && root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$k": {
+        ".read": "auth != null && auth.token.email_verified == true && $k === auth.token.email.toLowerCase().replace('.', ',')",
+        ".write": "auth != null && auth.token.email_verified == true && ((!root.child('site/claimed').exists() && $k === auth.token.email.toLowerCase().replace('.', ',')) || root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        ".validate": "!newData.exists() || newData.isBoolean()"
+      }
+    },
+    "organisers": {
+      ".read": "auth != null && auth.token.email_verified == true && root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$k": {
+        ".read": "auth != null && auth.token.email_verified == true && $k === auth.token.email.toLowerCase().replace('.', ',')",
+        ".write": "auth != null && auth.token.email_verified == true && root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists()",
+        ".validate": "!newData.exists() || (newData.child('email').isString() && newData.child('email').val().toLowerCase().replace('.', ',') === $k)"
+      }
+    },
+    "site": {
+      ".read": "true",
+      "claimed": {
+        ".write": "auth != null && auth.token.email_verified == true && (root.child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists() || newData.parent().parent().child('siteOwners/' + auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        ".validate": "newData.isBoolean()"
       }
     }
   }

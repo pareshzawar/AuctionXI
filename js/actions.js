@@ -17,6 +17,55 @@ async function newAuctionId(name, tournament) {
 
 // A major auction: a fresh player pool. `copyFrom` (an earlier auction, normalized) copies its
 // rules, house rules and teams - typically last season's auction of the same tournament.
+/* ---------------- who may create auctions ---------------- */
+// Only approved organisers (Google accounts on organisers/, managed by the site owners at
+// siteOwners/) can create auctions; the database rules enforce it. Demo mode has no accounts, so
+// everyone can. Keys are the email in lower case with '.' as ',' (dots aren't allowed in keys).
+export const emailKey = (email) => String(email || '').trim().toLowerCase().replace(/\./g, ',');
+
+// { can, email, owner, claimed, why }
+export async function organiserStatus() {
+  if (isLocal) return { can: true, local: true };
+  const email = db.email?.();
+  const claimed = !!(await db.get('site/claimed').catch(() => null));
+  if (!email) return { can: false, claimed, why: 'signin' };
+  const k = emailKey(email);
+  const [owner, org] = await Promise.all([db.get(`siteOwners/${k}`).catch(() => null), db.get(`organisers/${k}`).catch(() => null)]);
+  if (owner || org) return { can: true, email, owner: !!owner, claimed };
+  return { can: false, email, claimed, why: claimed ? 'not-listed' : 'no-owner' };
+}
+
+// The first person to claim the site becomes its owner (only while nobody has).
+export async function claimSite() {
+  const email = db.email?.();
+  if (!email) throw new Error('Sign in with Google first');
+  await db.update('', { [`siteOwners/${emailKey(email)}`]: true, 'site/claimed': true });
+}
+
+export async function listOrganisers() {
+  const [owners, orgs] = await Promise.all([db.get('siteOwners').catch(() => null), db.get('organisers').catch(() => null)]);
+  const out = new Map();
+  for (const [k, x] of Object.entries(orgs || {})) out.set(k, { key: k, email: x.email, addedBy: x.addedBy || '', owner: false });
+  for (const k of Object.keys(owners || {})) out.set(k, { ...(out.get(k) || { key: k, email: k.replace(/,/g, '.') }), owner: true });
+  return [...out.values()].sort((x, y) => Number(y.owner) - Number(x.owner) || x.email.localeCompare(y.email));
+}
+
+export async function addOrganiser(email, { owner = false } = {}) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error(`"${email}" is not an email address`);
+  const k = emailKey(e);
+  await db.set(`organisers/${k}`, { email: e, addedBy: db.email?.() || '', addedAt: db.now() });
+  if (owner) await db.set(`siteOwners/${k}`, true);
+}
+
+export async function removeOrganiser(key, { owner = false } = {}) {
+  if (owner) {
+    if (key === emailKey(db.email?.())) throw new Error('You cannot remove yourself as a site owner');
+    await db.set(`siteOwners/${key}`, null);
+  }
+  await db.set(`organisers/${key}`, null);
+}
+
 export async function createAuction({ name, tournament, season, venue, date, organiser, copyFrom = null }) {
   const aid = await newAuctionId(name, tournament);
   const adminCode = randomCode(8);
