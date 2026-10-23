@@ -16,7 +16,7 @@ import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
   HOUSE_RULE_QUESTIONS, TEAM_COLORS, num,
 } from './csv.js';
-import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
+import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, watchConnection, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer, profileGroups } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
@@ -132,9 +132,15 @@ async function boot() {
   db.on(`captains/${aid}`, (v) => { captains = v || {}; render(); });
   db.on(`coadmins/${aid}`, (v) => { coadmins = v || {}; render(); });
   watchMedia(aid, (m) => { media = m; if (A) { applyMedia(A, media); render(); } });
+  watchConnection(db, {
+    text: 'The database can\'t be reached. Everything you change is kept in this tab and sent when the connection is back, so <b>don\'t close or reload this tab</b>. Phones can\'t bid meanwhile: take paddle bids and record them here, or carry on with the slides and the Excel tracker.',
+    extra: ' <button class="btn-sm" data-offline-action="backup">Download backup</button>',
+  });
+  document.addEventListener('offline-action', (e) => { if (e.detail === 'backup') downloadBackup(); });
   db.on(P, (v) => {
     A = applyMedia(normalize(v), media);
     if (!A) return;
+    keepBackup();
     commentator.update(A);
     $('#title').textContent = A.meta.name;
     const st = A.meta.status;
@@ -427,15 +433,18 @@ function teams(el) {
       await db.set(`${P}/teams/${tr.dataset.id}/${e.target.dataset.f}`, v);
       const notes = await syncLeaders();
       if (notes.length) alert(notes.join('\n'));
+      saved(`${A.teams[tr.dataset.id]?.name}: ${FIELD_NAMES[e.target.dataset.f]} saved`);
       return;
     }
     if (e.target.dataset.f === 'purse') {
       if (v != null && num(v) == null) throw new Error(`"${v}" is not an amount`);
       await db.update(P, { [`teams/${tr.dataset.id}/purse`]: v == null ? null : num(v) });
       await db.update(P, capsUpdate(normalize(await db.get(P))));
+      saved(`${A.teams[tr.dataset.id]?.name}: budget saved`);
       return;
     }
     await db.set(`${P}/teams/${tr.dataset.id}/${e.target.dataset.f}`, v);
+    saved(`${v && e.target.dataset.f === 'name' ? v : A.teams[tr.dataset.id]?.name}: ${FIELD_NAMES[e.target.dataset.f] || 'change'} saved`);
   });
   el.onclick = run(async (e) => {
     if (!e.target.matches('[data-del]')) return;
@@ -482,6 +491,84 @@ async function addTeams(map) {
 
 /* ---------------- 3. Players ---------------- */
 
+// A short "saved" note after each edit, so it is clear nothing more needs pressing.
+const FIELD_NAMES = { name: 'name', role: 'role', category: 'pool', battingHand: 'batting hand', bowlingArm: 'bowling arm', bowlingType: 'bowling type', basePrice: 'base price',
+  locality: 'locality', photoUrl: 'photo link', allottedTeam: 'team', allottedAs: 'captain / vice-captain', short: 'code', color: 'colour', captainName: 'captain', vcName: 'vice-captain', owner: 'owner', purse: 'budget' };
+const saved = (msg) => toast(`✓ ${msg}`, 'ok');
+
+// Edit one player's details in a dialog with its own Save button. Allowed even when the list is
+// locked or the auction is running: these fields never change who is in the auction or the money.
+const EDIT_FIELDS = [
+  ['name', 'Name', 'text'], ['role', 'Role', 'role'], ['battingHand', 'Bats', 'bat'], ['bowlingArm', 'Bowls', 'arm'], ['bowlingType', 'Bowling type', 'type'],
+  ['age', 'Age', 'num'], ['locality', 'Locality / flat wing', 'text'], ['matches', 'Matches', 'num'], ['runs', 'Runs', 'num'], ['wickets', 'Wickets', 'num'],
+  ['strikeRate', 'Strike rate', 'dec'], ['highest', 'Highest score', 'text'], ['economy', 'Economy', 'dec'], ['cricheroesUrl', 'CricHeroes link', 'text'],
+  ['notes', 'Notes', 'area'], ['scout', 'Scouting note', 'area'],
+];
+function editPlayer(id) {
+  const p = A.players[id];
+  if (!p) return;
+  const val = (k) => (k === 'battingHand' ? battingHandOf(p) : k === 'bowlingArm' ? bowlingArmOf(p) : k === 'bowlingType' ? bowlingTypeOf(p) : p[k]) ?? '';
+  const input = ([k, , kind]) => {
+    const v = val(k);
+    if (kind === 'role') return `<select data-e="${k}">${Object.entries(ROLES).map(([r, x]) => `<option value="${r}" ${r === roleId(v) ? 'selected' : ''}>${x.name}</option>`).join('')}</select>`;
+    if (kind === 'bat' || kind === 'arm') return `<select data-e="${k}"><option value="">${kind === 'arm' ? 'Doesn\'t bowl' : '—'}</option><option value="R" ${v === 'R' ? 'selected' : ''}>Right</option><option value="L" ${v === 'L' ? 'selected' : ''}>Left</option></select>`;
+    if (kind === 'type') return `<select data-e="${k}"><option value="">—</option>${[...new Set([...BOWLING_TYPES, v].filter(Boolean))].map((t) => `<option ${t === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    if (kind === 'area') return `<textarea data-e="${k}" rows="2">${esc(v)}</textarea>`;
+    return `<input data-e="${k}" value="${esc(v)}" ${kind === 'num' || kind === 'dec' ? 'inputmode="decimal"' : ''}>`;
+  };
+  const dlg = document.createElement('dialog');
+  dlg.className = 'card';
+  dlg.style.cssText = 'max-width:720px;width:calc(100% - 32px);max-height:88vh;overflow:auto;color:var(--ink);background:var(--surface);border:1px solid var(--line)';
+  dlg.innerHTML = `<h2 style="margin-top:0">${esc(p.name)} <small class="muted">${esc(id)}</small></h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:var(--space-2) var(--space-4)">${EDIT_FIELDS.map((f) => `<label style="margin:0;${f[2] === 'area' ? 'grid-column:1/-1' : ''}">${f[1]}${input(f)}</label>`).join('')}</div>
+    <p class="hint">Saved for everyone at once: the stage, phones and slides show the new details. Pool, base price and captain can only change before the list is locked.</p>
+    <p class="row"><button class="btn-primary" data-save>Save</button><button class="btn-ghost" data-cancel>Cancel</button></p>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); };
+  $('[data-cancel]', dlg).onclick = close;
+  $('[data-save]', dlg).onclick = run(async () => {
+    const upd = {};
+    for (const [k, label, kind] of EDIT_FIELDS) {
+      let v = $(`[data-e="${k}"]`, dlg).value.trim();
+      if (kind === 'num' || kind === 'dec') {
+        if (v !== '' && !Number.isFinite(Number(v))) throw new Error(`${label}: "${v}" is not a number`);
+        v = v === '' ? null : Number(v);
+      }
+      upd[k] = v === '' ? null : v;
+    }
+    if (!upd.name) throw new Error('Name is required');
+    upd.battingStyle = null; upd.bowlingStyle = null; // older free-text styles are replaced by the fields above
+    await db.update(`${P}/players/${id}`, upd);
+    if (upd.name !== p.name) await syncLeaders({ link: false });
+    close();
+    saved(`${upd.name}: details saved`);
+  });
+}
+
+// A copy of the auction on this laptop (no photos), refreshed a few seconds after each change, so
+// there is always something to fall back on if the database is out for long. Download backup saves
+// it as an AuctionXI record file: it can be added as a record, or used to rebuild the slides / tracker.
+const BACKUP_KEY = () => `auctionxi:backup:${aid}`;
+let backupTimer = null;
+function keepBackup() {
+  clearTimeout(backupTimer);
+  backupTimer = setTimeout(() => {
+    try { localStorage.setItem(BACKUP_KEY(), JSON.stringify({ savedAt: Date.now(), snap: { ...exportSnapshot({ ...A, media: null }), media: null } })); } catch { /* storage full or private mode */ }
+  }, 3000);
+}
+function downloadBackup() {
+  let snap = null;
+  let savedAt = Date.now();
+  if (A) snap = { ...exportSnapshot({ ...A, media: null }), media: null };
+  else {
+    try { const b = JSON.parse(localStorage.getItem(BACKUP_KEY()) || 'null'); snap = b?.snap; savedAt = b?.savedAt || savedAt; } catch { /* nothing kept */ }
+  }
+  if (!snap) { toast('No backup on this laptop yet', 'error'); return; }
+  const stamp = new Date(savedAt).toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  download(`${slug(snap.meta?.name || aid)}_backup_${stamp}.json`, JSON.stringify(snap, null, 1), 'application/json');
+}
+
 function players(el) {
   const locked = !!A.meta.locked;
   const list = Object.entries(A.players).sort(([x], [y]) => x.localeCompare(y, undefined, { numeric: true }));
@@ -498,7 +585,7 @@ function players(el) {
 
   el.innerHTML = `
     ${locked
-      ? `<div class="notice notice-ok"><b>Player list locked</b> for this auction. ${A.meta.status === 'setup' ? '<button class="btn-sm" id="p-unlock">Unlock to edit</button>' : 'It can no longer change because the auction has started.'}</div>`
+      ? `<div class="notice notice-ok"><b>Player list locked</b>: who is in the auction, pools, base prices and captains are fixed${A.meta.status === 'setup' ? '' : ' now that the auction has started'}. Small fixes still work: <b>Edit</b> a player's name, role, stats or notes, change their list (auction / waiting / cancelled) or photo. ${A.meta.status === 'setup' ? '<button class="btn-sm" id="p-unlock">Unlock to edit everything</button>' : ''}</div>`
       : '<div class="notice notice-info">Upload players, check and fix anything below, then lock the list. A new auction starts with a fresh upload.</div>'}
     <div class="card">
       <div class="section-title">
@@ -531,7 +618,7 @@ function players(el) {
             <td><select data-f="allottedTeam" ${dis}>${teamOpts(p.allottedTeam)}</select></td>
             <td><select data-f="allottedAs" ${dis}>${asOpts(p.allottedAs)}</select>${isAllotted(p) ? `<span class="hint">${esc(money(allottedPrice(p, A.rules), A.rules))}</span>` : ''}</td>
             <td>${isAllotted(p) ? '' : A.sales[id] ? '<small class="muted">Sold</small>' : `<select data-list="${esc(id)}" title="In the auction, on the waiting list, or registration cancelled (can be changed at any time)"><option value="">Auction</option><option value="waiting" ${isWaiting(p) ? 'selected' : ''}>Waiting list</option><option value="cancelled" ${isCancelled(p) ? 'selected' : ''}>Registration cancelled</option></select>`}</td>
-            <td>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
+            <td style="white-space:nowrap"><button class="btn-sm" data-edit="${esc(id)}" title="Name, role, stats, notes and more. Works even after locking">Edit</button>${locked ? '' : '<button class="btn-sm btn-ghost" data-del>Remove</button>'}</td>
           </tr>`).join('') || '<tr><td colspan="14" class="muted">No players yet. Download the template, fill it in and upload it.</td></tr>'}</tbody></table>
       </div>
       <span class="hint">Base blank = the pool's base price. "Allotted to" + "As" make a player that team's captain or vice-captain:
@@ -554,6 +641,7 @@ function players(el) {
   })));
   $('#p-deck').onclick = run(saveDeck);
   $('#p-ai').onclick = run(aiScouting);
+  $$('[data-edit]', el).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); editPlayer(b.dataset.edit); }));
   if (locked) {
     $('#p-unlock') && ($('#p-unlock').onclick = run(() => db.set(`${P}/meta/locked`, false)));
     return;
@@ -587,8 +675,12 @@ function players(el) {
   });
   el.onchange = run(async (e) => {
     const tr = e.target.closest('tr[data-id]');
+    if (!tr || !e.target.dataset.f) return;
+    await savePlayerField(e, tr);
+    saved(`${A.players[tr.dataset.id]?.name || tr.dataset.id}: ${e.target.closest('td') && FIELD_NAMES[e.target.dataset.f] || 'change'} saved`);
+  });
+  async function savePlayerField(e, tr) {
     const f = e.target.dataset.f;
-    if (!tr || !f) return;
     let v = e.target.value.trim();
     if (f === 'basePrice') {
       if (v !== '' && num(v) == null) throw new Error(`"${v}" is not an amount. Try 500000 or 5L.`);
@@ -621,7 +713,7 @@ function players(el) {
     }
     await db.set(`${P}/players/${tr.dataset.id}/${f}`, v === '' ? null : v);
     if (f === 'allottedAs' || f === 'name') await syncLeaders({ link: false });
-  });
+  }
   el.onclick = run(async (e) => {
     if (!e.target.matches('[data-del]')) return;
     const id = e.target.closest('tr').dataset.id;

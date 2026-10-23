@@ -273,3 +273,7 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 .team-profile-stage .team-profile-past { font-size: 28px; gap: 10px; margin-top: var(--space-5); }
 .team-profile-stage .team-profile-past .muted, .team-profile-stage .team-profile-past span { font-size: 24px; }
 .team-profile-stage .team-profile-squad { font-size: 24px; line-height: 34px; margin-top: var(--space-5); }
+
+/* Shown while the database can't be reached */
+.offline-bar { position: sticky; top: 0; z-index: calc(var(--layer-overlay) + 1); padding: var(--space-3) var(--space-4); background: var(--danger-soft); border-bottom: 2px solid var(--danger); color: var(--ink); font-size: 15px; line-height: 21px; }
+.offline-bar .btn-sm { margin-left: var(--space-2); }

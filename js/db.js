@@ -87,6 +87,7 @@ function localBackend() {
     },
     async push(p, v) { const id = pushId(); await this.set(`${p}/${id}`, v); return id; },
     async remove(p) { await this.set(p, null); },
+    onConnection(cb) { cb(true); return () => {}; },
     on(p, cb) {
       const l = { last: undefined };
       l.fire = () => {
@@ -139,6 +140,9 @@ async function firebaseBackend(cfg) {
     update: (p, obj) => D.update(ref(p), obj),
     push: async (p, v) => (await D.push(ref(p), v)).key,
     remove: (p) => D.remove(ref(p)),
+    // True while connected to the database. While offline, writes apply in this tab at once and are
+    // queued; they are sent, in order, when the connection is back (lost if the tab is closed).
+    onConnection: (cb) => D.onValue(ref('.info/connected'), (s) => cb(!!s.val())),
     on: (p, cb) => D.onValue(ref(p), (s) => cb(s.val()), (err) => console.warn('listen failed', p, err)),
     async transaction(p, fn) {
       const res = await D.runTransaction(ref(p), fn);

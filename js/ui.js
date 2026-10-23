@@ -56,6 +56,23 @@ export function myAuctions() {
   try { return JSON.parse(localStorage.getItem('auctionxi:mine')) || []; } catch { return []; }
 }
 
+// A banner while the database can't be reached (shown only after it has been connected once).
+export function watchConnection(db, { text, extra = '' } = {}) {
+  let was = false;
+  let timer = null;
+  db.onConnection?.((online) => {
+    clearTimeout(timer);
+    let bar = document.getElementById('offline-bar');
+    if (online) { was = true; bar?.remove(); return; }
+    if (!was) return;
+    timer = setTimeout(() => { // ignore a blip of a second or two
+      if (!bar) { bar = document.createElement('div'); bar.id = 'offline-bar'; bar.className = 'offline-bar'; document.body.prepend(bar); }
+      bar.innerHTML = `<b>Offline.</b> ${text}${extra}`;
+      bar.querySelector('[data-offline-action]')?.addEventListener('click', (e) => document.dispatchEvent(new CustomEvent('offline-action', { detail: e.target.dataset.offlineAction })));
+    }, 2500);
+  });
+}
+
 export function pageUrl(page, params) {
   const u = new URL(page, location.href);
   for (const [k, v] of Object.entries(params || {})) if (v != null) u.searchParams.set(k, v);

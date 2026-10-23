@@ -8,7 +8,7 @@ import { whatIf, buyable } from './plan.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
-import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, deviceCommLang, setDeviceCommLang } from './ui.js';
+import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, watchConnection, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
 import { seasonsOf } from './history.js';
@@ -66,6 +66,7 @@ async function boot() {
   }
   const draw = () => { if (stage) renderStage(); else renderPhone(); };
   watchMedia(aid, (m) => { media = m; if (A) { applyMedia(A, media); draw(); } });
+  if (!stage) watchConnection(db, { text: 'Reconnecting to the auction… What you see may be out of date, and bids can\'t be sent until the connection is back.' });
   db.on(`auctions/${aid}`, (v) => {
     A = applyMedia(normalize(v), media);
     if (!A) { $('#app').innerHTML = '<div class="card"><h2>Auction not found</h2><p><a href="index.html">Back to home</a></p></div>'; return; }
