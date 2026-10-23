@@ -8,14 +8,15 @@
 
 import { db } from './db.js';
 import { $, $$, esc, toast } from './ui.js';
-import { money, category, ROLES, roleId, basePrice, teamSummary, isAllotted, minBase } from './engine.js';
+import { money, category, ROLES, roleId, basePrice, teamSummary, isAllotted, minBase, nextBid, searchPlayers } from './engine.js';
+import { planFor, whatIf, buyable } from './plan.js';
 import { roleChip, badge, teamBadge } from './ds.js';
 import { keyFor, encryptJSON, decryptJSON, calc } from './vault.js';
 import { aiReady, aiSettingsCard, askAI, playerFacts } from './ai.js';
 
 export { calc };
 
-const emptyBook = () => ({ players: {}, ledger: {}, teamNotes: {}, teamPurse: {}, pad: '' });
+const emptyBook = () => ({ players: {}, ledger: {}, teamNotes: {}, teamPurse: {}, pad: '', order: [] });
 
 // The workbook of one seat (`T2_C`, `T2_VC`) in one auction.
 export function openWorkbook(aid, seat) {
@@ -68,7 +69,7 @@ export function openWorkbook(aid, seat) {
 
 /* ---------------- view ---------------- */
 
-const ui = { aiQ: '', aiA: '', view: 'players', q: '', pool: '', role: '', favOnly: false, availOnly: true };
+const ui = { aiQ: '', aiA: '', wiPid: '', wiPrice: '', addQ: '', view: 'plan', q: '', pool: '', role: '', favOnly: false, availOnly: true };
 
 function playerStatus(a, pid) {
   const s = a.sales[pid];
@@ -150,6 +151,103 @@ function teamsView(a, book, myTeam) {
     }).join('')}</div>`;
 }
 
+// The captain's targets in their own order (the order list first, then by max bid).
+export function targetsOf(book) {
+  const order = book.order || [];
+  return Object.entries(book.players).filter(([, x]) => x.fav)
+    .map(([id, x]) => ({ id, max: x.max ?? null }))
+    .sort((x, y) => {
+      const i = order.indexOf(x.id); const j = order.indexOf(y.id);
+      return (i < 0 ? 1e9 : i) - (j < 0 ? 1e9 : j) || (Number(y.max) || 0) - (Number(x.max) || 0);
+    });
+}
+
+const kv = (k, v, tone = '') => `<div class="ax-kv"><span class="ax-k">${k}</span><span class="ax-price ax-price-md ${tone}">${v}</span></div>`;
+
+function planView(a, book, team) {
+  const r = a.rules;
+  const m = (n) => esc(money(n, r));
+  const targets = targetsOf(book);
+  const plan = planFor(a, team, targets);
+  const { now } = plan;
+  const name = (id) => esc(a.players[id]?.name || id);
+  // The player on the block, if this team can still buy them.
+  const live = a.live?.status === 'bidding' && a.live.playerId;
+  let block = '';
+  if (live && buyable(a, live)) {
+    const nb = nextBid(a.live, r) ?? basePrice(a.players[live], r);
+    const mine = book.players[live]?.max;
+    const line = (price, label) => {
+      const w = whatIf(a, team, live, price, targets);
+      if (!w.allowed) return `<p style="margin:var(--space-1) 0">${label} ${m(price)}: <b class="ax-tone-danger">over your max bid of ${m(w.limit.max)}</b>${w.limit.why ? ` (${esc(w.limit.why)})` : ''}</p>`;
+      return `<p style="margin:var(--space-1) 0">${label} <b>${m(price)}</b>: leaves <b>${m(w.after.remaining)}</b> for ${w.after.toBuy} more player${w.after.toBuy === 1 ? '' : 's'}, your max bid then <b>${m(w.after.maxBid)}</b>.
+        ${w.lost.length ? `<br><span class="ax-tone-danger">Your list would no longer fit: ${w.lost.map((x) => `${name(x.id)} (your max ${m(x.price)}, you could bid ${m(x.limit)})`).join(', ')}.</span>` : targets.length ? '<br><span class="muted">The rest of your list still fits.</span>' : ''}</p>`;
+    };
+    block = `<div class="card" style="border-color:var(--gold);margin-bottom:var(--space-4)">
+      <div class="section-title"><h3 style="margin:0">On the block: ${name(live)}</h3>${a.live.bid?.team ? `<small>${esc(a.teams[a.live.bid.team]?.name || '')} leads at ${m(a.live.bid.amount)}</small>` : ''}</div>
+      ${a.live.bid?.team === team ? line(Number(a.live.bid.amount), 'You lead. If it ends at') : line(nb, 'If you win at the next bid')}
+      ${mine != null && Number(mine) !== nb ? line(Number(mine), 'At your max') : ''}
+    </div>`;
+  }
+  const row = (st, i) => {
+    const p = a.players[st.id];
+    return `<div class="plan-row${st.fits ? '' : ' plan-row-bad'}">
+      <div class="row" style="gap:var(--space-2)">
+        <b>${i + 1}.</b> <b style="flex:1;min-width:0">${esc(p.name)} <small class="muted">${esc(st.id)} · ${esc(ROLES[roleId(p.role)].code)}${a.live?.playerId === st.id && a.live.status === 'bidding' ? ' · up now' : a.unsold[st.id] ? ' · unsold so far' : ''}</small></b>
+        <span style="white-space:nowrap"><button class="btn-sm btn-ghost" data-up="${esc(st.id)}" ${i ? '' : 'disabled'} aria-label="Move up">↑</button><button class="btn-sm btn-ghost" data-down="${esc(st.id)}" ${i === plan.steps.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button><button class="btn-sm btn-ghost" data-fav="${esc(st.id)}" aria-label="Remove from my list">✕</button></span>
+      </div>
+      <div class="plan-nums">
+        <label style="margin:0"><span class="ax-k">My max</span><input data-max="${esc(st.id)}" inputmode="numeric" value="${esc(book.players[st.id]?.max ?? '')}" placeholder="${esc(basePrice(p, r))}"></label>
+        <div class="ax-kv"><span class="ax-k">Leaves</span><b>${st.fits ? m(st.remaining) : '—'}</b></div>
+        <div class="ax-kv"><span class="ax-k">To buy</span><b>${st.fits ? st.toBuy : '—'}</b></div>
+        <div class="ax-kv"><span class="ax-k">Max bid after</span><b>${st.fits ? m(st.maxBid) : '—'}</b></div>
+      </div>
+      ${st.fits ? '' : `<small class="ax-tone-danger">${st.belowBase ? `Below the base price of ${m(basePrice(p, r))}` : `Too much at this point: you could bid at most ${m(st.limit)}`}</small>`}
+    </div>`;
+  };
+  const found = ui.addQ.trim() ? searchPlayers(Object.entries(a.players).filter(([id]) => buyable(a, id) && !book.players[id]?.fav).map(([id, p]) => ({ ...p, id })), ui.addQ, 5) : [];
+  const wiList = Object.entries(a.players).filter(([id]) => buyable(a, id)).sort(([, x], [, y]) => x.name.localeCompare(y.name));
+  const wiPid = ui.wiPid && buyable(a, ui.wiPid) ? ui.wiPid : '';
+  let wiOut = '';
+  if (wiPid && ui.wiPrice !== '') {
+    const w = whatIf(a, team, wiPid, Number(ui.wiPrice), targets);
+    wiOut = `<div class="row" style="gap:var(--space-5);margin-top:var(--space-3)">
+        ${kv('Points left after', m(w.after.remaining))}${kv('Still to buy', w.after.toBuy)}${kv('Max bid after', m(w.after.maxBid), 'ax-tone-gold')}
+        ${w.after.toBuy ? kv('Average per player', m(Math.floor(w.after.remaining / w.after.toBuy))) : ''}
+      </div>
+      ${!w.allowed ? `<p class="notice notice-warn">${w.belowBase ? `Below ${name(wiPid)}'s base price of ${m(basePrice(a.players[wiPid], r))}.` : `You can't pay that now: your max bid for ${name(wiPid)} is ${m(w.limit.max)}. ${esc(w.limit.why || '')}`}</p>` : ''}
+      ${w.allowed && targets.filter((t) => t.id !== wiPid).length ? (w.lost.length
+        ? `<p class="notice notice-warn">Then your list no longer fits: ${w.lost.map((x) => `${name(x.id)} (your max ${m(x.price)}, you could bid at most ${m(x.limit)})`).join(', ')}. Lower those max bids or drop a target.</p>`
+        : `<p class="hint">The rest of your list still fits: after it you would have ${m(w.plan.left)} for ${w.plan.restSlots} more player${w.plan.restSlots === 1 ? '' : 's'}.</p>`) : ''}`;
+  }
+  return `${block}
+    <div class="card">
+      <div class="section-title"><h3 style="margin:0">Where you stand</h3><small>${esc(a.teams[team]?.name || '')}</small></div>
+      <div class="row" style="gap:var(--space-5)">${kv('Points left', m(now.remaining))}${kv('Squad', `${now.count} / ${now.squadSize}`)}${kv('Still to buy', now.toBuy)}${kv('Max bid now', m(now.maxBid), 'ax-tone-gold')}</div>
+      <p class="hint" style="margin-bottom:0">Max bid = points left - (players still to buy - 1) x ${m(plan.base)}, so you can always fill your squad.</p>
+    </div>
+    <div class="card" style="margin-top:var(--space-4)">
+      <div class="section-title"><h3 style="margin:0">My targets</h3><small>in the order you'd like to buy them</small></div>
+      ${plan.steps.length ? `<div class="stack" style="gap:var(--space-2)">${plan.steps.map(row).join('')}</div>
+      <p style="margin:var(--space-3) 0 0">If you win ${plan.count === plan.steps.length ? (plan.count === 1 ? 'it' : `all ${plan.count}`) : `the ${plan.count} that fit`} at your max: you spend <b>${m(plan.spend)}</b> and keep <b>${m(plan.left)}</b> for ${plan.restSlots} more player${plan.restSlots === 1 ? '' : 's'}${plan.restSlots ? ` (about <b>${m(plan.perSlot)}</b> each; ${m(Math.max(0, plan.spare))} above the base price to spread)` : ''}.</p>
+      ${plan.extra ? `<p class="notice notice-warn">Your list has ${plan.steps.length} players but you have only ${now.toBuy} place${now.toBuy === 1 ? '' : 's'} left. Keep some as back-ups.</p>` : ''}
+      <p class="hint">"Leaves" and "Max bid after" assume you win each player above it at your max. No max set = the base price. Rows in red don't fit at that point.</p>`
+      : '<p class="muted">No targets yet. Add players below or tap "Add to list" in Players.</p>'}
+      ${plan.gone.length ? `<p style="margin:var(--space-3) 0 0"><small class="muted">Gone: ${plan.gone.map((g) => `${name(g.id)} ${g.mine ? `(yours, ${m(g.price)})` : g.team ? `(${esc(a.teams[g.team]?.name || g.team)}, ${m(g.price)})` : `(${g.unavailable === 'waiting' ? 'waiting list' : 'not in the auction'})`}`).join(' · ')}</small></p>` : ''}
+      <label>Add a target</label>
+      <input data-wb-add value="${esc(ui.addQ)}" placeholder="Name, number or both" autocomplete="off">
+      <div class="stack" style="gap:var(--space-1);margin-top:var(--space-2)">${found.map((p) => `<div class="row" style="padding:var(--space-1) var(--space-2);border:1px solid var(--line);border-radius:var(--radius-sm)"><code>${esc(p.id)}</code> ${esc(p.name)} <small class="muted">${esc(ROLES[roleId(p.role)].code)}</small><span class="spacer"></span><button class="btn-sm" data-fav="${esc(p.id)}">Add</button></div>`).join('')}</div>
+    </div>
+    <div class="card" style="margin-top:var(--space-4)">
+      <div class="section-title"><h3 style="margin:0">What if I buy…</h3></div>
+      <div class="row">
+        <select data-wi-pid style="flex:1;min-width:160px"><option value="">Choose a player</option>${wiList.map(([id, p]) => `<option value="${esc(id)}" ${wiPid === id ? 'selected' : ''}>${esc(id)} · ${esc(p.name)}</option>`).join('')}</select>
+        <input data-wi-price inputmode="numeric" value="${esc(ui.wiPrice)}" placeholder="Price" style="width:100px">
+      </div>
+      ${wiOut || '<p class="hint" style="margin-bottom:0">Pick a player and a price to see what it leaves for the rest of your squad and whether your list still fits.</p>'}
+    </div>`;
+}
+
 function padView(book) {
   return `<div class="card">
     <label>Quick sum</label>
@@ -199,9 +297,9 @@ export function renderWorkbook(el, ctx) {
       <button class="btn-sm btn-ghost" data-wb-lock>Lock</button>
     </div>
     <div class="ax-seg" role="group" aria-label="Workbook section" style="margin-bottom:var(--space-4)">
-      ${[['players', 'Players'], ['teams', 'Other teams'], ['pad', 'Scratch pad']].map(([k, l]) => `<button type="button" data-wb-view="${k}" aria-pressed="${ui.view === k}">${l}</button>`).join('')}
+      ${[['plan', 'My plan'], ['players', 'Players'], ['teams', 'Other teams'], ['pad', 'Scratch pad']].map(([k, l]) => `<button type="button" data-wb-view="${k}" aria-pressed="${ui.view === k}">${l}</button>`).join('')}
     </div>
-    <div data-wb-body>${ui.view === 'teams' ? teamsView(a, book, ctx.team) : ui.view === 'pad' ? padView(book) : playersView(a, book)}</div>`;
+    <div data-wb-body>${ui.view === 'teams' ? teamsView(a, book, ctx.team) : ui.view === 'pad' ? padView(book) : ui.view === 'plan' ? planView(a, book, ctx.team) : playersView(a, book)}</div>`;
 
   const redraw = () => renderWorkbook(el, ctx);
   const changed = () => wb.save();
@@ -223,14 +321,33 @@ export function renderWorkbook(el, ctx) {
     };
   });
   const entry = (pid) => (book.players[pid] ||= {});
-  $$('[data-fav]', el).forEach((b) => (b.onclick = () => { const e = entry(b.dataset.fav); e.fav = !e.fav; changed(); redraw(); }));
+  // New targets go to the end of the plan, in the order they are added.
+  const listed = (pid) => { book.order = (book.order || []).filter((x) => x !== pid); if (book.players[pid]?.fav) book.order.push(pid); };
+  $$('[data-fav]', el).forEach((b) => (b.onclick = () => { const e = entry(b.dataset.fav); e.fav = !e.fav; listed(b.dataset.fav); changed(); redraw(); }));
   $$('[data-max]', el).forEach((inp) => (inp.onchange = () => {
     const v = inp.value.trim();
     const n = v === '' ? null : Number(v.replace(/[₹,\s]/g, ''));
     if (v && !Number.isFinite(n)) { toast('Enter a number', 'error'); return; }
-    const e = entry(inp.dataset.max); e.max = n; if (n != null) e.fav = true; changed(); redraw();
+    const e = entry(inp.dataset.max); e.max = n; if (n != null && !e.fav) { e.fav = true; listed(inp.dataset.max); } changed(); redraw();
   }));
   $$('[data-note]', el).forEach((inp) => (inp.oninput = () => { entry(inp.dataset.note).note = inp.value; changed(); }));
+  // My plan: order, add a target, what-if
+  const move = (id, by) => {
+    const ids = targetsOf(book).map((t) => t.id);
+    const i = ids.indexOf(id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    book.order = ids; changed(); redraw();
+  };
+  $$('[data-up]', el).forEach((b) => (b.onclick = () => move(b.dataset.up, -1)));
+  $$('[data-down]', el).forEach((b) => (b.onclick = () => move(b.dataset.down, 1)));
+  const add = $('[data-wb-add]', el);
+  if (add) add.oninput = () => { ui.addQ = add.value; const pos = add.selectionStart; redraw(); const again = $('[data-wb-add]', el); again.focus(); again.setSelectionRange(pos, pos); };
+  const wiP = $('[data-wi-pid]', el);
+  if (wiP) wiP.onchange = () => { ui.wiPid = wiP.value; if (ui.wiPid && ui.wiPrice === '') ui.wiPrice = String(book.players[ui.wiPid]?.max ?? basePrice(a.players[ui.wiPid], a.rules)); redraw(); };
+  const wiN = $('[data-wi-price]', el);
+  if (wiN) wiN.onchange = () => { ui.wiPrice = wiN.value.replace(/[₹,\s]/g, ''); redraw(); };
   // Other teams
   $$('[data-add]', el).forEach((b) => (b.onclick = () => {
     const id = b.dataset.add;
