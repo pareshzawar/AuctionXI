@@ -967,11 +967,11 @@ function pastSeasonsCard() {
   return `<div class="card" style="margin-bottom:var(--space-4)">
     <div class="section-title"><h2>Past seasons</h2><small class="muted">optional · team records and top performers</small><span class="spacer"></span>
       <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Add a season's record<input type="file" accept=".json,application/json" id="hs-upload" hidden></label></div>
-    ${seasons.length ? `<ul class="stack" style="list-style:none;padding:0;margin:0;gap:var(--space-2)">${seasons.map((h) => `<li class="row"><b>Season ${esc(h.season)}</b>
+    ${seasons.length ? `<ul class="stack" style="list-style:none;padding:0;margin:0;gap:var(--space-2)">${seasons.map((h) => `<li class="row"><b>Season ${esc(h.season)}${h.kind === 'mini' ? ' · mini' : ''}</b>
       <small class="muted">${esc([h.champion && `Champion ${h.champion}`, `${h.auction?.teams?.length || 0} teams`, `${h.auction?.sold || 0} players sold`, h.standings?.length ? 'standings' : '', h.top?.mvp?.length ? 'top performers' : ''].filter(Boolean).join(' · '))}</small>
-      <span class="spacer"></span><button class="btn-sm btn-ghost" data-hs-del="${esc(h.season)}">Remove</button></li>`).join('')}</ul>`
+      <span class="spacer"></span><button class="btn-sm btn-ghost" data-hs-del="${esc(h.season)}" data-hs-key="${esc(h.key)}">Remove</button></li>`).join('')}</ul>`
       : '<p class="muted" style="margin:0">None yet.</p>'}
-    <span class="hint">Use the record file of an earlier season (Results → Download JSON, or a past auction you added as a record). Add a <code>results</code> block for the standings, knockouts and top performers; see README. Phones get a Past seasons tab, and the control room can put a season or a team's profile on the stage.</span>
+    <span class="hint">Add every earlier season you have, one file each: there is no limit. Use the record file of an earlier season (Results → Download JSON, or a past auction you added as a record). Add a <code>results</code> block for the standings, knockouts and top performers; see README. Phones get a Past seasons tab, and the control room can put a season or a team's profile on the stage.</span>
   </div>`;
 }
 
@@ -983,11 +983,15 @@ function wirePastSeasons(el) {
     try { rec = JSON.parse(await readFile(f)); } catch { throw new Error('That file is not JSON'); }
     const h = historyFromRecord(rec);
     if (!h.season) throw new Error('The record has no season number (meta.season)');
-    await db.set(`${P}/history/s${h.season.replace(/[^A-Za-z0-9]/g, '')}`, h);
+    // One entry per season (a mini auction's record sits beside its season's major one); add as many
+    // seasons as you have. The same season again replaces it.
+    const key = `s${h.season.replace(/[^A-Za-z0-9]/g, '')}${rec.meta.kind === 'mini' ? 'm' : ''}`;
+    if (A.history?.[key] && !confirm(`Season ${h.season}${h.kind === 'mini' ? ' (mini)' : ''} is already here. Replace it with this file?`)) return;
+    await db.set(`${P}/history/${key}`, h);
     toast(`Season ${h.season} added${h.standings.length ? ', with standings' : ''}${h.top.mvp.length ? ' and top performers' : ''}`, 'ok');
   });
   $$('[data-hs-del]', el).forEach((b) => (b.onclick = run(async () => {
-    if (confirm(`Remove season ${b.dataset.hsDel} from this auction?`)) await db.set(`${P}/history/s${b.dataset.hsDel.replace(/[^A-Za-z0-9]/g, '')}`, null);
+    if (confirm(`Remove season ${b.dataset.hsDel} from this auction?`)) await db.set(`${P}/history/${b.dataset.hsKey}`, null);
   })));
 }
 
@@ -1488,7 +1492,7 @@ function stagePanel(bidding) {
     <p class="row">
       <button class="btn-sm" data-sv="available" ${bidding ? 'disabled title="Finish the player on the block first"' : ''}>Show players up for auction (${available.length})</button>
       <button class="btn-sm" data-sv="waiting" ${bidding || !waiting.length ? 'disabled' : ''}>Show the waiting list (${waiting.length})</button>
-      ${seasons.map((h) => `<button class="btn-sm" data-svh="${esc(h.season)}" ${bidding ? 'disabled' : ''}>Season ${esc(h.season)} record</button>`).join('')}
+      ${seasons.map((h) => `<button class="btn-sm" data-svh="${esc(h.key)}" ${bidding ? 'disabled' : ''}>Season ${esc(h.season)}${h.kind === 'mini' ? ' mini' : ''} record</button>`).join('')}
       <select id="sv-team" style="width:auto" ${bidding ? 'disabled' : ''}><option value="">A team's profile…</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}">${esc(t.name)}</option>`).join('')}</select>
     </p>
     <div style="max-width:560px">
@@ -1653,12 +1657,14 @@ function results(el) {
       </div>
       <div class="card">
         <h2>Keep results online permanently</h2>
+        <p>The archive holds any number of auctions: every season, major and mini, side by side.</p>
+        <p><button id="r-archive">Download the 2 archive files</button></p>
         <ol>
-          <li>Download the full auction JSON.</li>
-          <li>In GitHub, add it as <code>archive/${esc(slug(A.meta.name))}/auction.json</code>.</li>
-          <li>Add an entry to <code>archive/index.json</code>.</li>
+          <li>In GitHub, add <code>auction.json</code> as <code>archive/${esc(archiveSlug())}/auction.json</code>.</li>
+          <li>Replace <code>archive/index.json</code> with the downloaded one: it already lists the archived auctions plus this one.</li>
         </ol>
-        <p>GitHub Pages then serves it at <code>results.html?archive=${esc(slug(A.meta.name))}</code>, even if the live database is cleaned up.</p>
+        <p class="hint">The archive is public. Player photos are not included; leave a tournament out of it if its details should stay private.</p>
+        <p>GitHub Pages then serves it at <code>results.html?archive=${esc(archiveSlug())}</code>, even if the live database is cleaned up.</p>
       </div>
     </div>
     ${A.meta.mock ? "" : miniBuilder()}`;
@@ -1677,6 +1683,34 @@ function results(el) {
   $('#r-tracker').onclick = run(saveTracker);
   $('#r-deck').onclick = run(saveDeck);
   $('#r-json').onclick = () => download(`${slug(A.meta.name) || aid}.auction.json`, JSON.stringify(exportSnapshot(A), null, 2), 'application/json');
+  $('#r-archive').onclick = run(downloadArchive);
+}
+
+// The folder name in archive/: the auction's name, plus its season when the name doesn't say it.
+function archiveSlug() {
+  const s = slug(A.meta.name) || aid.toLowerCase();
+  const season = slug(String(A.meta.season || ''));
+  return season && !s.includes(season) ? `${s}-${season}` : s;
+}
+
+// auction.json for the folder, and index.json = the archive's current list with this auction added
+// (or updated, if it was archived before), newest first.
+async function downloadArchive() {
+  const s = archiveSlug();
+  let index = { auctions: [] };
+  try {
+    const res = await fetch('archive/index.json', { cache: 'no-cache' });
+    if (res.ok) index = await res.json();
+  } catch { /* no archive yet */ }
+  const entry = { slug: s, name: A.meta.name, tournament: A.meta.tournament || undefined, season: A.meta.season || undefined, kind: A.meta.kind === 'mini' ? 'mini' : undefined, date: A.meta.date || undefined };
+  const list = (index.auctions || []).filter((x) => x.slug !== s);
+  list.push(JSON.parse(JSON.stringify(entry)));
+  list.sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')) || String(x.name).localeCompare(String(y.name)));
+  // Public copy: the league logo and banner, but no player photos or team banners.
+  const snap = { ...exportSnapshot(A), media: { logo: A.media?.logo || null, banner: A.media?.banner || null } };
+  download('auction.json', JSON.stringify(snap, null, 2), 'application/json');
+  setTimeout(() => download('index.json', `${JSON.stringify({ ...index, auctions: list }, null, 2)}\n`, 'application/json'), 400);
+  toast(`${list.length} auction${list.length === 1 ? '' : 's'} in the archive list`, 'ok');
 }
 
 /* ---------------- Next season's mini auction ---------------- */

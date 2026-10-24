@@ -87,8 +87,16 @@ async function renderArchive() {
   try {
     const res = await fetch('archive/index.json', { cache: 'no-cache' });
     const list = (await res.json()).auctions || [];
+    // Any number of entries, grouped by tournament, newest first.
+    const groups = new Map();
+    for (const x of [...list].sort((p, q) => String(q.date || q.season || '').localeCompare(String(p.date || p.season || ''), undefined, { numeric: true }))) {
+      const t = x.tournament || '';
+      if (!groups.has(t)) groups.set(t, []);
+      groups.get(t).push(x);
+    }
+    const item = (x) => `<li><a href="${pageUrl('results.html', { archive: x.slug })}">${esc(x.name)}</a> <small>${esc([x.season && `season ${x.season}`, x.kind === 'mini' && 'mini', x.date].filter(Boolean).join(' · '))}</small></li>`;
     $('#archive').innerHTML = list.length
-      ? `<ul>${list.map((x) => `<li><a href="${pageUrl('results.html', { archive: x.slug })}">${esc(x.name)}</a> <small>${esc(x.date || '')}</small></li>`).join('')}</ul>`
+      ? [...groups].map(([t, items]) => `${t && groups.size > 1 ? `<h3 style="margin:var(--space-3) 0 var(--space-1)">${esc(t)}</h3>` : ''}<ul>${items.map(item).join('')}</ul>`).join('')
       : '<p class="muted">No archived auctions yet.</p>';
   } catch {
     $('#archive').innerHTML = '<p class="muted">No archived auctions yet.</p>';

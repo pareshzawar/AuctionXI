@@ -305,7 +305,7 @@ export function historyView(a) {
   if (!seasons.length) return '<div class="card"><p class="muted">No past seasons added yet.</p></div>';
   return `<div class="card"><h3 style="margin-top:0">This season's teams</h3><div class="stack" style="gap:var(--space-3)">${Object.keys(a.teams).map((id) => teamProfile(a, id)).join('')}</div></div>
     ${seasons.map((h) => `<div class="card" style="margin-top:var(--space-4)">
-      <div class="section-title"><h3 style="margin:0">Season ${esc(h.season)}</h3><small class="muted">${esc([h.dates, h.venue].filter(Boolean).join(' · '))}</small></div>
+      <div class="section-title"><h3 style="margin:0">Season ${esc(h.season)}${h.kind === 'mini' ? ' · mini auction' : ''}</h3><small class="muted">${esc([h.dates, h.venue].filter(Boolean).join(' · '))}</small></div>
       ${h.champion ? `<p class="hist-champ"><span class="hist-gold">Champion</span> <b>${esc(h.champion)}</b>${h.runnerUp ? ` · <span class="hist-silver">Runner-up</span> ${esc(h.runnerUp)}` : ''}</p>` : ''}
       ${standingsTable(h, a)}
       ${h.knockouts?.length ? `<ul class="hist-ko">${h.knockouts.map((k) => `<li><b>${esc(k.stage)}</b> ${esc(k.result)}</li>`).join('')}</ul>` : ''}
@@ -317,7 +317,7 @@ export function historyView(a) {
 
 // The stage: one past season (standings, champion, top performers).
 export function stageHistory(a, season) {
-  const h = seasonsOf(a).find((x) => x.season === String(season)) || seasonsOf(a)[0];
+  const h = seasonsOf(a).find((x) => x.key === String(season)) || seasonsOf(a).find((x) => x.season === String(season)) || seasonsOf(a)[0];
   if (!h) return '';
   return `<div class="stage-history" style="grid-column:1/-1">
     <h2 class="stage-board-title">${esc(h.tournament ? `${h.tournament.replace(/\s*\(.*\)$/, '')} · ` : '')}Season ${esc(h.season)} <span>${esc(h.champion ? `Champion: ${h.champion}` : '')}${h.runnerUp ? ` · Runner-up: ${esc(h.runnerUp)}` : ''}</span></h2>
