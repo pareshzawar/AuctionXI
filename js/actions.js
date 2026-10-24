@@ -6,7 +6,7 @@
 
 import { db, isLocal } from './db.js';
 import { esc } from './ui.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget, visibilityOf } from './engine.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget, visibilityOf, ladderError } from './engine.js';
 
 async function newAuctionId(name, tournament) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
@@ -322,6 +322,9 @@ export async function placeBid(aid, a, team, source = 'phone', jump = null) {
   const amount = jump != null ? Number(jump) : next;
   if (!Number.isFinite(amount)) throw new Error('Enter an amount');
   if (amount < next) throw new Error(`The next bid must be at least ${money(next, a.rules)}`);
+  // One step up is always on the ladder; a jump must land on a step too.
+  const step = jump != null && ladderError(amount, basePrice(a.players[a.live.playerId], a.rules), a.rules);
+  if (step) throw new Error(step);
   const why = bidBlocker(a, team, amount);
   if (why) throw new Error(why);
   const timer = Number(a.rules.bidTimer) || 0;
@@ -352,7 +355,8 @@ export async function undoLastBid(aid, a) {
 
 // Room / paddle auction: the auctioneer enters the winning team and final amount.
 // Returns a warning string (and does nothing) when a soft rule would be broken, unless `force`.
-export async function recordRoomSale(aid, a, team, amount, force = false) {
+// The final amount from the paddles: on the bid steps and within the team's max bid, like any bid.
+export async function recordRoomSale(aid, a, team, amount) {
   const live = a.live;
   if (!live || live.status !== 'bidding') throw new Error('Bring up a player first');
   if (!a.teams[team]) throw new Error('Choose the winning team');
@@ -361,8 +365,12 @@ export async function recordRoomSale(aid, a, team, amount, force = false) {
   if (!(amount >= base)) throw new Error(`Enter at least the base price, ${money(base, a.rules)}`);
   const s = teamSummary(a, team);
   if (amount > s.remaining) throw new Error(`${a.teams[team].name} has only ${money(s.remaining, a.rules)} left`);
+  const step = ladderError(amount, base, a.rules);
+  if (step) throw new Error(step);
   const { max, why } = bidLimit(a, team, p);
-  if (amount > max && !force) return `Over ${a.teams[team].name}'s max bid of ${money(max, a.rules)}. ${why}`;
+  if (max <= 0) throw new Error(`${a.teams[team].name} cannot buy this player. ${why}`.trim());
+  const whose = /s$/i.test(a.teams[team].name) ? `${a.teams[team].name}'` : `${a.teams[team].name}'s`;
+  if (amount > max) throw new Error(`Over ${whose} max bid of ${money(max, a.rules)}. ${why}`.trim());
   await db.set(`auctions/${aid}/live/bid`, { amount, team, source: 'room', at: db.now(), until: null });
   await sell(aid, { ...a, live: { ...live, bid: { amount, team } } });
   return null;

@@ -195,6 +195,27 @@ export function increment(amount, rules) {
   return Number(slabs.at(-1)?.step) || 1;
 }
 
+// Bids follow the steps: from the base price, each raise is the step of the slab it starts in
+// (CPL: 50, 60 … 150, 165, 180 … 300, 320 …). Room and jump bids must land on one of these.
+export function onLadder(amount, base, rules) {
+  let v = Number(base) || 0;
+  for (let i = 0; v < amount && i < 100000; i++) v += increment(v, rules);
+  return v === Number(amount);
+}
+// The step amounts either side of an amount that is off the ladder: { below, above }.
+export function ladderAround(amount, base, rules) {
+  let v = Number(base) || 0;
+  let below = null;
+  for (let i = 0; v < amount && i < 100000; i++) { below = v; v += increment(v, rules); }
+  return { below, above: v };
+}
+// "Bids go in steps here: 165 or 180" for an amount that is off the ladder, else null.
+export function ladderError(amount, base, rules) {
+  if (onLadder(amount, base, rules)) return null;
+  const { below, above } = ladderAround(amount, base, rules);
+  return `${money(amount, rules)} is not a bid step. Bids go up by ${money(increment(below ?? base, rules), rules)} here: ${[below, above].filter((x) => x != null && x >= base).map((x) => money(x, rules)).join(' or ')}`;
+}
+
 export function category(rules, id) {
   return (rules.categories || []).find((c) => c.id === id) || null;
 }

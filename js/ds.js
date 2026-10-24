@@ -215,9 +215,13 @@ export function salesTicker(items, rules, { size = '', label = 'Last sold', scro
   const list = (hidden) => `<div class="ax-ticker-list"${hidden ? ' aria-hidden="true"' : ''}>${items.map((it) => `<span class="ax-ticker-item"><b>${esc(it.player)}</b>${
     it.result === 'unsold' ? '<span class="ax-k" style="color:var(--unsold)">Unsold</span>' : teamBadge(it.team) + price(it.price, rules, { tone: 'gold' })
   }</span>`).join('')}</div>`;
+  // Scrolling: two copies move left together and loop seamlessly, about 4 s per sale. The start is
+  // taken from the clock, so a page that redraws on every bid carries on where it was.
+  const dur = Math.max(20, items.length * 4);
+  const track = scroll ? ` class="ax-ticker-track" style="--dur:${dur}s;animation-delay:-${Date.now() % (dur * 1000)}ms"` : ' style="display:flex"';
   return `<div class="${cx('ax-ticker', size === 'stage' && 'ax-ticker-stage', scroll && 'ax-ticker-scroll')}">`
     + `<span class="ax-ticker-k">${esc(label)}</span>`
-    + `<div class="ax-ticker-view"><div style="display:flex">${list(false)}${scroll ? list(true) : ''}</div></div></div>`;
+    + `<div class="ax-ticker-view"><div${track}>${list(false)}${scroll ? list(true) : ''}</div></div></div>`;
 }
 
 export function soldStamp({ result = 'sold', player = '', team = null, amount = null, rules, size = '', note = '' }) {
