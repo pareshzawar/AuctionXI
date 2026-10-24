@@ -454,7 +454,9 @@ export async function undoSale(aid, a, pid) {
 
 // Change the team and / or price of any sale. Returns a warning (and changes nothing) when a rule
 // would be broken, unless `force`: the admin may know better (a mistake typed in the hall).
-export async function editSale(aid, a, pid, { team, price }, force = false) {
+// A correction follows the same rules as a live bid: at least the base price, on the bid steps,
+// and within what the team could pay without this player.
+export async function editSale(aid, a, pid, { team, price }) {
   const s = a.sales[pid];
   const p = a.players[pid];
   if (!s || s.allotted || s.retained || !p) throw new Error('That player was not bought in the auction');
@@ -464,17 +466,17 @@ export async function editSale(aid, a, pid, { team, price }, force = false) {
   if (team === s.team && amount === Number(s.price)) return null;
   const without = { ...a, sales: Object.fromEntries(Object.entries(a.sales).filter(([k]) => k !== pid)), live: null };
   const lim = bidLimit(without, team, p);
-  const warn = [];
-  if (amount < basePrice(p, a.rules)) warn.push(`below ${p.name}'s base price of ${money(basePrice(p, a.rules), a.rules)}`);
-  if (amount > lim.max) warn.push(`over what ${a.teams[team].name} can pay (${money(lim.max, a.rules)}${lim.why ? `: ${lim.why}` : ''})`);
-  if (warn.length && !force) return `This sale would be ${warn.join(' and ')}.`;
+  const base = basePrice(p, a.rules);
+  if (amount < base) throw new Error(`${money(amount, a.rules)} is below ${p.name}'s base price of ${money(base, a.rules)}`);
+  const step = ladderError(amount, base, a.rules);
+  if (step) throw new Error(step);
+  if (amount > lim.max) throw new Error(`${money(amount, a.rules)} is over what ${a.teams[team].name} can pay (max ${money(lim.max, a.rules)}${lim.why ? `: ${lim.why}` : ''})`);
   const sale = { ...s, team, price: amount, editedAt: db.now(), was: { team: s.team, price: Number(s.price) } };
   await db.update(`auctions/${aid}`, {
     [`sales/${pid}`]: sale,
     ...capsUpdate({ ...a, sales: { ...a.sales, [pid]: sale } }),
   });
   await log(aid, { type: 'edit', playerId: pid, team, amount, fromTeam: s.team, fromAmount: Number(s.price) });
-  return null;
 }
 
 // The countdown after each bid is only shown, never acted on: the auctioneer always closes the

@@ -381,3 +381,7 @@ body.stage-mode #banner-bar { display: none; }
 .final-stage .final-head h2 { font-size: 52px; } .final-stage .final-head span { font-size: 24px; }
 .final-stage .final-grid { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--space-4); }
 .final-stage .final-team li { font-size: 21px; padding: 4px 0; } .final-stage .final-team header small { font-size: 16px; }
+details.stage-extras > summary { list-style: none; }
+details.stage-extras > summary::-webkit-details-marker { display: none; }
+details.stage-extras > summary h2::before { content: '▸ '; color: var(--ink-muted); }
+details.stage-extras[open] > summary h2::before { content: '▾ '; }
