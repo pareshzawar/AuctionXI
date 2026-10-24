@@ -10,7 +10,7 @@ import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, watchConnection, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
+import { cardFor, livePanel, purses, otherTeams, comingLists, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
 import { seasonsOf } from './history.js';
 import { armSound, soundReady, gavel, confetti } from './celebrate.js';
 
@@ -195,6 +195,9 @@ function renderPhone() {
   const { meta, live, rules } = A;
   const hasLot = live && A.players[live.playerId];
   const team = myTeam && A.teams[myTeam];
+  // A captain's (or bidding vice-captain's) page: my team, the other teams, the player on the
+  // block, then who is still to come and who went unsold.
+  const captainCorner = isBidder() && !!team;
   const roleLabel = { audience: 'Audience', member: 'Team member', captain: 'Captain', vc: 'Vice-captain' }[role] || role;
   const current = tab || (meta.status === 'setup' ? 'rules' : 'squads');
   if (!$('#p-top')) {
@@ -217,13 +220,14 @@ function renderPhone() {
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>
     </div>
     ${isBidder() && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot && live.status === 'bidding' ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined, hidePurse: !canSeePurse(rules, viewer(), myTeam) }) : ''}
+    ${captainCorner ? `<div style="margin-top:var(--space-4)">${otherTeams(A, viewer())}</div>` : ''}
     <div class="live-grid live-focus" style="margin-top:var(--space-4)">
       <div class="live-player">${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
       <div class="stack" style="gap:var(--space-4)">${hasLot ? livePanel(A, '', viewer()) : ''}${A.rules.commentary === false ? '' : phoneComm()}</div>
     </div>
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
-    <h2 style="margin-top:var(--space-5)">Teams</h2>
-    <div class="purses">${purses(A, { viewer: viewer() })}</div>
+    ${captainCorner ? (meta.status === 'live' ? comingLists(A) : '') : `<h2 style="margin-top:var(--space-5)">Teams</h2>
+    <div class="purses">${purses(A, { viewer: viewer() })}</div>`}
     <div style="margin-top:var(--space-4)">${ticker(A, { scroll: true }) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
       ${[['squads', 'Squads'], ['pool', 'Players'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ...(seasonsOf(A).length ? [['hist', 'Past seasons']] : []), ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}

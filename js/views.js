@@ -2,7 +2,7 @@
 // assembled from the design-system components in ds.js.
 
 import { esc } from './ui.js';
-import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, canSeeMaxBid, canSeeBid, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers, leadersOf } from './engine.js';
+import { money, teamSummary, bidLimit, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, canSeeMaxBid, canSeeBid, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers, leadersOf } from './engine.js';
 import { seasonsOf, teamPast, findTeam, peopleText } from './history.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
@@ -68,6 +68,41 @@ export function purses(a, { viewer = null, size = '' } = {}) {
   const leading = a.live?.status === 'bidding' && canSeeBid(a.rules, viewer) ? a.live.bid?.team : null;
   return Object.entries(a.teams).map(([id, t]) =>
     teamPurse(t, teamSummary(a, id), a.rules, { size, leading: id === leading, mine: id === viewer?.team, hidePurse: !canSeePurse(a.rules, viewer, id), hideMax: !canSeeMaxBid(a.rules, viewer, id) })).join('');
+}
+
+// Captains: every other team in one table, purse left, players still to buy and max bid (for the
+// player on the block while bidding), each shown only as the tournament's settings allow.
+export function otherTeams(a, viewer) {
+  const live = a.live?.status === 'bidding' ? a.live : null;
+  const p = live && a.players[live.playerId];
+  const leading = live && canSeeBid(a.rules, viewer) ? live.bid?.team : null;
+  const rows = Object.entries(a.teams).filter(([id]) => id !== viewer?.team).map(([id, t]) => {
+    const s = teamSummary(a, id);
+    const max = p ? bidLimit(a, id, p).max : s.maxBid;
+    return `<tr class="${id === leading ? 'is-lead' : ''}"><td>${teamBadge(t, { showName: true })}${id === leading ? ' <span class="ax-purse-flag">Leads</span>' : ''}</td>
+      <td class="num">${canSeePurse(a.rules, viewer, id) ? price(s.remaining, a.rules, { size: 'sm' }) : '<span class="muted">hidden</span>'}</td>
+      <td class="num">${s.toBuy || '<span class="muted">full</span>'}</td>
+      <td class="num">${canSeeMaxBid(a.rules, viewer, id) ? price(max, a.rules, { size: 'sm', tone: 'gold' }) : '<span class="muted">hidden</span>'}</td></tr>`;
+  });
+  return `<div class="card other-teams"><h3 style="margin:0 0 var(--space-2)">Other teams</h3>
+    <div class="table-wrap"><table class="grid-table"><thead><tr><th>Team</th><th class="num">Purse left</th><th class="num">To buy</th><th class="num">Max bid</th></tr></thead>
+    <tbody>${rows.join('')}</tbody></table></div></div>`;
+}
+
+// Captains: who is still to come in this round (not the player on the block), and who went unsold.
+export function comingLists(a) {
+  const onBlock = a.live?.status === 'bidding' ? a.live.playerId : null;
+  const byName = (x, y) => x.name.localeCompare(y.name, undefined, { numeric: true });
+  const next = pool(a).filter((p) => p.id !== onBlock).sort((x, y) => String(x.category).localeCompare(String(y.category)) || byName(x, y));
+  const unsold = Object.keys(a.unsold || {}).filter((id) => !a.sales[id] && a.players[id] && id !== onBlock).map((id) => ({ ...a.players[id], id })).sort(byName);
+  const row = (p) => `<tr><td><b>${esc(p.name)}</b> <small class="muted">${esc(p.id)}</small></td><td>${esc(ROLES[roleId(p.role)].code)}</td><td>${esc(category(a.rules, p.category)?.label || '')}</td><td class="num">${esc(money(basePrice(p, a.rules), a.rules))}</td></tr>`;
+  const table = (list, empty) => (list.length
+    ? `<div class="table-wrap coming-list"><table class="grid-table"><thead><tr><th>Player</th><th>Role</th><th>Pool</th><th class="num">Base</th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>`
+    : `<p class="muted" style="margin:0">${empty}</p>`);
+  return `<div class="grid grid-2" style="margin-top:var(--space-4)">
+    <div class="card"><h3 style="margin:0 0 var(--space-2)">Still to come (${next.length})</h3>${table(next, 'Nobody left in this round.')}</div>
+    <div class="card"><h3 style="margin:0 0 var(--space-2)">Unsold (${unsold.length})</h3>${table(unsold, 'Nobody unsold yet.')}<p class="hint">Unsold players can come back in the next round.</p></div>
+  </div>`;
 }
 
 export function tickerItems(a, limit = 12) {
