@@ -376,8 +376,17 @@ const RUPEES = { en: 'rupees', hi: 'rupaye', mr: 'रुपये' };
 const POINTS = { en: 'points', hi: 'points', mr: 'पॉइंट्स' };
 const LAKH = { en: ['lakh', 'crore'], hi: ['lakh', 'crore'], mr: ['लाख', 'कोटी'] };
 
+// Browsers don't say whether a voice is female or male, so the known names decide: Windows (Heera,
+// Neerja, Swara / Ravi, Prabhat, Madhur), Apple (Veena, Isha, Lekha / Rishi), Android (en-in-x-ena…).
+const FEMALE = /female|woman|heera|neerja|swara|kalpana|aarohi|veena|isha|lekha|kajal|aditi|raveena|priya|ananya|zira|samantha|en-in-x-(ena|enc|ahp)|hi-in-x-(hia|hic)/i;
+const MALE = /\bmale|ravi\b|prabhat|madhur|hemant|rishi|kunal|aarav|manohar|en-in-x-(end|ene)|hi-in-x-(hid|hie)/i;
+const genderOf = (v) => (FEMALE.test(`${v.name} ${v.voiceURI}`) ? 'female' : MALE.test(`${v.name} ${v.voiceURI}`) ? 'male' : '');
+export const VOICE_CHOICES = { female: 'Indian female', male: 'Indian male' };
+const VOICE_KEY = 'auctionxi:voice';
+
 // Reads lines aloud with the browser's own speech (free, on the device). A new bid cuts off an
-// older bid line so the voice keeps up with fast bidding.
+// older bid line so the voice keeps up with fast bidding. The voice is chosen per device: Indian
+// female (the default), Indian male, or any voice installed for the language.
 export function createVoice() {
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   let on = false;
@@ -387,13 +396,25 @@ export function createVoice() {
     .replace(/₹\s?([\d.,]+)\s?L\b/g, `$1 ${LAKH[lg][0]} ${RUPEES[lg]}`)
     .replace(/₹\s?([\d,]+)/g, `$1 ${RUPEES[lg]}`)
     .replace(/([\d,]+) pts\b/g, `$1 ${POINTS[lg]}`);
-  const voiceFor = (lg) => {
-    const voices = synth.getVoices();
+  let choice = 'female';
+  try { choice = localStorage.getItem(VOICE_KEY) || 'female'; } catch { /* private mode */ }
+  // Voices for a language, best match first (exact locale, e.g. en-IN, before plain en).
+  const voicesFor = (lg) => {
+    const voices = synth?.getVoices() || [];
+    const out = [];
     for (const want of VOICE_LANGS[lg] || VOICE_LANGS.en) {
-      const v = voices.find((x) => x.lang === want) || voices.find((x) => x.lang?.startsWith(want));
-      if (v) return v;
+      for (const v of voices) if ((v.lang === want || v.lang?.replace('_', '-').startsWith(want)) && !out.includes(v)) out.push(v);
     }
-    return null;
+    return out;
+  };
+  const voiceFor = (lg) => {
+    const list = voicesFor(lg);
+    if (!list.length) return null;
+    if (choice === 'female' || choice === 'male') {
+      // The wanted kind in the best locale; a voice of unknown kind next; the other kind last.
+      return list.find((v) => genderOf(v) === choice) || list.find((v) => !genderOf(v)) || list[0];
+    }
+    return list.find((v) => v.voiceURI === choice) || list.find((v) => genderOf(v) === 'female') || list[0];
   };
   const speak = (text, lg) => {
     const u = new SpeechSynthesisUtterance(spoken(text, lg));
@@ -406,6 +427,21 @@ export function createVoice() {
   return {
     supported: !!synth,
     get on() { return on; },
+    get choice() { return choice; },
+    // For a picker: Indian female, Indian male, then every voice this device has for the language.
+    options(lg = 'en') {
+      return [...Object.entries(VOICE_CHOICES).map(([value, label]) => ({ value, label })),
+        ...voicesFor(lg).map((v) => ({ value: v.voiceURI, label: `${v.name} (${v.lang}${genderOf(v) ? `, ${genderOf(v)}` : ''})` }))];
+    },
+    // The voice that will actually speak, for a label such as "Heera (en-IN)".
+    current(lg = 'en') { const v = synth && voiceFor(lg); return v ? `${v.name} (${v.lang})` : ''; },
+    choose(value, lg = 'en') {
+      choice = value || 'female';
+      try { localStorage.setItem(VOICE_KEY, choice); } catch { /* private mode */ }
+      if (on) { synth.cancel(); speak(PHRASES[lg]?.voiceOn || PHRASES.en.voiceOn, lg); }
+    },
+    // Voices load after the page on some browsers.
+    onVoices(fn) { synth?.addEventListener?.('voiceschanged', fn); },
     // True when this device has a voice for the language (Marathi needs a Marathi or Hindi voice).
     hasVoice(lg) { return !!synth && (lg !== 'mr' || !!voiceFor('mr')); },
     toggle(lg = 'en') {

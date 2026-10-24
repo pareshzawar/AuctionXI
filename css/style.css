@@ -286,3 +286,39 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 fieldset.lockset { border: 0; margin: 0; padding: 0; min-width: 0; }
 fieldset.lockset[disabled] .card { opacity: .72; }
 fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lockset[disabled] textarea { cursor: not-allowed; }
+
+/* Live page once the auction has started: a small banner, the player and the commentary in focus. */
+.phone-banner-mini { max-height: 96px; margin-bottom: var(--space-3); }
+@media (max-width: 768px) { .phone-banner-mini { max-height: 64px; } }
+.live-focus .ax-card { gap: var(--space-4); padding: var(--space-5); }
+.live-focus .ax-avatar { width: 128px; height: 160px; border-radius: var(--radius-md); font-size: 48px; }
+.live-focus .ax-card-name { font-size: 40px; line-height: 42px; }
+.live-focus .ax-card-meta { font-size: 16px; line-height: 22px; }
+.live-focus .ax-stat-v { font-size: 34px; line-height: 38px; }
+@media (max-width: 768px) {
+  .live-focus .ax-avatar { width: 96px; height: 120px; }
+  .live-focus .ax-card-name { font-size: 30px; line-height: 32px; }
+}
+/* A minute's spotlight on the player up for bidding: one glow and a slow zoom of the photo. */
+.ax-card-live.is-spot { animation: spot-glow 2.4s ease-out; }
+.ax-card-live.is-spot .ax-avatar img, .ax-card-live.is-spot .ax-photo img { animation: spot-zoom 2.4s ease-in-out; }
+@keyframes spot-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 60%, transparent); } 60% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gold) 0%, transparent); } 100% { box-shadow: inset 0 0 0 1px var(--gold); } }
+@keyframes spot-zoom { 50% { transform: scale(1.08); } }
+
+/* Commentary as a feature box on phones and laptops. */
+.comm-feature { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5);
+  background: var(--surface); border: 1px solid var(--gold); border-left: 6px solid var(--gold); border-radius: var(--radius-md); }
+.comm-feature .stage-label { display: inline-flex; align-items: center; gap: var(--space-2); padding: 2px var(--space-3); border-radius: var(--radius-xs); background: var(--gold-soft); color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.comm-feature .comm-mic { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); }
+.comm-feature .comm-line { margin: 0; font-size: 22px; line-height: 30px; font-weight: 500; color: var(--ink); }
+.comm-feature .comm-older { margin: 0; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+.comm-feature .comm-voice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: 13px; color: var(--ink-muted); }
+.comm-feature.is-new .comm-line { animation: comm-in .7s cubic-bezier(.2, .8, .2, 1); }
+.comm-feature.is-new { animation: comm-glow 1.6s ease-out; }
+.comm-feature::after { content: ''; position: absolute; inset: 0 auto 0 -40%; width: 40%; pointer-events: none; opacity: 0;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold) 22%, transparent), transparent); }
+.comm-feature.is-shine::after { animation: comm-shine 1.8s ease-in-out; }
+.comm-feature.is-shine .comm-mic, .comm-feature.is-new .comm-mic { animation: comm-mic .6s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) {
+  .ax-card-live.is-spot, .ax-card-live.is-spot img, .comm-feature, .comm-feature .comm-line, .comm-feature::after, .comm-feature .comm-mic { animation: none !important; }
+}

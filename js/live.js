@@ -88,6 +88,8 @@ async function boot() {
     addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (k === 'v' && voice.supported) { voice.toggle(commLang()); renderStage(); }
+      // G changes the voice: Indian female, Indian male, then each voice installed for the language.
+      if (k === 'g' && voice.supported) { const o = voice.options(commLang()).map((x) => x.value); voice.choose(o[(o.indexOf(voice.choice) + 1) % o.length], commLang()); renderStage(); }
       if (k === 'l' && A) { const ls = Object.keys(LANGUAGES); switchLang(ls[(ls.indexOf(commLang()) + 1) % ls.length]); renderStage(); }
     });
   }
@@ -97,6 +99,8 @@ async function boot() {
 
 // A board of players longer than one screen turns its pages every 10 seconds.
 armSound(() => { if (stage && A) renderStage(); });
+// Some browsers list their voices a moment after the page loads: refresh the voice picker then.
+voice.onVoices(() => { if (A) (stage ? renderStage() : renderPhone()); });
 let boardPage = 0;
 if (stage) setInterval(() => { if (A?.meta.stageView?.type === 'list') { boardPage++; renderStage(); } }, 10000);
 
@@ -110,13 +114,17 @@ const commIsNew = (where) => {
   if (commSeen[where] === null || key) commSeen[where] = key || '';
   return fresh ? ' is-new' : '';
 };
+const replay = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 setInterval(() => {
-  const el = document.querySelector('.stage-comm');
-  if (!el || document.hidden) return;
-  el.classList.remove('is-shine');
-  void el.offsetWidth;
-  el.classList.add('is-shine');
+  const el = document.querySelector('.stage-comm, .comm-feature');
+  if (el && !document.hidden) replay(el, 'is-shine');
 }, COMM_SHINE);
+// Once a minute the player up for bidding gets a short spotlight (a glow and a gentle zoom of the
+// photo), so a long bidding war still draws the eye. Not while nobody is bidding.
+setInterval(() => {
+  const el = document.querySelector('.ax-card-live');
+  if (el && !document.hidden) replay(el, 'is-spot');
+}, 60000);
 
 function renderStage() {
   const { meta, live, rules } = A;
@@ -151,7 +159,7 @@ function renderStage() {
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
       </div>
       ${A.meta.sfx !== false && !soundReady() ? '<div class="stage-sound-hint">Click anywhere once to turn on the gavel sound</div>' : ''}
-      ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm${commIsNew('stage')}"><span class="stage-label"><span class="comm-mic"></span>Commentary${voice.on ? ' · voice on' : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
+      ${A.rules.commentary === false ? '<div></div>' : `<div class="stage-comm${commIsNew('stage')}"><span class="stage-label"><span class="comm-mic"></span>Commentary${voice.on ? ` · ${esc(voice.current(commLang()) || 'voice on')}` : ''}</span><p>${esc(commentator.lines[0]?.text || 'Commentary appears here as the auction runs.')}</p></div>`}
       <section class="stage-teams" style="--n:${Math.min(Math.max(n, 1), 8)}">${purses(A, { size: 'stage', viewer: viewer() })}</section>
       <div class="stage-ticker">${ticker(A, { size: 'stage', scroll: true }) || '<div style="height:64px"></div>'}</div>
     </div></div>`;
@@ -197,7 +205,7 @@ function renderPhone() {
     }, 0));
   }
   $('#p-top').innerHTML = `
-    ${bannerImg(A, { cls: 'phone-banner' })}
+    ${bannerImg(A, { cls: `phone-banner${meta.status === 'setup' ? '' : ' phone-banner-mini'}` })}
     <div class="page-head">
       <div class="brand-row">
         ${logoImg(A, { size: 56 })}
@@ -209,15 +217,10 @@ function renderPhone() {
       <span class="muted">${esc(roleLabel)}${team ? ` · ${esc(team.name)}` : ''}</span>
     </div>
     ${isBidder() && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot && live.status === 'bidding' ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined, hidePurse: !canSeePurse(rules, viewer(), myTeam) }) : ''}
-    <div class="live-grid" style="margin-top:var(--space-4)">
-      <div>${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
-      <div>${hasLot ? livePanel(A, '', viewer()) : ''}</div>
+    <div class="live-grid live-focus" style="margin-top:var(--space-4)">
+      <div class="live-player">${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
+      <div class="stack" style="gap:var(--space-4)">${hasLot ? livePanel(A, '', viewer()) : ''}${A.rules.commentary === false ? '' : phoneComm()}</div>
     </div>
-    ${A.rules.commentary === false ? '' : `<div class="card" style="margin-top:var(--space-4)"><div class="section-title"><h3 style="margin:0">Commentary</h3><span class="spacer"></span>
-      <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === commLang() ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
-      ${voice.on && !voice.hasVoice(commLang()) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
-      <div class="feed" style="max-height:none">${commentator.lines.slice(0, 3).map((l, i) => `<div${i ? '' : ` class="comm-latest${commIsNew('phone')}"`}>${l.kind === 'ai' ? badge('upcoming', { text: 'AI' }) : ''}<span>${esc(l.text)}</span></div>`).join('') || '<p class="muted">Lines appear as the auction runs.</p>'}</div></div>`}
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
@@ -229,8 +232,26 @@ function renderPhone() {
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; belowDirty = true; $('#below').innerHTML = ''; renderPhone(); }));
   if ($('#voice-btn')) $('#voice-btn').onclick = () => { voice.toggle(commLang()); renderPhone(); };
   if ($('#lang-sel')) $('#lang-sel').onchange = (e) => { switchLang(e.target.value); renderPhone(); };
+  if ($('#voice-sel')) $('#voice-sel').onchange = (e) => { voice.choose(e.target.value, commLang()); renderPhone(); };
   const btn = $('[data-bid-button]');
   if (btn) btn.onclick = bid;
+}
+
+// The commentary as a feature box next to the bid: the latest line large, two before it small,
+// the language, read aloud and the voice to read with.
+function phoneComm() {
+  const lines = commentator.lines.slice(0, 3);
+  const lg = commLang();
+  return `<div class="comm-feature${commIsNew('phone')}">
+    <div class="section-title" style="margin:0"><span class="stage-label"><span class="comm-mic"></span>Commentary</span><span class="spacer"></span>
+      <select id="lang-sel" style="width:auto;min-height:32px" aria-label="Commentary language">${Object.entries(LANGUAGES).map(([k, v]) => `<option value="${k}" ${k === lg ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      ${voice.supported ? `<button class="btn-sm" id="voice-btn">${voice.on ? 'Stop voice' : 'Read aloud'}</button>` : ''}</div>
+    <p class="comm-line">${lines[0] ? `${lines[0].kind === 'ai' ? badge('upcoming', { text: 'AI' }) + ' ' : ''}${esc(lines[0].text)}` : '<span class="muted">Lines appear as the auction runs.</span>'}</p>
+    ${lines.slice(1).map((l) => `<p class="comm-older">${esc(l.text)}</p>`).join('')}
+    ${voice.supported ? `<label class="comm-voice">Voice <select id="voice-sel" style="width:auto;min-height:32px">${voice.options(lg).map((o) => `<option value="${esc(o.value)}" ${o.value === voice.choice ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>
+      ${voice.current(lg) ? `<small class="muted">${esc(voice.current(lg))}</small>` : ''}</label>` : ''}
+    ${voice.on && !voice.hasVoice(lg) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
+  </div>`;
 }
 
 function captainButton() {
