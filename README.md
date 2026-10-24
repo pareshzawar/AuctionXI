@@ -141,12 +141,15 @@ Any AuctionXI record (Results → *Download JSON*, or a past auction added as a 
 
 ```json
 "results": {
-  "champion": "Hilltop Hawks", "runnerUp": "Rockford Yetis", "dates": "18-19 Apr 2026", "venue": "Society ground", "source": "https://cricheroes.com/tournament/...",
-  "standings": [{ "team": "Rockford Yetis", "played": 4, "won": 4, "lost": 0, "points": 8, "nrr": 6.09, "finish": "Runner-up" }],
-  "knockouts": [{ "stage": "Final", "result": "Hilltop Hawks beat Rockford Yetis by 3 wickets" }],
-  "performers": [{ "name": "Vikram Rao", "team": "Hilltop Hawks", "runs": 171, "sr": 329, "wickets": 3, "economy": 9.5, "mvpRank": 1, "mvpPoints": 27 }]
+  "champion": "Wing A Tigers", "runnerUp": "Wing B Warriors", "dates": "18-19 Apr 2026", "venue": "Society ground", "source": "https://cricheroes.com/tournament/...",
+  "standings": [{ "team": "Wing B Warriors", "played": 4, "won": 4, "lost": 0, "points": 8, "nrr": 6.09, "finish": "Runner-up" }],
+  "knockouts": [{ "stage": "Final", "result": "Wing A Tigers beat Wing B Warriors by 3 wickets" }],
+  "performers": [{ "name": "Vikram Rao", "team": "Wing A Tigers", "runs": 171, "sr": 329, "wickets": 3, "economy": 9.5, "mvpRank": 1, "mvpPoints": 27 }],
+  "teams": [{ "team": "Wing A Tigers", "captain": "Vikram Rao", "viceCaptain": "Amit Shah", "owner": "Mr. Kulkarni", "sponsor": "Kulkarni Motors" }]
 }
 ```
+
+Captains, vice-captains, owners and sponsors change every season, so each past season keeps its own: from the record (its allotted captains and the teams' owner / sponsor), the `teams` block, or typed in with **Captains and owners** next to the season under *Past seasons*.
 
 Only a summary is stored (no photos), inside the auction, so it is seen by exactly the people who can see the auction.
 

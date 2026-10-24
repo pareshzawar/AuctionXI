@@ -450,7 +450,7 @@ function teams(el) {
       </div>
       <fieldset class="lockset" ${ready ? 'disabled' : ''}>
       <div class="table-wrap">
-        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Captain</th>${hasVC(A.rules) ? '<th>Vice-captain</th>' : ''}<th>Owner</th><th>Budget</th><th>Players</th><th></th></tr></thead>
+        <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Captain</th>${hasVC(A.rules) ? '<th>Vice-captain</th>' : ''}<th>Owner</th><th>Sponsor</th><th>Budget</th><th>Players</th><th></th></tr></thead>
         <tbody>${entries.map(([id, t]) => `
           <tr data-id="${esc(id)}">
             <td><code>${esc(id)}</code></td>
@@ -460,10 +460,11 @@ function teams(el) {
             <td><input data-f="captainName" value="${esc(leadersOf(A, id).C?.name || t.captainName || '')}" placeholder="Optional" list="player-names"></td>
             ${hasVC(A.rules) ? `<td><input data-f="vcName" value="${esc(leadersOf(A, id).VC?.name || t.vcName || '')}" placeholder="Optional" list="player-names"></td>` : ''}
             <td><input data-f="owner" value="${esc(t.owner || '')}" placeholder="Optional"></td>
+            <td><input data-f="sponsor" value="${esc(t.sponsor || '')}" placeholder="Optional"></td>
             <td><input data-f="purse" inputmode="numeric" value="${esc(t.purse ?? '')}" placeholder="${esc(money(A.rules.purse, A.rules))}" style="width:100px" title="Blank = the standard purse. A mini auction fills in each team's carried-over budget"></td>
             <td>${teamSummary(A, id).count}</td>
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
-          </tr>`).join('') || '<tr><td colspan="9" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
+          </tr>`).join('') || '<tr><td colspan="10" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
       </fieldset>
       <datalist id="player-names">${Object.values(A.players).map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
@@ -566,7 +567,7 @@ async function addTeams(map) {
 
 // A short "saved" note after each edit, so it is clear nothing more needs pressing.
 const FIELD_NAMES = { name: 'name', role: 'role', category: 'pool', battingHand: 'batting hand', bowlingArm: 'bowling arm', bowlingType: 'bowling type', basePrice: 'base price',
-  locality: 'locality', photoUrl: 'photo link', allottedTeam: 'team', allottedAs: 'captain / vice-captain', short: 'code', color: 'colour', captainName: 'captain', vcName: 'vice-captain', owner: 'owner', purse: 'budget' };
+  locality: 'locality', photoUrl: 'photo link', allottedTeam: 'team', allottedAs: 'captain / vice-captain', short: 'code', color: 'colour', captainName: 'captain', vcName: 'vice-captain', owner: 'owner', sponsor: 'sponsor', purse: 'budget' };
 const saved = (msg) => toast(`✓ ${msg}`, 'ok');
 
 // Edit one player's details in a dialog with its own Save button. Allowed even when the list is
@@ -968,8 +969,8 @@ function pastSeasonsCard() {
     <div class="section-title"><h2>Past seasons</h2><small class="muted">optional · team records and top performers</small><span class="spacer"></span>
       <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Add a season's record<input type="file" accept=".json,application/json" id="hs-upload" hidden></label></div>
     ${seasons.length ? `<ul class="stack" style="list-style:none;padding:0;margin:0;gap:var(--space-2)">${seasons.map((h) => `<li class="row"><b>Season ${esc(h.season)}${h.kind === 'mini' ? ' · mini' : ''}</b>
-      <small class="muted">${esc([h.champion && `Champion ${h.champion}`, `${h.auction?.teams?.length || 0} teams`, `${h.auction?.sold || 0} players sold`, h.standings?.length ? 'standings' : '', h.top?.mvp?.length ? 'top performers' : ''].filter(Boolean).join(' · '))}</small>
-      <span class="spacer"></span><button class="btn-sm btn-ghost" data-hs-del="${esc(h.season)}" data-hs-key="${esc(h.key)}">Remove</button></li>`).join('')}</ul>`
+      <small class="muted">${esc([h.champion && `Champion ${h.champion}`, `${h.auction?.teams?.length || 0} teams`, (h.auction?.teams || []).some((t) => t.captain) ? 'captains' : 'no captains yet', `${h.auction?.sold || 0} players sold`, h.standings?.length ? 'standings' : '', h.top?.mvp?.length ? 'top performers' : ''].filter(Boolean).join(' · '))}</small>
+      <span class="spacer"></span><button class="btn-sm" data-hs-people="${esc(h.key)}" title="Captain, vice-captain, owner and sponsor of each team that season">Captains and owners</button><button class="btn-sm btn-ghost" data-hs-del="${esc(h.season)}" data-hs-key="${esc(h.key)}">Remove</button></li>`).join('')}</ul>`
       : '<p class="muted" style="margin:0">None yet.</p>'}
     <span class="hint">Add every earlier season you have, one file each: there is no limit. Use the record file of an earlier season (Results → Download JSON, or a past auction you added as a record). Add a <code>results</code> block for the standings, knockouts and top performers; see README. Phones get a Past seasons tab, and the control room can put a season or a team's profile on the stage.</span>
   </div>`;
@@ -990,9 +991,42 @@ function wirePastSeasons(el) {
     await db.set(`${P}/history/${key}`, h);
     toast(`Season ${h.season} added${h.standings.length ? ', with standings' : ''}${h.top.mvp.length ? ' and top performers' : ''}`, 'ok');
   });
+  $$('[data-hs-people]', el).forEach((b) => (b.onclick = () => seasonPeopleDialog(b.dataset.hsPeople)));
   $$('[data-hs-del]', el).forEach((b) => (b.onclick = run(async () => {
     if (confirm(`Remove season ${b.dataset.hsDel} from this auction?`)) await db.set(`${P}/history/${b.dataset.hsKey}`, null);
   })));
+}
+
+// Each past season keeps its own captains, vice-captains, owners and sponsors: type them in here
+// when the record file didn't have them.
+function seasonPeopleDialog(key) {
+  const h = A.history?.[key];
+  const list = h?.auction?.teams || [];
+  if (!list.length) { toast('This season has no teams in its record', 'error'); return; }
+  const dlg = document.createElement('dialog');
+  dlg.className = 'card';
+  dlg.style.cssText = 'max-width:980px;width:calc(100% - 32px);color:var(--ink);background:var(--surface);border:1px solid var(--line)';
+  const names = [...new Set(list.flatMap((t) => (t.squad || []).map((p) => p.name)))];
+  const cell = (i, f, v, ph) => `<td><input data-i="${i}" data-pf="${f}" value="${esc(v || '')}" placeholder="${ph}" list="hs-names"></td>`;
+  dlg.innerHTML = `<h2 style="margin-top:0">Season ${esc(h.season)}: captains and owners</h2>
+    <p class="muted">Who led and backed each team that season. Shown in the team profiles, the phones' Past seasons tab and on the stage. Leave blank what you don't know.</p>
+    <div class="table-wrap"><table class="grid-table"><thead><tr><th>Team</th><th>Captain</th><th>Vice-captain</th><th>Owner</th><th>Sponsor</th></tr></thead><tbody>
+    ${list.map((t, i) => `<tr><td><b>${esc(t.name)}</b></td>${cell(i, 'captain', t.captain, 'Captain')}${cell(i, 'vc', t.vc, 'Vice-captain')}${cell(i, 'owner', t.owner, 'Owner')}${cell(i, 'sponsor', t.sponsor, 'Sponsor')}</tr>`).join('')}
+    </tbody></table></div>
+    <datalist id="hs-names">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+    <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary" data-go>Save</button><button class="btn-ghost" data-no>Cancel</button></p>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); };
+  $('[data-no]', dlg).onclick = close;
+  dlg.oncancel = close;
+  $('[data-go]', dlg).onclick = run(async () => {
+    const upd = {};
+    for (const inp of $$('[data-pf]', dlg)) upd[`history/${key}/auction/teams/${inp.dataset.i}/${inp.dataset.pf}`] = inp.value.trim() || null;
+    await db.update(P, upd);
+    close();
+    toast(`Season ${h.season}: captains and owners saved`, 'ok');
+  });
 }
 
 function brandingCard() {

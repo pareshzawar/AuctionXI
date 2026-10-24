@@ -15,7 +15,7 @@ export const PLAYER_COLUMNS = [
 
 // Only `name` is required. captain / vice_captain: player names; they become the team's leaders
 // (added to the player list if they are not in the players file).
-export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'captain', 'vice_captain', 'owner', 'logo_url'];
+export const TEAM_COLUMNS = ['id', 'name', 'short_name', 'color', 'captain', 'vice_captain', 'owner', 'sponsor', 'logo_url'];
 
 const PLAYER_EXAMPLE = [
   ['P001', 'Vikram Rao', 'All-rounder', 'A', '', 'Right', 'Left', 'Spin', '32', 'Wing A - 410', '', '12', '340', '9', '142.5', '58*', '9.2', '', 'https://cricheroes.com/player-profile/123/vikram-rao', 'T1', 'C', ''],
@@ -26,8 +26,8 @@ const PLAYER_EXAMPLE = [
 ];
 
 const TEAM_EXAMPLE = [
-  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Vikram Rao', 'Amit Shah', 'Mr. Kulkarni', ''],
-  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Sanjay Mehta', '', '', ''],
+  ['T1', 'Wing A Tigers', 'TIG', '#4f9dff', 'Vikram Rao', 'Amit Shah', 'Mr. Kulkarni', 'Kulkarni Motors', ''],
+  ['T2', 'Wing B Warriors', 'WAR', '#ff8a3d', 'Sanjay Mehta', '', '', '', ''],
 ];
 
 // Design-system default team colours (team-1 … team-8, night theme).
@@ -185,6 +185,7 @@ export function importTeams(rows) {
       short: (r.short_name || r.name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(),
       color: /^#[0-9a-f]{3,8}$/i.test(r.color) ? r.color : TEAM_COLORS[Object.keys(teams).length % TEAM_COLORS.length],
       owner: r.owner || null,
+      sponsor: r.sponsor || null,
       logoUrl: r.logo_url || null,
       captainName: (r.captain || r.captain_name || '').trim() || null,
       vcName: (r.vice_captain || r['vice-captain'] || r.vc || r.vicecaptain || '').trim() || null,

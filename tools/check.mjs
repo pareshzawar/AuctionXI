@@ -258,3 +258,15 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
   const hits = files.filter((f) => /github\.io|gstatic\.com|cdnjs|jsdelivr|unpkg/.test(fs.readFileSync(`${root}/${f}`, 'utf8')));
   ok(!hits.length, `no fixed domain or CDN in the app${hits.length ? `: ${hits.join(', ')}` : ''}`);
 }
+{
+  // Each past season keeps its own captain, vice-captain, owner and sponsor.
+  const H = await import(root + '/js/history.js');
+  const h = H.historyFromRecord({ format: 'auctionxi/1', meta: { season: '2' }, rules: {},
+    teams: { T1: { name: 'Wing A Tigers', owner: 'Mr A' }, T2: { name: 'Wing B Warriors' } },
+    players: { P1: { name: 'Kiran', allottedTeam: 'T1', allottedAs: 'C' }, P2: { name: 'Om' } },
+    sales: { P1: { team: 'T1', price: 0, allotted: true }, P2: { team: 'T2', price: 90 } },
+    results: { teams: [{ team: 'Wing B Warriors', captain: 'Ravi', viceCaptain: 'Sam', sponsor: 'Acme' }] } });
+  const p1 = H.peopleText(H.teamPast(h, 'Wing A Tigers'));
+  const p2 = H.peopleText(H.teamPast(h, 'Wing B Warriors'));
+  ok(p1 === 'Captain Kiran · Owner Mr A' && p2 === 'Captain Ravi · Vice-captain Sam · Sponsor Acme', `season people: ${p1} | ${p2}`);
+}
