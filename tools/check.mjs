@@ -270,3 +270,11 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
   const p2 = H.peopleText(H.teamPast(h, 'Wing B Warriors'));
   ok(p1 === 'Captain Kiran · Owner Mr A' && p2 === 'Captain Ravi · Vice-captain Sam · Sponsor Acme', `season people: ${p1} | ${p2}`);
 }
+{
+  // Room and jump bids must be on the bid steps (CPL-style slabs: 10 below 150, 15 below 300, 20 below 500).
+  const rules = E.withDefaults({ increments: [{ upto: 150, step: 10 }, { upto: 300, step: 15 }, { upto: 500, step: 20 }, { upto: 0, step: 50 }] });
+  const good = [50, 60, 150, 165, 180, 300, 320].every((x) => E.onLadder(x, 50, rules));
+  const bad = [55, 155, 170, 310].every((x) => !E.onLadder(x, 50, rules));
+  const msg = E.ladderError(170, 50, rules);
+  ok(good && bad && /165.*180/.test(msg), `bid steps: 165/180 ok, 170 not (${msg})`);
+}

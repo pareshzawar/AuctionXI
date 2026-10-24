@@ -205,7 +205,7 @@ function renderPhone() {
     }, 0));
   }
   $('#p-top').innerHTML = `
-    ${bannerImg(A, { cls: `phone-banner${meta.status === 'setup' ? '' : ' phone-banner-mini'}` })}
+    ${meta.status === 'setup' ? bannerImg(A, { cls: 'phone-banner' }) : '' /* once started, the room goes to the player */}
     <div class="page-head">
       <div class="brand-row">
         ${logoImg(A, { size: 56 })}
@@ -224,7 +224,7 @@ function renderPhone() {
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
     <h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>
-    <div style="margin-top:var(--space-4)">${ticker(A) || ''}</div>
+    <div style="margin-top:var(--space-4)">${ticker(A, { scroll: true }) || ''}</div>
     <nav class="tabs" style="margin-top:var(--space-5)">
       ${[['squads', 'Squads'], ['pool', 'Players'], ...(A.rules.commentary === false ? [] : [['comm', 'Commentary']]), ['feed', 'Activity'], ...(seasonsOf(A).length ? [['hist', 'Past seasons']] : []), ['rules', 'Rules'], ...(wb ? [['wb', 'My workbook']] : [])].map(([k, l]) => `<button data-tab="${k}" class="${current === k ? 'active' : ''}">${l}</button>`).join('')}
     </nav>`;

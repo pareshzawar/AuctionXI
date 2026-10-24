@@ -214,7 +214,10 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
 .ax-ticker-k { flex: none; display: flex; align-items: center; padding: 0 var(--space-4); background: var(--gold); color: var(--on-gold); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .ax-ticker-view { flex: 1; overflow: hidden; display: flex; align-items: center; }
 .ax-ticker-list { display: flex; align-items: center; gap: var(--space-6); padding: 0 var(--space-5); }
-.ax-ticker-scroll .ax-ticker-list { animation: ax-marquee 40s linear infinite; }
+.ax-ticker-view { container-type: inline-size; }
+.ax-ticker-track { display: flex; width: max-content; animation: ax-marquee var(--dur, 40s) linear infinite; }
+.ax-ticker-scroll .ax-ticker-list { flex: none; min-width: 100cqw; }
+.ax-ticker-scroll:hover .ax-ticker-track { animation-play-state: paused; }
 .ax-ticker-item { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 15px; }
 .ax-ticker-item b { font-weight: 600; }
 .ax-ticker-item .ax-price { font-size: 17px; }
@@ -249,7 +252,7 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
 .ax-seg-lg button { height: 40px; font-size: 15px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ax-badge-live .ax-dot, .ax-ticker-scroll .ax-ticker-list, .ax-stamp { animation: none; }
+  .ax-badge-live .ax-dot, .ax-ticker-track, .ax-stamp { animation: none; }
   .ax-count-fill, .ax-btn { transition: none; }
 }
 @media print {

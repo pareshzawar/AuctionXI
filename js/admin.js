@@ -6,7 +6,7 @@ import {
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
   BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, isCancelled, inAuction,
-  STAGES, stageOf,
+  STAGES, stageOf, ladderError,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
@@ -1370,7 +1370,9 @@ function control(el) {
     jumpBox.oninput = () => {
       const m = jumpBox.value.trim().match(/^([1-8])\s+(.+)$/);
       const t = m && A.teams[Object.keys(A.teams)[Number(m[1]) - 1]];
-      $('#c-jump-hint', el).textContent = t && num(m[2]) != null ? `Enter: ${t.name} bids ${money(num(m[2]), A.rules)}` : jumpBox.value.trim() ? 'Now press the team' : '';
+      const typed = num(m ? m[2] : jumpBox.value.trim());
+      const off = typed != null && A.live?.playerId && ladderError(typed, basePrice(A.players[A.live.playerId], A.rules), A.rules);
+      $('#c-jump-hint', el).textContent = off || (t && typed != null ? `Enter: ${t.name} bids ${money(typed, A.rules)}` : jumpBox.value.trim() ? 'Now press the team' : '');
     };
     jumpBox.onkeydown = run(async (e) => {
       if (e.key === 'Escape') { jumpBox.value = ''; jumpBox.blur(); return; }
@@ -1389,8 +1391,7 @@ function control(el) {
     const team = $('#r-team').value;
     const amount = num($('#r-amount').value);
     if (amount == null) throw new Error('Enter the final amount, for example 1200000 or 12L');
-    const warning = await recordRoomSale(aid, A, team, amount);
-    if (warning && confirm(`${warning}\n\nRecord the sale anyway?`)) await recordRoomSale(aid, A, team, amount, true);
+    await recordRoomSale(aid, A, team, amount);
   });
 }
 

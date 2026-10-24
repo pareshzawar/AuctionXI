@@ -287,17 +287,23 @@ fieldset.lockset { border: 0; margin: 0; padding: 0; min-width: 0; }
 fieldset.lockset[disabled] .card { opacity: .72; }
 fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lockset[disabled] textarea { cursor: not-allowed; }
 
-/* Live page once the auction has started: a small banner, the player and the commentary in focus. */
-.phone-banner-mini { max-height: 96px; margin-bottom: var(--space-3); }
-@media (max-width: 768px) { .phone-banner-mini { max-height: 64px; } }
-.live-focus .ax-card { gap: var(--space-4); padding: var(--space-5); }
-.live-focus .ax-avatar { width: 128px; height: 160px; border-radius: var(--radius-md); font-size: 48px; }
-.live-focus .ax-card-name { font-size: 40px; line-height: 42px; }
-.live-focus .ax-card-meta { font-size: 16px; line-height: 22px; }
-.live-focus .ax-stat-v { font-size: 34px; line-height: 38px; }
+/* Live page once the auction has started: no banner; the player's photo and name large, the stats
+   small underneath. */
+.live-focus .ax-card { gap: var(--space-3); padding: var(--space-5); }
+.live-focus .ax-card-head { align-items: flex-end; gap: var(--space-5); }
+.live-focus .ax-avatar { width: 220px; height: 293px; border-radius: var(--radius-md); font-size: 72px; }
+.live-focus .ax-card-name { font-size: 48px; line-height: 48px; }
+.live-focus .ax-card-meta { margin-top: var(--space-2); font-size: 17px; line-height: 24px; }
+.live-focus .ax-stat { padding: var(--space-1) var(--space-3); }
+.live-focus .ax-stat .ax-k { font-size: 10px; line-height: 14px; }
+.live-focus .ax-stat-v { font-size: 18px; line-height: 22px; }
+.live-focus .ax-feat > span { font-size: 12px; }
 @media (max-width: 768px) {
-  .live-focus .ax-avatar { width: 96px; height: 120px; }
+  .live-focus .ax-card { padding: var(--space-4); }
+  .live-focus .ax-card-head { gap: var(--space-3); }
+  .live-focus .ax-avatar { width: 132px; height: 176px; font-size: 44px; }
   .live-focus .ax-card-name { font-size: 30px; line-height: 32px; }
+  .live-focus .ax-card-meta { font-size: 14px; line-height: 20px; }
 }
 /* A minute's spotlight on the player up for bidding: one glow and a slow zoom of the photo. */
 .ax-card-live.is-spot { animation: spot-glow 2.4s ease-out; }
