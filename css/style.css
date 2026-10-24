@@ -385,3 +385,13 @@ details.stage-extras > summary { list-style: none; }
 details.stage-extras > summary::-webkit-details-marker { display: none; }
 details.stage-extras > summary h2::before { content: '▸ '; color: var(--ink-muted); }
 details.stage-extras[open] > summary h2::before { content: '▾ '; }
+
+/* Protected player photos: a watermark across each photo, no long-press save, no dragging. */
+.photos-protected .ax-photo, .photos-protected .ax-avatar, .photos-protected .stage-tile-photo { position: relative; -webkit-touch-callout: none; user-select: none; }
+.photos-protected .ax-photo img, .photos-protected .ax-avatar img, .photos-protected .stage-tile-photo img { pointer-events: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
+.photos-protected .ax-photo:has(img), .photos-protected .ax-avatar:has(img), .photos-protected .stage-tile-photo:has(img) { container-type: size; }
+.photos-protected .ax-photo:has(img)::after, .photos-protected .ax-avatar:has(img)::after, .photos-protected .stage-tile-photo:has(img)::after {
+  content: var(--wm); position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  font: 700 clamp(6px, 7cqw, 26px)/1.1 var(--font-display, sans-serif); letter-spacing: .06em; text-transform: uppercase; text-align: center;
+  color: rgba(255, 255, 255, .5); text-shadow: 0 0 3px rgba(0, 0, 0, .6); transform: rotate(-28deg); white-space: pre-wrap; padding: 0 6%;
+}

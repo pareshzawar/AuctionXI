@@ -2,6 +2,7 @@ import { db, isLocal } from './db.js';
 import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction, accountAuctions, organiserStatus, claimSite, listOrganisers, addOrganiser, removeOrganiser } from './actions.js';
 import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param, projectLink } from './ui.js';
 import { badge } from './ds.js';
+import { getMedia } from './media.js';
 import { vcCanBid, withDefaults, normalize, visibilityOf, STAGES, stageOf } from './engine.js';
 
 mountHeader();
@@ -242,7 +243,7 @@ $('#create-form').addEventListener('submit', async (e) => {
     if (copyId) {
       const v = await db.get(`auctions/${copyId}`);
       if (!v) throw new Error('Could not read the auction to copy from');
-      copyFrom = { ...normalize(v), id: copyId, media: await db.get(`media/${copyId}`).catch(() => null) };
+      copyFrom = { ...normalize(v), id: copyId, media: await getMedia(copyId) };
     }
     const { aid, adminCode } = await createAuction({
       name,
