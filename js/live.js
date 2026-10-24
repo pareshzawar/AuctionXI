@@ -4,7 +4,7 @@
 import { db } from './db.js';
 import { basePrice, normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
 import { placeBid, myBidderSeat, viewGate, waitUntilOpen } from './actions.js';
-import { whatIf, buyable } from './plan.js';
+import { whatIf, buyable, withLeaders } from './plan.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
@@ -72,6 +72,9 @@ async function boot() {
   if (!stage) watchConnection(db, { text: 'Reconnecting to the auction… What you see may be out of date, and bids can\'t be sent until the connection is back.' });
   db.on(`auctions/${aid}`, (v) => {
     A = applyMedia(normalize(v), media);
+    // Before the start, captains and vice-captains already count in their squads (as Start will
+    // add them), so purses, players to buy and max bids are right from the first look.
+    if (A && A.meta.status === 'setup') A = withLeaders(A);
     if (!A) { $('#app').innerHTML = '<div class="card"><h2>Auction not found</h2><p><a href="index.html">Back to home</a></p></div>'; return; }
     commentator.update(A);
     document.title = `${A.meta.name} - AuctionXI`;
