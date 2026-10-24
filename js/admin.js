@@ -1046,7 +1046,7 @@ function brandingCard() {
         <label>Banner</label>
         <div class="brand-preview" style="height:180px;width:100%">${m.banner ? `<img src="${esc(m.banner)}" alt="League banner">` : '<span class="muted">No banner</span>'}</div>
         <p class="row" style="margin:var(--space-2) 0 0">${fileButton(m.banner ? 'Change banner' : 'Upload banner', 'id="b-banner"')}${m.banner ? '<button class="btn-sm btn-ghost" data-brand-del="banner">Remove</button>' : ''}</p>
-        <span class="hint">Any shape, never cropped: a wide banner or your auction poster. Shrunk to ${BANNER.max} px on the longest side.</span>
+        <span class="hint">Any shape, never cropped. A wide banner, 4 : 1 (e.g. 2400 × 600) with dark ends, fills the full-width bar at the top of the live page; a poster works too. Shrunk to ${BANNER.max} px on the longest side.</span>
       </div>
     </div>
   </div>`;

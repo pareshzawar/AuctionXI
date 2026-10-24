@@ -341,3 +341,10 @@ fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lo
   .other-teams .table-wrap { overflow-x: visible; }
   .other-teams .grid-table { width: 100%; min-width: 0; }
 }
+
+/* Live page: the league banner as a full-width bar under the header. A 4:1 banner fills it; any
+   other shape sits in the middle of a dark band. Slimmer once the auction runs. */
+#banner-bar { width: 100%; background: #0b0d14; border-bottom: 1px solid var(--line); display: flex; justify-content: center; }
+#banner-bar img { display: block; width: 100%; height: auto; max-height: clamp(96px, 25vw, 360px); object-fit: contain; }
+#banner-bar.is-live img { max-height: clamp(100px, 12vw, 170px); }
+body.stage-mode #banner-bar { display: none; }
