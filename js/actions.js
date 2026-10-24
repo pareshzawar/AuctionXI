@@ -6,7 +6,7 @@
 
 import { db, isLocal } from './db.js';
 import { esc } from './ui.js';
-import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget, visibilityOf, ladderError } from './engine.js';
+import { DEFAULT_RULES, capsUpdate, nextBid, bidBlocker, bidLimit, normalize, randomCode, slug, basePrice, money, teamSummary, allottedPrice, miniBudget, visibilityOf, ladderError, tieCandidates } from './engine.js';
 
 async function newAuctionId(name, tournament) {
   const prefix = (slug(tournament || name).replace(/-/g, '').slice(0, 4) || 'axi').toUpperCase();
@@ -406,6 +406,24 @@ export async function sell(aid, a) {
     ...capsUpdate(after),
   });
   await log(aid, { type: 'sold', playerId: live.playerId, team: sale.team, amount: sale.price });
+}
+
+// Two or more teams called the same price together (or are stuck at the same max): draw one of them
+// at random. The winner leads at that price; the auctioneer then marks it sold as usual.
+export async function tieBreak(aid, a, teamIds) {
+  const live = a.live;
+  if (!live || live.status !== 'bidding') throw new Error('Bring up a player first');
+  const { amount, teams } = tieCandidates(a);
+  const ok = teamIds.filter((id) => teams.some((t) => t.id === id));
+  if (ok.length < 2) throw new Error('Choose at least two teams that can pay this price');
+  const winner = ok[crypto.getRandomValues(new Uint32Array(1))[0] % ok.length];
+  const cur = live.bid || {};
+  await db.update(`auctions/${aid}/live`, {
+    bid: { amount, team: winner, source: 'tie', at: db.now(), until: null, prev: { amount: Number(cur.amount) || amount, team: cur.team || null } },
+    tie: { teams: ok, winner, amount, at: db.now() },
+  });
+  await log(aid, { type: 'tie', playerId: live.playerId, teams: ok, team: winner, amount });
+  return winner;
 }
 
 export async function markUnsold(aid, a) {

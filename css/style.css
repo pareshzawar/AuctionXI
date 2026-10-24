@@ -350,3 +350,34 @@ fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lo
 body.stage-mode #banner-bar { display: none; }
 .live-focus .ax-avatar { background: #0b0d14; }
 .live-focus .ax-avatar img { object-fit: contain; object-position: center; }
+
+/* Tie-breaker draw: the names flash in turn for a few seconds, then the winner stays lit. */
+.tie-card { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border: 2px solid var(--gold); border-radius: var(--radius-lg); background: var(--surface); }
+.tie-card .stage-label { color: var(--gold); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.tie-teams { display: grid; gap: var(--space-3); }
+.tie-team { padding: var(--space-3) var(--space-4); border: 2px solid var(--line); border-radius: var(--radius-md); animation: tie-flash .5s calc(var(--i) * .5s / var(--n)) 6 both; }
+.tie-team.is-winner { animation: tie-flash .5s calc(var(--i) * .5s / var(--n)) 6 both, tie-win .6s 3.2s forwards; }
+@keyframes tie-flash { 0%, 100% { border-color: var(--line); background: transparent; } 40% { border-color: var(--c); background: color-mix(in srgb, var(--c) 25%, transparent); } }
+@keyframes tie-win { to { border-color: var(--c); background: color-mix(in srgb, var(--c) 30%, transparent); box-shadow: 0 0 30px color-mix(in srgb, var(--c) 60%, transparent); transform: scale(1.04); } }
+.tie-result { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--gold); opacity: 0; animation: tie-show .4s 3.4s forwards; }
+@keyframes tie-show { to { opacity: 1; } }
+.tie-stage { padding: var(--space-6); } .tie-stage .stage-label { font-size: 24px; } .tie-stage .tie-team { padding: var(--space-4) var(--space-5); } .tie-stage .tie-result { font-size: 52px; line-height: 1.1; }
+@media (prefers-reduced-motion: reduce) { .tie-team, .tie-team.is-winner, .tie-result { animation: none; opacity: 1; } .tie-team.is-winner { border-color: var(--c); } }
+
+/* Final squads after the auction: one column per team. */
+.final-board { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; }
+.final-stage { grid-column: 1 / -1; }
+.final-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); }
+.final-head h2 { margin: 0; font-family: var(--font-display); font-size: 32px; }
+.final-head span { color: var(--ink-muted); }
+.final-head .final-top b { color: var(--ink); }
+.final-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
+.final-team { border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: var(--radius-md); background: var(--surface); padding: var(--space-3); min-width: 0; }
+.final-team header { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.final-team header small { color: var(--ink-muted); white-space: nowrap; }
+.final-team ol { margin: 0; padding-left: 1.4em; }
+.final-team li { padding: 2px 0; font-size: 14px; } .final-team li span { display: inline-block; max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.final-team li b { float: right; font-variant-numeric: tabular-nums; } .final-team em { color: var(--gold); font-style: normal; font-size: 12px; }
+.final-stage .final-head h2 { font-size: 52px; } .final-stage .final-head span { font-size: 24px; }
+.final-stage .final-grid { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--space-4); }
+.final-stage .final-team li { font-size: 21px; padding: 4px 0; } .final-stage .final-team header small { font-size: 16px; }

@@ -10,7 +10,7 @@ import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
 import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, watchConnection, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
-import { cardFor, livePanel, purses, otherTeams, comingLists, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
+import { cardFor, livePanel, purses, otherTeams, comingLists, tieView, finalBoard, TIE_SHOW, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
 import { seasonsOf } from './history.js';
 import { armSound, soundReady, gavel, confetti } from './celebrate.js';
 
@@ -22,6 +22,8 @@ let myTeam = ['captain', 'vc', 'member'].includes(role) ? session.team : null;
 const isBidder = () => role === 'captain' || role === 'vc';
 const viewer = () => ({ role, team: myTeam });
 let A = null;
+let tieSeen = null;
+let lastStatus = null;
 let tab = null; // default: Rules before the auction starts, Squads after
 let sending = false;
 let lastResult = null;
@@ -75,6 +77,11 @@ async function boot() {
     document.title = `${A.meta.name} - AuctionXI`;
     draw();
     showResult();
+    // The tie-breaker card goes after a while; the final squads arrive with confetti.
+    const tie = A.live?.tie;
+    if (tie && tie.at !== tieSeen) { tieSeen = tie.at; setTimeout(() => A && draw(), Math.max(0, TIE_SHOW - (Date.now() - Number(tie.at))) + 200); }
+    if (lastStatus === 'live' && A.meta.status === 'completed') confetti({ colors: Object.values(A.teams).map((t) => t.color).filter(Boolean), big: true });
+    lastStatus = A.meta.status;
   });
   startCountdowns(db.now);
   if (stage) {
@@ -153,7 +160,8 @@ function renderStage() {
           : meta.stageView?.type === 'player' && A.players[meta.stageView.id] ? `${cardFor(A, meta.stageView.id, 'stage')}${stageProfileSide(meta.stageView.id)}`
           : meta.stageView?.type === 'history' ? stageHistory(A, meta.stageView.season)
           : meta.stageView?.type === 'team' && A.teams[meta.stageView.id] ? teamProfile(A, meta.stageView.id, { stage: true })
-          : hasLot ? `${cardFor(A, live.playerId, 'stage')}${livePanel(A, 'stage', viewer())}`
+          : meta.status === 'completed' ? finalBoard(A, { size: 'stage' })
+          : hasLot ? `${cardFor(A, live.playerId, 'stage')}${tieView(A, { size: 'stage' }) || livePanel(A, 'stage', viewer())}`
           : `<div class="stage-wait ${A.media?.banner ? 'has-banner' : ''}" style="grid-column:1/-1">${bannerImg(A, { cls: 'stage-banner' })}<div><h2>${meta.status === 'completed' ? 'Auction complete' : meta.status === 'live' ? 'Next player coming up' : 'Starting soon'}</h2>
              <p>${esc([meta.tournament, meta.season && `Season ${meta.season}`, meta.venue, meta.date, meta.time].filter(Boolean).join(' · '))}</p>
              ${meta.status === 'setup' ? stageRules() : ''}</div></div>`}
@@ -222,10 +230,11 @@ function renderPhone() {
     ${isBidder() && team ? teamPurse(team, teamSummary(A, myTeam), rules, { variant: 'card', leading: live?.status === 'bidding' && live.bid?.team === myTeam, maxBid: hasLot && live.status === 'bidding' ? bidLimit(A, myTeam, A.players[live.playerId]).max : undefined, hidePurse: !canSeePurse(rules, viewer(), myTeam) }) : ''}
     ${captainCorner ? `<div style="margin-top:var(--space-4)">${otherTeams(A, viewer())}</div>` : ''}
     <div class="live-grid live-focus" style="margin-top:var(--space-4)">
-      <div class="live-player">${hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
-      <div class="stack" style="gap:var(--space-4)">${hasLot ? livePanel(A, '', viewer()) : ''}${A.rules.commentary === false ? '' : phoneComm()}</div>
+      <div class="live-player">${meta.status === 'completed' ? `<div class="card"><h2>Auction complete</h2><p class="muted">The final squads are below.</p></div>` : hasLot ? cardFor(A, live.playerId) : `<div class="card"><h2>${meta.status === 'setup' ? 'The auction has not started yet' : meta.status === 'completed' ? 'Auction complete' : 'Next player coming up'}</h2><p class="muted">This page updates live.</p></div>`}</div>
+      <div class="stack" style="gap:var(--space-4)">${hasLot && meta.status !== 'completed' ? tieView(A) + livePanel(A, '', viewer()) : ''}${A.rules.commentary === false ? '' : phoneComm()}</div>
     </div>
     ${isBidder() && team ? `<div class="dock">${myLimit()}${captainButton()}</div>` : ''}
+    ${meta.status === 'completed' ? `<div style="margin-top:var(--space-4)">${finalBoard(A)}</div>` : ''}
     ${captainCorner ? (meta.status === 'live' ? comingLists(A) : '') : `<h2 style="margin-top:var(--space-5)">Teams</h2>
     <div class="purses">${purses(A, { viewer: viewer() })}</div>`}
     <div style="margin-top:var(--space-4)">${ticker(A, { scroll: true }) || ''}</div>

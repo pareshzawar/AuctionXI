@@ -6,12 +6,12 @@ import {
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
   BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, isCancelled, inAuction,
-  STAGES, stageOf, ladderError,
+  STAGES, stageOf, ladderError, tieCandidates,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
   startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
-  setVisibility, syncDirectory, directoryEntry, rememberOnAccount, undoSale, editSale, setTimer, lockDetails, unlockDetails,
+  setVisibility, syncDirectory, directoryEntry, rememberOnAccount, undoSale, editSale, setTimer, lockDetails, unlockDetails, tieBreak,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
@@ -690,6 +690,32 @@ function checkDialog({ title, body, confirmLabel, danger = false, extra = '' }) 
   });
 }
 
+// Tie-breaker: tick the teams that called this price together; one is drawn at random, shown on
+// the stage, and leads at that price. The teams that cannot go a step higher are ticked already.
+function tieDialog() {
+  const { amount, teams } = tieCandidates(A);
+  if (teams.length < 2) { toast(`Fewer than two teams can pay ${money(amount, A.rules)} for this player: no tie to break`, 'error'); return; }
+  const dlg = document.createElement('dialog');
+  dlg.className = 'card';
+  dlg.style.cssText = 'max-width:560px;width:calc(100% - 32px);color:var(--ink);background:var(--surface);border:1px solid var(--line)';
+  dlg.innerHTML = `<h2 style="margin-top:0">Tie-breaker draw at ${esc(money(amount, A.rules))}</h2>
+    <p>Tick the teams that called this price at the same time. One is drawn at random, shown on the stage and phones, and leads at ${esc(money(amount, A.rules))}. Then mark it sold as usual.</p>
+    <div class="stack" style="gap:var(--space-2)">${teams.map((t) => `<label class="check" style="margin:0"><input type="checkbox" data-tie="${esc(t.id)}" ${t.stuck ? 'checked' : ''}> ${teamBadge(A.teams[t.id], { showName: true })} <small class="muted">max ${esc(money(t.max, A.rules))}${t.stuck ? ' · can\'t go higher' : ''}</small></label>`).join('')}</div>
+    <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary" data-go>Draw</button><button class="btn-ghost" data-no>Cancel</button></p>`;
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); };
+  $('[data-no]', dlg).onclick = close;
+  dlg.oncancel = close;
+  $('[data-go]', dlg).onclick = run(async () => {
+    const ids = $$('[data-tie]', dlg).filter((c) => c.checked).map((c) => c.dataset.tie);
+    if (ids.length < 2) throw new Error('Tick at least two teams');
+    const w = await tieBreak(aid, A, ids);
+    close();
+    toast(`Tie-breaker: ${A.teams[w]?.name} wins the draw at ${money(amount, A.rules)}`, 'ok');
+  });
+}
+
 // "Team: 760 left → 600 left, 5 → 6 players" for each team a change touches.
 function purseChange(before, after, teams) {
   return `<table class="grid-table" style="margin-top:var(--space-3)"><thead><tr><th>Team</th><th>Budget left</th><th>Squad</th></tr></thead><tbody>${[...new Set(teams)].filter(Boolean).map((id) => {
@@ -1293,6 +1319,7 @@ function control(el) {
         <button class="btn-sold btn-lg" id="c-sold" ${leader ? '' : 'disabled'}>Mark sold${leader ? ` to ${esc(leader.short || leader.name)} · ${esc(money(live.bid.amount, rules))}` : ''} <kbd>S</kbd></button>
         <button class="btn-lg" id="c-unsold" ${bidding ? '' : 'disabled'}>Unsold <kbd>U</kbd></button>
         <button class="btn-ghost" id="c-undobid" ${bidding && live.bid?.team ? '' : 'disabled'}>Undo last bid <kbd>Z</kbd></button>
+        <button class="btn-ghost" id="c-tie" ${bidding ? '' : 'disabled'} title="Two teams called the same price at the same moment, or are stuck at the same max: draw one at random">Tie-breaker draw</button>
         <label class="check" style="margin:0" title="Only shown on screens: the bidding never closes by itself"><input type="checkbox" id="c-timer" ${Number(rules.bidTimer) ? 'checked' : ''}> Countdown after each bid${Number(rules.bidTimer) ? ` (${Number(rules.bidTimer)} s)` : ' (off)'}</label>
         <span class="spacer"></span>
         <button class="btn-sm btn-ghost" id="c-undo">Reverse last sale</button>
@@ -1352,6 +1379,7 @@ function control(el) {
   $('#c-sold').onclick = run(() => sell(aid, A));
   $('#c-unsold').onclick = run(() => markUnsold(aid, A));
   $('#c-undobid').onclick = run(() => undoLastBid(aid, A));
+  $('#c-tie').onclick = () => tieDialog();
   if ($('#c-timer')) $('#c-timer').onchange = run(async (e) => { await setTimer(aid, A, e.target.checked); toast(e.target.checked ? 'Countdown on' : 'Countdown off: bidding stays open until you close it', 'ok'); });
   wireSalesCard(el);
   $('#c-undo').onclick = run(async () => {

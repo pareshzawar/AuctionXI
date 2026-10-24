@@ -105,6 +105,41 @@ export function comingLists(a) {
   </div>`;
 }
 
+// Stage and phones: the tie-breaker draw just made (shown for TIE_SHOW ms). The names flash in turn
+// and settle on the winner.
+export const TIE_SHOW = 15000;
+export function tieView(a, { size = '' } = {}) {
+  const tie = a.live?.tie;
+  if (!tie || a.live.status !== 'bidding' || Date.now() - Number(tie.at) > TIE_SHOW) return '';
+  const n = tie.teams.length;
+  return `<div class="tie-card${size === 'stage' ? ' tie-stage' : ''}" style="--n:${n}">
+    <span class="stage-label">Tie-breaker draw · ${esc(money(tie.amount, a.rules))}</span>
+    <div class="tie-teams">${tie.teams.map((id, i) => `<div class="tie-team${id === tie.winner ? ' is-winner' : ''}" style="--i:${i};--c:${esc(a.teams[id]?.color || '#f2b84b')}">${teamBadge(a.teams[id], { showName: true, size: size === 'stage' ? 'lg' : '' })}</div>`).join('')}</div>
+    <p class="tie-result">${esc(a.teams[tie.winner]?.name || '')} win the draw</p>
+  </div>`;
+}
+
+// After the auction: every team's final squad, the top buys and the totals, for the stage and phones.
+export function finalBoard(a, { size = '' } = {}) {
+  const ids = Object.keys(a.teams);
+  const bought = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained);
+  const spent = bought.reduce((t, [, s]) => t + Number(s.price || 0), 0);
+  const top = bought.sort((x, y) => y[1].price - x[1].price).slice(0, 3);
+  return `<div class="final-board${size === 'stage' ? ' final-stage' : ''}" style="--n:${Math.min(ids.length, 8)}">
+    <div class="final-head"><h2>Final squads</h2>
+      <span>${bought.length} players sold · ${esc(money(spent, a.rules))} spent</span>
+      ${top.length ? `<span class="final-top">Top buys: ${top.map(([pid, s]) => `<b>${esc(a.players[pid]?.name || pid)}</b> ${esc(a.teams[s.team]?.short || '')} ${esc(money(s.price, a.rules))}`).join(' · ')}</span>` : ''}</div>
+    <div class="final-grid">${ids.map((id) => {
+      const t = a.teams[id];
+      const s = teamSummary(a, id);
+      return `<section class="final-team" style="--c:${esc(t.color || '#f2b84b')}">
+        <header>${teamBadge(t, { showName: true })}<small>${s.count}/${a.rules.squadSize} · ${esc(money(s.remaining, a.rules))} left</small></header>
+        <ol>${squadRows(a, id).map((r) => `<li><span>${esc(r.name)}${r.status === 'retained' ? ` <em>${esc(r.sub.split(' · ')[0] || '')}</em>` : ''}</span><b>${r.status === 'retained' ? '' : esc(money(r.price, a.rules))}</b></li>`).join('')}</ol>
+      </section>`;
+    }).join('')}</div>
+  </div>`;
+}
+
 export function tickerItems(a, limit = 12) {
   const sales = Object.entries(a.sales).filter(([, s]) => !s.allotted && !s.retained)
     .map(([pid, s]) => ({ at: s.at, player: a.players[pid]?.name || pid, team: a.teams[s.team], price: s.price }));
@@ -129,6 +164,7 @@ export function feed(a, limit = 30) {
       case 'undo': return `${badge('paused', { text: 'Reversed' })} Sale of ${name(e.playerId)} reversed`;
       case 'edit': return `${badge('paused', { text: 'Corrected' })} ${name(e.playerId)} ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm', tone: 'sold' })} <span class="muted">was ${esc(a.teams[e.fromTeam]?.short || e.fromTeam || '')} ${esc(money(e.fromAmount, a.rules))}</span>`;
       case 'round': return `${badge('upcoming', { text: 'Round' })} Round ${esc(e.round)}: unsold players return`;
+      case 'tie': return `${badge('upcoming', { text: 'Tie-break' })} ${name(e.playerId)} ${(e.teams || []).map((t) => teamBadge(a.teams[t])).join(' ')} drawn: ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm' })}`;
       case 'start': return `${badge('live')} Auction started`;
       case 'ready': return `${badge('retained', { text: 'Ready' })} Details saved and locked`;
       case 'draft': return `${badge('upcoming', { text: 'Draft' })} Details unlocked for changes`;

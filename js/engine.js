@@ -350,6 +350,21 @@ export function bidLimit(a, teamId, player) {
   return { max, why, keep, slotsAfter, remaining: s.remaining };
 }
 
+// Tie-breaker: the teams that could take the player on the block at the current price (room left,
+// max bid high enough). `stuck` = those who cannot go one step higher, the usual candidates when two
+// teams call the same price at once.
+export function tieCandidates(a) {
+  const live = a.live;
+  if (live?.status !== 'bidding') return { amount: null, teams: [] };
+  const p = a.players[live.playerId];
+  const amount = live.bid?.team ? Number(live.bid.amount) : basePrice(p, a.rules);
+  const next = live.bid?.team ? amount + increment(amount, a.rules) : amount;
+  const teams = Object.keys(a.teams).map((id) => ({ id, max: bidLimit(a, id, p).max }))
+    .filter((t) => t.max >= amount)
+    .map((t) => ({ ...t, stuck: t.max < next || live.bid?.team === t.id }));
+  return { amount, teams };
+}
+
 // Why a team can't bid `amount` right now, or null if it can.
 export function bidBlocker(a, teamId, amount) {
   const live = a.live;
