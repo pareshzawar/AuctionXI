@@ -156,11 +156,11 @@ ok(vis('own', { role: 'admin' }, 'T3') && vis('bidders', { role: 'captain', team
 // teams template captains / vice-captains → players
 {
   const rules = E.withDefaults({});
-  const a = E.normalize({ meta: {}, rules, teams: { T1: { name: 'Rajgad', captainName: 'Mayur Jain', vcName: 'Kiran' }, T2: { name: 'Torna', captainName: 'Ganesh Bhor' } },
+  const a = E.normalize({ meta: {}, rules, teams: { T1: { name: 'Rajgad', captainName: 'Ravi Kumar', vcName: 'Kiran' }, T2: { name: 'Torna', captainName: 'Ganesh Bhor' } },
     players: { P001: { name: 'Kiran Patil', role: 'bat', category: 'C' }, P002: { name: 'Old Captain', role: 'ar', category: 'A', allottedTeam: 'T2', allottedAs: 'C' } } });
   const { updates, warnings } = E.linkLeaders(a);
   const added = Object.entries(updates).filter(([k, v]) => /^players\/P\d+$/.test(k) && v);
-  ok(added.length === 2 && added.every(([, p]) => p.autoLeader) && added.some(([, p]) => p.name === 'Mayur Jain' && p.allottedTeam === 'T1' && p.allottedAs === 'C'), 'teams template: captains not in the player list are added');
+  ok(added.length === 2 && added.every(([, p]) => p.autoLeader) && added.some(([, p]) => p.name === 'Ravi Kumar' && p.allottedTeam === 'T1' && p.allottedAs === 'C'), 'teams template: captains not in the player list are added');
   ok(updates['players/P001/allottedTeam'] === 'T1' && updates['players/P001/allottedAs'] === 'VC' && warnings.some((w) => /matched to Kiran Patil/.test(w)), 'teams template: "Kiran" matches Kiran Patil, with a note');
   ok(updates['players/P002/allottedTeam'] === null, 'teams template: the replaced captain goes back into the pool');
 }
@@ -257,4 +257,16 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
   const files = ['index.html', 'admin.html', 'live.html', 'results.html', 'poster.html', ...fs.readdirSync(root + '/js').map((f) => 'js/' + f)];
   const hits = files.filter((f) => /github\.io|gstatic\.com|cdnjs|jsdelivr|unpkg/.test(fs.readFileSync(`${root}/${f}`, 'utf8')));
   ok(!hits.length, `no fixed domain or CDN in the app${hits.length ? `: ${hits.join(', ')}` : ''}`);
+}
+{
+  // Each past season keeps its own captain, vice-captain, owner and sponsor.
+  const H = await import(root + '/js/history.js');
+  const h = H.historyFromRecord({ format: 'auctionxi/1', meta: { season: '2' }, rules: {},
+    teams: { T1: { name: 'Wing A Tigers', owner: 'Mr A' }, T2: { name: 'Wing B Warriors' } },
+    players: { P1: { name: 'Kiran', allottedTeam: 'T1', allottedAs: 'C' }, P2: { name: 'Om' } },
+    sales: { P1: { team: 'T1', price: 0, allotted: true }, P2: { team: 'T2', price: 90 } },
+    results: { teams: [{ team: 'Wing B Warriors', captain: 'Ravi', viceCaptain: 'Sam', sponsor: 'Acme' }] } });
+  const p1 = H.peopleText(H.teamPast(h, 'Wing A Tigers'));
+  const p2 = H.peopleText(H.teamPast(h, 'Wing B Warriors'));
+  ok(p1 === 'Captain Kiran · Owner Mr A' && p2 === 'Captain Ravi · Vice-captain Sam · Sponsor Acme', `season people: ${p1} | ${p2}`);
 }

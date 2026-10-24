@@ -3,7 +3,7 @@
 
 import { esc } from './ui.js';
 import { money, teamSummary, category, basePrice, nextBid, roleId, ROLES, pool, canSeePurse, canSeeMaxBid, canSeeBid, leaderLabel, minBase, hasVC, vcCanBid, reserves, PURSE_VISIBILITY, variedBudgets, battingLabel, bowlingLabel, inAuction, isWaiting, isCancelled, searchPlayers, leadersOf } from './engine.js';
-import { seasonsOf, teamPast, sameTeam } from './history.js';
+import { seasonsOf, teamPast, findTeam, peopleText } from './history.js';
 import { playerCard, bidPanel, teamPurse, salesTicker, badge, teamBadge, price, playerTable } from './ds.js';
 
 export function playerStatus(a, pid) {
@@ -253,9 +253,16 @@ function standingsTable(h, a) {
   if (!h.standings?.length) return '';
   return `<div class="ax-table-wrap"><table class="ax-table ax-table-dense hist-table"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>NRR</th><th>Finish</th></tr></thead><tbody>
     ${h.standings.map((s, i) => {
-      const now = Object.values(a.teams).find((t) => sameTeam(t.name, s.team));
+      const now = findTeam(Object.values(a.teams), s.team, (t) => t.name);
       return `<tr><td>${i + 1}</td><td><b style="${now?.color ? `border-left:4px solid ${esc(now.color)};padding-left:6px` : ''}">${esc(s.team)}</b></td><td>${s.played ?? ''}</td><td>${s.won ?? ''}</td><td>${s.lost ?? ''}</td><td><b>${s.points ?? ''}</b></td><td>${nrrText(s.nrr)}</td><td><span class="${finishTone(s.finish)}">${esc(s.finish)}</span></td></tr>`;
     }).join('')}</tbody></table></div>`;
+}
+
+// Who led and backed each team that season (they change every season).
+function seasonPeople(h) {
+  const rows = (h.auction?.teams || []).filter((t) => peopleText(t));
+  if (!rows.length) return '';
+  return `<h4 style="margin:var(--space-4) 0 var(--space-2)">Teams that season</h4><ul class="hist-ko">${rows.map((t) => `<li><b>${esc(t.name)}</b> <span class="muted">${esc(peopleText(t))}</span></li>`).join('')}</ul>`;
 }
 
 function topList(title, rows, fmt) {
@@ -278,7 +285,8 @@ export function teamPastLines(a, team) {
   return seasonsOf(a).map((h) => ({ h, p: teamPast(h, team.name) })).filter((x) => x.p).map(({ h, p }) => `<li><b>Season ${esc(h.season)}</b>
     ${p.finish ? `<span class="${finishTone(p.finish)}">${esc(p.finish)}</span>` : ''}
     ${p.played != null ? `<span class="muted">W${p.won} L${p.lost} · ${p.points} pts${p.nrr != null ? ` · NRR ${nrrText(p.nrr)}` : ''}</span>` : ''}
-    ${p.topBuy ? `<span class="muted">Top buy ${esc(p.topBuy.name)}, ${esc(hm(h, p.topBuy.price))}</span>` : ''}</li>`).join('');
+    ${p.topBuy ? `<span class="muted">Top buy ${esc(p.topBuy.name)}, ${esc(hm(h, p.topBuy.price))}</span>` : ''}
+    ${peopleText(p) ? `<span class="muted">${esc(peopleText(p))}</span>` : ''}</li>`).join('');
 }
 
 // A team's profile: banner, captain and vice-captain, squad so far, past seasons.
@@ -292,7 +300,7 @@ export function teamProfile(a, id, { stage = false } = {}) {
     ${t.bannerData ? `<img class="team-profile-banner" src="${esc(t.bannerData)}" alt="">` : `<div class="team-profile-banner team-profile-nobanner"><span>${esc(t.short || t.name.slice(0, 3))}</span></div>`}
     <div class="team-profile-body">
       <h3>${esc(t.name)}</h3>
-      <p class="team-profile-leaders">${l.C || t.captainName ? `Captain <b>${esc(l.C?.name || t.captainName)}</b>` : ''}${l.VC || t.vcName ? ` · Vice-captain <b>${esc(l.VC?.name || t.vcName)}</b>` : ''}${t.owner ? ` · Owner <b>${esc(t.owner)}</b>` : ''}</p>
+      <p class="team-profile-leaders">${l.C || t.captainName ? `Captain <b>${esc(l.C?.name || t.captainName)}</b>` : ''}${l.VC || t.vcName ? ` · Vice-captain <b>${esc(l.VC?.name || t.vcName)}</b>` : ''}${t.owner ? ` · Owner <b>${esc(t.owner)}</b>` : ''}${t.sponsor ? ` · Sponsor <b>${esc(t.sponsor)}</b>` : ''}</p>
       ${past ? `<ul class="team-profile-past">${past}</ul>` : ''}
       ${squad.length ? `<p class="team-profile-squad"><span class="muted">Squad ${squad.length}/${a.rules.squadSize}:</span> ${squad.map((r) => esc(r.name)).join(' · ')}</p>` : ''}
     </div>
@@ -308,6 +316,7 @@ export function historyView(a) {
       <div class="section-title"><h3 style="margin:0">Season ${esc(h.season)}${h.kind === 'mini' ? ' · mini auction' : ''}</h3><small class="muted">${esc([h.dates, h.venue].filter(Boolean).join(' · '))}</small></div>
       ${h.champion ? `<p class="hist-champ"><span class="hist-gold">Champion</span> <b>${esc(h.champion)}</b>${h.runnerUp ? ` · <span class="hist-silver">Runner-up</span> ${esc(h.runnerUp)}` : ''}</p>` : ''}
       ${standingsTable(h, a)}
+      ${seasonPeople(h)}
       ${h.knockouts?.length ? `<ul class="hist-ko">${h.knockouts.map((k) => `<li><b>${esc(k.stage)}</b> ${esc(k.result)}</li>`).join('')}</ul>` : ''}
       ${performers(h)}
       ${h.auction?.topBuys?.length ? `<h4 style="margin:var(--space-4) 0 var(--space-2)">That auction's top buys</h4><ol class="hist-buys">${h.auction.topBuys.map((b) => `<li><b>${esc(b.name)}</b> <span class="muted">${esc(b.team)}</span> <span class="hist-gold">${esc(hm(h, b.price))}</span></li>`).join('')}</ol>` : ''}
