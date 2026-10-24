@@ -24,6 +24,7 @@ import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { downloadTracker, preloadExcel } from './tracker.js';
 import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
+import { withLeaders } from './plan.js';
 import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, PHOTO_WHOLE, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
@@ -462,7 +463,7 @@ function teams(el) {
             <td><input data-f="owner" value="${esc(t.owner || '')}" placeholder="Optional"></td>
             <td><input data-f="sponsor" value="${esc(t.sponsor || '')}" placeholder="Optional"></td>
             <td><input data-f="purse" inputmode="numeric" value="${esc(t.purse ?? '')}" placeholder="${esc(money(A.rules.purse, A.rules))}" style="width:100px" title="Blank = the standard purse. A mini auction fills in each team's carried-over budget"></td>
-            <td>${teamSummary(A, id).count}</td>
+            <td>${teamSummary(A.meta.status === 'setup' ? withLeaders(A) : A, id).count}</td>
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
           </tr>`).join('') || '<tr><td colspan="10" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
