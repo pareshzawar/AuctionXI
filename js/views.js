@@ -157,8 +157,14 @@ export function squadRows(a, teamId) {
 export function squads(a, { viewer = null } = {}) {
   const leading = a.live?.status === 'bidding' && canSeeBid(a.rules, viewer) ? a.live.bid?.team : null;
   const mine = viewer?.team;
-  // The viewer's own team first.
-  const ids = Object.keys(a.teams).sort((x, y) => (y === mine) - (x === mine));
+  // The viewer's own team first, then the team that bought most recently, and so on; teams that
+  // have not bought yet keep their order at the end. Captains and kept players don't count.
+  const lastBuy = {};
+  for (const s of Object.values(a.sales || {})) {
+    if (!s.allotted && !s.retained && a.teams[s.team]) lastBuy[s.team] = Math.max(lastBuy[s.team] || 0, Number(s.at) || 0);
+  }
+  const order = Object.keys(a.teams);
+  const ids = [...order].sort((x, y) => (y === mine) - (x === mine) || (lastBuy[y] || 0) - (lastBuy[x] || 0) || order.indexOf(x) - order.indexOf(y));
   return `<div class="grid grid-2">${ids.map((id) => `
     <div class="stack">
       ${a.teams[id].bannerData ? `<img class="team-banner" src="${esc(a.teams[id].bannerData)}" alt="${esc(a.teams[id].name)}">` : ''}

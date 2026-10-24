@@ -207,8 +207,8 @@ function renderPhone() {
       if (belowDirty && !$('#below').contains(document.activeElement)) renderBelow();
     }, 0));
   }
+  bannerBar(meta.status !== 'setup');
   $('#p-top').innerHTML = `
-    ${meta.status === 'setup' ? bannerImg(A, { cls: 'phone-banner' }) : '' /* once started, the room goes to the player */}
     <div class="page-head">
       <div class="brand-row">
         ${logoImg(A, { size: 56 })}
@@ -256,6 +256,23 @@ function phoneComm() {
       ${voice.current(lg) ? `<small class="muted">${esc(voice.current(lg))}</small>` : ''}</label>` : ''}
     ${voice.on && !voice.hasVoice(lg) ? '<p class="hint">This phone has no Marathi or Hindi voice installed, so lines are shown but not read.</p>' : ''}
   </div>`;
+}
+
+// The league banner as a full-width bar under the header: tall before the auction, slim once it
+// runs, so the player stays in focus. The image is only replaced when it changes (no flicker).
+function bannerBar(live) {
+  let bar = $('#banner-bar');
+  const src = A.media?.banner || '';
+  if (!src) { bar?.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'banner-bar';
+    bar.innerHTML = '<img alt="">';
+    $('header.top').after(bar);
+  }
+  const img = bar.querySelector('img');
+  if (img.getAttribute('src') !== src) { img.src = src; img.alt = `${A.meta.tournament || A.meta.name} banner`; }
+  bar.classList.toggle('is-live', live);
 }
 
 function captainButton() {
