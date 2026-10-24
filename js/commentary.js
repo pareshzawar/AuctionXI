@@ -47,6 +47,7 @@ const PHRASES = {
     undo: (f) => `Correction: the sale of ${f.p} to ${f.t} has been reversed.`,
     edit: (f) => `Correction: ${f.p} goes to ${f.t} for ${f.amt}.`,
     round: (f) => `Round ${f.r}. The unsold players are back for another chance.`,
+    tie: (f) => `${f.ts} called ${f.amt} together. Tie-breaker draw: ${f.t} win it. Fortune favours the brave.`,
     end: (f) => `That is the end of the auction. ${f.count} players sold${f.top ? `; the top buy was ${f.top.p} to ${f.top.t} for ${f.top.amt}` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} open the bidding at ${f.amt}.`, `${f.t} make the first move, ${f.amt}.`, `First bid: ${f.t}, ${f.amt}.`], k),
     bidRecord: (f) => `${f.amt} from ${f.t}. That beats the highest price of the auction so far.`,
@@ -76,6 +77,7 @@ const PHRASES = {
     undo: (f) => `Correction: ${f.p} ki ${f.t} wali sale cancel ho gayi hai.`,
     edit: (f) => `Correction: ${f.p} ab ${f.t} mein, ${f.amt}.`,
     round: (f) => `Round ${f.r}. Unsold players phir se auction mein.`,
+    tie: (f) => `${f.ts} ne ek saath ${f.amt} bola. Tie-breaker draw: ${f.t} jeet gaye. Kismat bhi koi cheez hai.`,
     end: (f) => `Auction khatam. ${f.count} players bike${f.top ? `; sabse badi boli ${f.top.p} ki, ${f.top.t} ne ${f.top.amt} mein li` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} ne bidding shuru ki, ${f.amt}.`, `Pehli boli ${f.t} ki, ${f.amt}.`, `${f.t} ne pehla kadam uthaya, ${f.amt}.`], k),
     bidRecord: (f) => `${f.amt}, ${f.t} se. Is auction ki ab tak ki sabse oonchi boli se bhi zyada.`,
@@ -105,6 +107,7 @@ const PHRASES = {
     undo: (f) => `दुरुस्ती: ${f.p} ची ${f.t} कडे झालेली विक्री रद्द केली आहे.`,
     edit: (f) => `दुरुस्ती: ${f.p} आता ${f.t} कडे, ${f.amt} ला.`,
     round: (f) => `फेरी ${f.r}. न विकलेले खेळाडू पुन्हा लिलावात.`,
+    tie: (f) => `${f.ts} यांनी एकाच वेळी ${f.amt} म्हटले. टाय-ब्रेकर सोडत: ${f.t} जिंकले. नशीब बलवत्तर!`,
     end: (f) => `लिलाव संपला. ${f.count} खेळाडू विकले गेले${f.top ? `; सर्वात मोठी बोली ${f.top.p} साठी, ${f.top.t} ने ${f.top.amt} ला घेतलं` : ''}.`,
     bidFirst: (f, k) => pick([`${f.t} ने ${f.amt} ने बोली सुरू केली.`, `पहिली बोली ${f.t} ची, ${f.amt}.`, `${f.t} ने पहिलं पाऊल टाकलं, ${f.amt}.`], k),
     bidRecord: (f) => `${f.t} कडून ${f.amt}. या लिलावातली आतापर्यंतची सर्वात मोठी बोली ओलांडली.`,
@@ -239,6 +242,8 @@ function lineForLog(a, e, key, lang) {
         name: a.meta.name, teams: Object.keys(a.teams).length, size: r.squadSize,
         toBuy: r.squadSize - (r.leaders === 'captain_vc' ? 2 : 1), pool: Object.values(a.players).filter((x) => !isAllotted(x)).length,
       }, key) + punch(a, lang, 'start', key);
+    case 'tie':
+      return L.tie({ ts: (e.teams || []).map((t) => teamName(a, t)).join(' and '), t: teamName(a, e.team), amt: m(e.amount) }, key);
     case 'up':
       return L.up({ how: e.drawn, intro: intro(a, p, lang), base: m(e.amount) }, key) + punch(a, lang, upKind(p), key, { sr: Math.round(Number(p.strikeRate) || 0), wkts: Number(p.wickets) || 0 });
     case 'sold': {
