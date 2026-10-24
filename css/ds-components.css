@@ -102,7 +102,9 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
 .ax-card-cat.is-featured { color: var(--gold); }
 .ax-card-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .ax-avatar { flex: none; display: grid; place-items: center; width: 56px; height: 56px; overflow: hidden; border-radius: var(--radius-full); background: var(--surface-raised); border: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--ink-muted); }
-.ax-avatar img, .ax-photo img { width: 100%; height: 100%; object-fit: cover; }
+.ax-avatar img, .ax-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+/* Big photos show the whole picture: a 3:4 photo fills the box as before, a ready-made poster is not cut. */
+.ax-photo img { object-fit: contain; object-position: center; }
 .ax-card-name { margin: 0; overflow-wrap: anywhere; font-family: var(--font-display); font-size: 24px; line-height: 28px; font-weight: 700; }
 .ax-card-meta { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .ax-feat { display: flex; flex-wrap: wrap; gap: var(--space-1); }

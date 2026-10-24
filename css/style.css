@@ -348,3 +348,5 @@ fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lo
 #banner-bar img { display: block; width: 100%; height: auto; max-height: clamp(96px, 25vw, 360px); object-fit: contain; }
 #banner-bar.is-live img { max-height: clamp(100px, 12vw, 170px); }
 body.stage-mode #banner-bar { display: none; }
+.live-focus .ax-avatar { background: #0b0d14; }
+.live-focus .ax-avatar img { object-fit: contain; object-position: center; }

@@ -9,6 +9,7 @@ import { db } from './db.js';
 import { esc } from './ui.js';
 
 export const PHOTO = { w: 360, h: 480, type: 'image/jpeg', quality: 0.8 }; // 3:4, like the stage card
+export const PHOTO_WHOLE = { max: 960, type: 'image/jpeg', quality: 0.82 }; // a ready-made poster: never cropped, only shrunk
 export const LOGO = { max: 320, type: 'image/png' }; // keeps a transparent background
 export const BANNER = { max: 2400, type: 'image/jpeg', quality: 0.85 }; // keeps its shape: a wide banner (2400 x 600 fills the live page's bar) or a poster
 
