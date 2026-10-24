@@ -1283,7 +1283,16 @@ function access(el) {
     if (d.copy) {
       const vc = d.as === 'VC';
       const who = vc ? 'vice-captain' : 'captain';
-      const msg = `${A.meta.name}\nYou are the ${who} of ${A.teams[d.copy].name}.\n1. Open ${joinUrl}\n2. Choose ${vc ? 'Vice-captain' : 'Captain'} and team ${A.teams[d.copy].name}\n3. Enter code ${(vc ? secrets.vcCodes : secrets.teamCodes)[d.copy]}\nKeep this code private.`;
+      // A ready-to-send WhatsApp message: how to join, then how to use the captain's corner.
+      const m = A.meta;
+      const when = [m.date && new Date(`${m.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }), m.time, m.venue].filter(Boolean).join(', ');
+      const msg = [
+        `🏏 *${m.name}*${when ? `\n📅 ${when}` : ''}`,
+        `You are the *${who}* of *${A.teams[d.copy].name}*.`,
+        `*Join (do it the evening before):*\n1. Open ${joinUrl}\n2. Choose ${vc ? 'Vice-captain' : 'Captain'} and team ${A.teams[d.copy].name}\n3. Enter your code: *${(vc ? secrets.vcCodes : secrets.teamCodes)[d.copy]}*\n🔒 This code is only for you. Don't forward it: anyone with it can bid for your team.`,
+        `*Captain's corner, on the day:*\n• Top of the page: your *purse left*, *max bid* and *players still to buy*, then the other teams.\n• The gold *BID* button shows the next price: one tap = one step up. You can never bid above your max bid.\n• "Win at …" above the button shows what winning leaves you.\n• *My workbook* (set a PIN): your private target list with your own max for each player, and *My plan* shows what each buy leaves. Fill it in before the auction.\n• Below the player: *Still to come* and *Unsold*, so you don't overpay early.\n• Same price called together? The auctioneer runs a tie-breaker draw on the screen.`,
+        `Keep your phone charged with the screen timeout off. Good luck! 🏆`,
+      ].join('\n\n');
       await navigator.clipboard.writeText(msg);
       toast('Copied. Paste it in WhatsApp.', 'ok');
     }
