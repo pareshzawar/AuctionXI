@@ -743,7 +743,10 @@ function wireSalesCard(el) {
     const teamSel = `<select data-t>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}" ${id === s.team ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select>`;
     const preview = (team, price) => {
       const after = { ...A, sales: { ...A.sales, [pid]: { ...s, team, price: Number(price) || 0 } } };
-      return `<p>Now: <b>${esc(A.teams[s.team]?.name)}</b>, ${esc(money(s.price, A.rules))} → after: <b>${esc(A.teams[team]?.name)}</b>, <b>${esc(money(Number(price) || 0, A.rules))}</b></p>${purseChange(A, after, [s.team, team])}`;
+      const base = basePrice(A.players[pid], A.rules);
+      const n = Number(price) || 0;
+      const off = n && (n < base ? `Below the base price of ${money(base, A.rules)}` : ladderError(n, base, A.rules));
+      return `${off ? `<p class="notice notice-warn" style="margin:0 0 var(--space-2)">${esc(off)}</p>` : ''}<p>Now: <b>${esc(A.teams[s.team]?.name)}</b>, ${esc(money(s.price, A.rules))} → after: <b>${esc(A.teams[team]?.name)}</b>, <b>${esc(money(Number(price) || 0, A.rules))}</b></p>${purseChange(A, after, [s.team, team])}`;
     };
     const dlgP = checkDialog({
       title: `Edit the sale of ${esc(A.players[pid]?.name || pid)}`, confirmLabel: 'Save the correction',
@@ -758,11 +761,7 @@ function wireSalesCard(el) {
     const team = $('[data-t]', ok).value;
     const price = num($('[data-p]', ok).value);
     if (price == null) throw new Error('Enter the price');
-    let warning = await editSale(aid, A, pid, { team, price });
-    if (warning) {
-      if (!confirm(`${warning}\n\nSave it anyway?`)) return;
-      warning = await editSale(aid, A, pid, { team, price }, true);
-    }
+    await editSale(aid, A, pid, { team, price });
     saved(`${A.players[pid]?.name || pid}: sale corrected`);
   })));
 }
@@ -1318,7 +1317,6 @@ function control(el) {
   el.innerHTML = `
     ${meta.status === 'completed' ? '<div class="notice notice-ok">Auction completed. Export and archive the results from the Results tab.</div>' : ''}
     ${nextPlayerPanel(bidding, remaining)}
-    ${stagePanel(bidding)}
     <div class="live-grid">
       <div>${player ? cardFor(A, live.playerId) : '<div class="card"><h2>No player on the block</h2><p class="muted">Press Next player or pick one.</p></div>'}</div>
       <div>${player ? livePanel(A) : ''}</div>
@@ -1361,6 +1359,7 @@ function control(el) {
         ${meta.status === 'live' ? '<button class="btn-sm btn-danger" id="c-finish">End auction</button>' : ''}
       </div>
     </div>
+    ${stagePanel(bidding)}
     ${salesCard()}
     <div class="grid grid-2" style="margin-top:var(--space-4)">
       <div class="card"><h2>Purses</h2><div class="stack">${purses(A, { viewer: { role: 'admin' } })}</div></div>
@@ -1567,9 +1566,10 @@ function stagePanel(bidding) {
     : v?.type === 'player' ? `${A.players[v.id]?.name || 'a player'}'s profile`
     : v?.type === 'history' ? `season ${v.season}` : v?.type === 'team' ? `${A.teams[v.id]?.name || 'a team'}'s profile` : (bidding ? 'the bidding' : 'the auction');
   const seasons = seasonsOf(A);
-  return `<div class="card" style="margin-top:var(--space-4)">
-    <div class="section-title"><h2 style="margin:0">On the stage</h2><small>Now showing ${esc(now)}</small><span class="spacer"></span>
-      ${v ? '<button class="btn-sm btn-primary" id="sv-back">Back to the auction</button>' : ''}</div>
+  return `<details class="card stage-extras" style="margin-top:var(--space-4)" ${v ? 'open' : ''}>
+    <summary class="section-title" style="cursor:pointer"><h2 style="margin:0">Big screen extras <small class="muted">(no bidding)</small></h2><small>Now showing ${esc(now)}</small><span class="spacer"></span>
+      ${v ? '<button class="btn-sm btn-primary" id="sv-back">Back to the auction</button>' : ''}</summary>
+    <p class="hint" style="margin-top:0">Between players: put a list, a profile or a past season on the stage. This does <b>not</b> start bidding; use <b>Next player</b> above for that.</p>
     <p class="row">
       <button class="btn-sm" data-sv="available" ${bidding ? 'disabled title="Finish the player on the block first"' : ''}>Show players up for auction (${available.length})</button>
       <button class="btn-sm" data-sv="waiting" ${bidding || !waiting.length ? 'disabled' : ''}>Show the waiting list (${waiting.length})</button>
@@ -1577,11 +1577,11 @@ function stagePanel(bidding) {
       <select id="sv-team" style="width:auto" ${bidding ? 'disabled' : ''}><option value="">A team's profile…</option>${Object.entries(A.teams).map(([id, t]) => `<option value="${esc(id)}">${esc(t.name)}</option>`).join('')}</select>
     </p>
     <div style="max-width:560px">
-      <input id="sv-search" placeholder="Show a player's profile: type the name, the number, or both" autocomplete="off" ${bidding ? 'disabled' : ''}>
+      <input id="sv-search" placeholder="Show a player's profile on the stage: name, number or both" autocomplete="off" ${bidding ? 'disabled' : ''}>
       <div id="sv-results" class="stack" style="gap:var(--space-1);margin-top:var(--space-2)"></div>
     </div>
     <span class="hint">Phones always have these under the Players tab. Bringing up the next player puts the stage back on the auction.</span>
-  </div>`;
+  </details>`;
 }
 
 function wireStagePanel(el) {
@@ -1599,9 +1599,10 @@ function wireStagePanel(el) {
       $('#sv-results', el).innerHTML = !input.value.trim() ? '' : list.length ? list.map((p, i) => `
         <div class="row" style="padding:var(--space-2) var(--space-3);border:1px solid ${i ? 'var(--line)' : 'var(--gold)'};border-radius:var(--radius-sm)">
           <code>${esc(p.id)}</code> <b>${esc(p.name)}</b> <small>${esc(ROLES[roleId(p.role)].name)}${wait.has(p.id) ? ' · waiting list' : ''}</small>
-          <span class="spacer"></span><button class="btn-sm ${i ? '' : 'btn-primary'}" data-svp="${esc(p.id)}">Show on stage</button>
+          <span class="spacer"></span><button class="btn-sm ${i ? '' : 'btn-primary'}" data-svp="${esc(p.id)}">Show profile only</button>${wait.has(p.id) || A.meta.status !== 'live' ? '' : `<button class="btn-sm" data-svup="${esc(p.id)}">Bring up for bidding</button>`}
         </div>`).join('') : '<p class="muted" style="margin:0">No player up for auction or on the waiting list matches.</p>';
       $$('[data-svp]', el).forEach((b) => (b.onclick = () => { input.value = ''; set({ type: 'player', id: b.dataset.svp }); }));
+      $$('[data-svup]', el).forEach((b) => (b.onclick = run(() => { input.value = ''; return bringUp(b.dataset.svup); })));
     };
     input.oninput = show;
     input.onkeydown = (e) => {
@@ -1649,11 +1650,11 @@ function nextPlayerPanel(bidding, remaining) {
       : `
         <div class="row" style="align-items:flex-start">
           <div style="flex:1;min-width:260px;max-width:560px">
-            <input id="d-search" placeholder="Type the name or number on the chit" autocomplete="off" ${closed ? 'disabled' : ''}>
+            <input id="d-search" placeholder="Chit: type the name or number, then Bring up for bidding" autocomplete="off" ${closed ? 'disabled' : ''}>
             <div id="d-results" class="stack" style="gap:var(--space-1);margin-top:var(--space-2)"></div>
           </div>
         </div>
-        <span class="hint">${closed && bidding ? 'Finish the player on the block first. ' : ''}Draw a chit in the hall, type the name (or player number), and press Enter or Bring up. Only players not yet auctioned this round are found.</span>`}
+        <span class="hint">${closed && bidding ? 'Finish the player on the block first. ' : ''}Draw a chit in the hall, type the name (or player number), and press Enter or <b>Bring up for bidding</b>: the player goes on the block, the stage and phones. Only players not yet auctioned this round are found.</span>`}
       <p style="margin:var(--space-3) 0 0"><small>Left this round: ${counts.map((c) => `${esc(c.label)} ${c.left}`).join(' · ')}</small></p>
     </div>`;
 }
@@ -1678,7 +1679,7 @@ function wireNextPlayerPanel(el) {
           <code>${esc(p.id)}</code> <b>${esc(p.name)}</b>
           <small>${esc([category(A.rules, p.category)?.label, ROLES[roleId(p.role)].name].filter(Boolean).join(' · '))}</small>
           <span class="spacer"></span>
-          <button class="btn-sm ${i ? '' : 'btn-primary'}" data-up="${esc(p.id)}">Bring up</button>
+          <button class="btn-sm ${i ? '' : 'btn-primary'}" data-up="${esc(p.id)}">Bring up for bidding</button>
         </div>`).join('')
         : '<p class="muted" style="margin:0">No player left in this round matches. Already sold, unsold this round, or a captain / vice-captain?</p>';
     $$('[data-up]', el).forEach((b) => (b.onclick = run(() => bringUp(b.dataset.up))));
@@ -1694,6 +1695,7 @@ async function bringUp(pid) {
   $('#d-search') && ($('#d-search').value = '');
   document.activeElement?.blur();
   await startPlayer(aid, A, pid, { drawn: 'chit' });
+  toast(`${A.players[pid]?.name || pid} is up for bidding`, 'ok');
 }
 
 async function doNext() {
