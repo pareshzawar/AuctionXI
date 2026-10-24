@@ -187,9 +187,10 @@ export function teamPurse(team, s, rules, o = {}) {
       + '<div class="row" style="gap:var(--space-5);align-items:flex-end">'
       + `<div class="ax-kv"><span class="ax-k">Purse left</span>${price(s.remaining, rules, { size: 'lg' })}</div>`
       + (o.hideMax ? '' : `<div class="ax-kv"><span class="ax-k">Max bid</span>${price(o.maxBid ?? s.maxBid, rules, { size: 'lg', tone: 'gold' })}</div>`)
+      + `<div class="ax-kv"><span class="ax-k">Still to buy</span><span class="ax-price ax-price-lg"><span class="ax-price-n">${s.toBuy}</span></span></div>`
       + '</div>'
       + meter
-      + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>${s.toBuy ? `${s.toBuy} still to buy` : 'Squad complete'}</span></div>`
+      + `<div class="ax-purse-sub"><span>Spent ${esc(moneyText(s.spent, rules))} of ${esc(moneyText(purse, rules))}</span><span>${s.toBuy ? `${s.count} of ${rules.squadSize} in the squad` : 'Squad complete'}</span></div>`
       + (s.allottedValue ? `<div class="ax-purse-sub"><span>${s.players.some((p) => p.as === 'R') ? 'Kept players' : `Captain${rules.leaders === 'captain_vc' ? ' and VC' : ''}`} value ${esc(moneyText(s.allottedValue, rules))}</span><span>not from the purse</span></div>` : '')
       + (anyRoleMin ? `<div class="ax-slots">${Object.keys(ROLES).filter((k) => Number(roleMin[k])).map((k) => {
         const have = s.byRole[k] || 0;

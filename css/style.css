@@ -328,3 +328,16 @@ fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lo
 @media (prefers-reduced-motion: reduce) {
   .ax-card-live.is-spot, .ax-card-live.is-spot img, .comm-feature, .comm-feature .comm-line, .comm-feature::after, .comm-feature .comm-mic { animation: none !important; }
 }
+
+/* Captain's corner */
+.other-teams .grid-table td, .other-teams .grid-table th { padding: var(--space-2) var(--space-3); }
+.other-teams .num, .coming-list .num { text-align: right; white-space: nowrap; }
+.other-teams tr.is-lead td { background: var(--gold-soft); }
+.coming-list { max-height: 360px; overflow-y: auto; }
+.coming-list td, .coming-list th { padding: var(--space-1) var(--space-3); font-size: 14px; }
+@media (max-width: 600px) {
+  .other-teams .ax-team-name { display: none; }
+  .other-teams .grid-table td, .other-teams .grid-table th { padding: var(--space-2); font-size: 13px; }
+  .other-teams .table-wrap { overflow-x: visible; }
+  .other-teams .grid-table { width: 100%; min-width: 0; }
+}
