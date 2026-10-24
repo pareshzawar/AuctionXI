@@ -60,6 +60,7 @@ export function historyFromRecord(rec) {
   return clean({
     season: String(rec.meta.season || ''),
     name: rec.meta.name || '',
+    kind: rec.meta.kind === 'mini' ? 'mini' : 'major',
     tournament: rec.meta.tournament || '',
     dates: res.dates || rec.meta.date || '',
     venue: res.venue || rec.meta.venue || '',
@@ -79,7 +80,8 @@ export function historyFromRecord(rec) {
 }
 
 // Seasons newest first.
-export const seasonsOf = (a) => Object.values(a.history || {}).sort((x, y) => (Number(y.season) || 0) - (Number(x.season) || 0));
+export const seasonsOf = (a) => Object.entries(a.history || {}).map(([key, h]) => ({ ...h, key }))
+  .sort((x, y) => (Number(y.season) || 0) - (Number(x.season) || 0) || String(y.season).localeCompare(String(x.season)) || (x.kind === 'mini') - (y.kind === 'mini'));
 
 // What each of this season's teams did in a past season: finish, record, and its auction then.
 export function teamPast(h, name) {
