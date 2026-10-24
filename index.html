@@ -61,7 +61,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" id="create">
         <h2>Create a new auction</h2>
         <form id="create-form">
           <label for="c-tournament">Tournament</label>
@@ -103,6 +103,7 @@
             <div id="org-status" style="margin-top:var(--space-3)"></div>
           </div>
           <p style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="c-submit">Create major auction</button></p>
+          <p class="hint">Every new auction starts as a <b>Draft</b>: fill it in at your own pace, then <b>Save and lock details</b> (Setup tab) when it is final. Create as many as you like, side by side: each has its own code, admin console and status.</p>
         </form>
         <p class="hint" style="margin-top:var(--space-4)">Keeping a record of an auction held before? <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Add a past auction (record)<input type="file" id="c-record" accept=".json,application/json" hidden></label>
           Choose its AuctionXI file (<i>auction.json</i>): it is saved as a finished, private auction with its squads and prices, grouped under its tournament.</p>
@@ -142,10 +143,10 @@
         <li>Run the auction from the control room. Captains bid on their phones, or the auctioneer records paddle bids or just the final amount.</li>
         <li>Export the results and archive them in the repo.</li>
       </ol>
-      <p><a href="https://github.com/pareshzawar/AuctionXI#readme">Full guide and rules on GitHub</a></p>
+      <p data-project><a data-project-link="#readme" href="https://github.com/pareshzawar/AuctionXI#readme">Full guide and rules on GitHub</a></p>
     </section>
   </main>
-  <footer class="site">AuctionXI · open source (MIT) · <a href="https://github.com/pareshzawar/AuctionXI">GitHub</a></footer>
+  <footer class="site">AuctionXI · open source (MIT)<span data-project> · <a data-project-link="" href="https://github.com/pareshzawar/AuctionXI">Source code</a></span></footer>
   <script type="module" src="js/home.js"></script>
 </body>
 </html>

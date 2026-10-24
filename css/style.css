@@ -281,3 +281,8 @@ footer.site { text-align: center; color: var(--ink-muted); font-size: 13px; padd
 /* SOLD celebration */
 .confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: calc(var(--layer-overlay) + 2); pointer-events: none; }
 .stage-sound-hint { position: absolute; right: var(--space-10); top: 140px; z-index: 3; padding: 6px 14px; border-radius: var(--radius-full); background: var(--gold-soft); color: var(--gold); font-size: 18px; letter-spacing: .04em; }
+
+/* Draft / Ready: a locked group of setup fields, greyed out and not editable. */
+fieldset.lockset { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.lockset[disabled] .card { opacity: .72; }
+fieldset.lockset[disabled] input, fieldset.lockset[disabled] select, fieldset.lockset[disabled] textarea { cursor: not-allowed; }

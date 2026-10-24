@@ -1,10 +1,16 @@
 import { db, isLocal } from './db.js';
 import { createAuction, claimCaptain, claimCoadmin, isAdmin, viewGate, importAuction, accountAuctions, organiserStatus, claimSite, listOrganisers, addOrganiser, removeOrganiser } from './actions.js';
-import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param } from './ui.js';
+import { $, $$, esc, toast, mountHeader, setSession, rememberAuction, myAuctions, pageUrl, param, projectLink } from './ui.js';
 import { badge } from './ds.js';
-import { vcCanBid, withDefaults, normalize, visibilityOf } from './engine.js';
+import { vcCanBid, withDefaults, normalize, visibilityOf, STAGES, stageOf } from './engine.js';
 
 mountHeader();
+// The guide and source links follow config.projectUrl, so a self-hosted copy can point them at its
+// own fork or hide them.
+for (const a of $$('[data-project-link]')) {
+  const href = projectLink(a.dataset.projectLink);
+  if (href) a.href = href; else a.closest('[data-project]')?.remove();
+}
 
 let found = null; // { aid, meta, teams }
 
@@ -23,7 +29,7 @@ async function loadKnown() {
 }
 
 const kindBadge = (m) => (m.mock ? badge('unsold', { text: 'Mock' }) : badge(m.kind === 'mini' ? 'retained' : 'upcoming', { text: m.kind === 'mini' ? 'Mini' : 'Major' }));
-const statusText = (m) => (m.status === 'live' ? 'live' : m.status === 'completed' ? 'completed' : 'in setup');
+const stageBadge = (m) => { const s = STAGES[stageOf(m)]; return badge(s.badge, { text: s.text }); };
 const label = (x) => `${x.meta.season ? `${x.meta.season} · ` : ''}${x.meta.kind === 'mini' ? 'Mini' : 'Major'} · ${x.meta.name} (${x.id})`;
 
 // My tournaments: grouped by tournament name, seasons newest first.
@@ -38,8 +44,8 @@ function renderMine() {
   $('#mine').innerHTML = [...groups].map(([t, items]) => `
     <h3 style="margin:var(--space-4) 0 var(--space-2)">${esc(t)}</h3>
     <table class="grid-table"><tbody>${items.map((x) => `
-      <tr><td>${kindBadge(x.meta)} <b>${esc(x.meta.season || '')}</b> ${esc(x.meta.name)}
-        <br><small>${esc(x.id)} · ${statusText(x.meta)} · you: ${esc(x.role)}${x.meta.parentName ? ` · based on ${esc(x.meta.parentName)}` : ''}${x.meta.copiedFromName ? ` · rules from ${esc(x.meta.copiedFromName)}` : ''}</small></td>
+      <tr><td>${stageBadge(x.meta)} ${kindBadge(x.meta)} <b>${esc(x.meta.season || '')}</b> ${esc(x.meta.name)}
+        <br><small>${esc(x.id)} · you: ${esc(x.role)}${x.meta.parentName ? ` · based on ${esc(x.meta.parentName)}` : ''}${x.meta.copiedFromName ? ` · rules from ${esc(x.meta.copiedFromName)}` : ''}</small></td>
       <td style="text-align:right" class="row">
         ${x.role === 'admin' ? `<a class="btn btn-sm" href="${pageUrl('admin.html', { a: x.id })}">Admin</a>` : ''}
         <a class="btn btn-sm" href="${pageUrl('live.html', { a: x.id })}">Live</a>

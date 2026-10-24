@@ -1,6 +1,11 @@
 // Small DOM helpers shared by every page.
 
 import { isLocal } from './db.js';
+import * as config from './config.js';
+
+// Older or test copies of config.js may not have these.
+const siteUrl = config.siteUrl || '';
+const projectUrl = config.projectUrl ?? '';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -89,10 +94,23 @@ export function pageUrl(page, params) {
   return u.toString();
 }
 
+// A link to send to other people (join links, QR codes, posters, messages). It follows the address
+// this page is on, so any domain works with no setup; config.siteUrl overrides it when set.
+export function shareUrl(page, params) {
+  if (!siteUrl) return pageUrl(page, params);
+  const base = /\/$/.test(siteUrl) ? siteUrl : `${siteUrl}/`;
+  const u = new URL(page, base);
+  for (const [k, v] of Object.entries(params || {})) if (v != null) u.searchParams.set(k, v);
+  return u.toString();
+}
+
+// The project's guide, or '' when config.projectUrl is empty (self-hosted copies can hide it).
+export const projectLink = (path = '') => (projectUrl ? `${projectUrl.replace(/\/$/, '')}${path}` : '');
+
 export function modeBadge() {
   // In demo mode the badge links to the guide for connecting the free database.
   const el = document.createElement(isLocal ? 'a' : 'span');
-  if (isLocal) { el.href = 'https://github.com/pareshzawar/AuctionXI/blob/main/docs/SETUP.md'; el.target = '_blank'; el.rel = 'noopener'; }
+  if (isLocal) { el.href = projectLink('/blob/main/docs/SETUP.md') || 'docs/SETUP.md'; el.target = '_blank'; el.rel = 'noopener'; }
   el.className = `mode-badge ${isLocal ? 'mode-demo' : 'mode-live'}`;
   el.textContent = isLocal ? 'Demo mode' : 'Connected';
   el.title = isLocal

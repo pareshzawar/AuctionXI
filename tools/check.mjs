@@ -247,3 +247,14 @@ ok(['waiting', 'Waiting list', 'cancelled', 'Registration cancelled', 'Withdrawn
   const rows = auctionRows(a).map((r) => `${r.name}:${r.team || '-'}:${r.price}`).join(',');
   ok(rows === 'A:One:80,B:-:,C:Two:120,D:Two:50', `offline pack rows: ${rows}`);
 }
+{
+  // Draft / Ready / Live / Completed, one per auction.
+  const st = [{ status: 'setup' }, { status: 'setup', detailsLocked: true }, { status: 'live', detailsLocked: true }, { status: 'completed' }].map(E.stageOf).join(',');
+  ok(st === 'draft,ready,live,completed', `auction stages: ${st}`);
+}
+{
+  // No address is built in: nothing in the pages or code points at github.io or a CDN.
+  const files = ['index.html', 'admin.html', 'live.html', 'results.html', 'poster.html', ...fs.readdirSync(root + '/js').map((f) => 'js/' + f)];
+  const hits = files.filter((f) => /github\.io|gstatic\.com|cdnjs|jsdelivr|unpkg/.test(fs.readFileSync(`${root}/${f}`, 'utf8')));
+  ok(!hits.length, `no fixed domain or CDN in the app${hits.length ? `: ${hits.join(', ')}` : ''}`);
+}
