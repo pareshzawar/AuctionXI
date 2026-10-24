@@ -12,3 +12,10 @@ A 31-slide guide to every feature and how to use it, with screenshots of the app
 **Part B, for captains:** joining and bidding from the phone, the private PIN-locked workbook, **My plan** (targets, max bids and what each buy leaves), the *what if I buy…* calculator, notes on other teams, the scratch pad and Ask AI, and what everyone sees on their phones.
 
 **Part C:** the auction-day checklist.
+
+## Captain's corner (for captains and vice-captains)
+
+[`Captains-Corner.pdf`](Captains-Corner.pdf): 8 slides on joining with a code, reading the purse, max bid
+and other teams, bidding, the private workbook and plan, who is still to come, and the tie-breaker draw.
+Send it on WhatsApp with each captain's message from Admin → Access and sharing → **Copy captain message**
+(it already carries the join link and that captain's code). Screenshots use made-up sample data.
