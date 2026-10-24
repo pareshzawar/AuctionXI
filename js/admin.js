@@ -24,7 +24,7 @@ import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { downloadTracker, preloadExcel } from './tracker.js';
 import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
-import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, LOGO, BANNER } from './media.js';
+import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, PHOTO_WHOLE, LOGO, BANNER } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -1108,6 +1108,12 @@ function wireBranding(el) {
   })));
 }
 
+// Ready-made player posters are kept whole (only shrunk); ordinary photos are cropped to 3 : 4.
+// Remembered per auction on this device.
+const wholeKey = () => `auctionxi:photowhole:${aid}`;
+const wholePhotos = () => { try { return localStorage.getItem(wholeKey()) === '1'; } catch { return false; } };
+const photoSize = () => (wholePhotos() ? PHOTO_WHOLE : PHOTO);
+
 function photosCard(list) {
   const have = list.filter(([, p]) => p.photoData || p.photoUrl).length;
   return `<div class="card" style="margin-top:var(--space-4)">
@@ -1116,6 +1122,7 @@ function photosCard(list) {
     <p class="muted">Tap a player to upload their photo from this phone or laptop, or choose many at once named by player ID or name
       (<code>P001.jpg</code>, <code>Rohan Patil.jpg</code>). Photos are cropped to a 3 : 4 portrait and shrunk, and can be changed even after the list is locked.
       A <code>photo_url</code> in the CSV still works; an uploaded photo replaces it.</p>
+    <label class="check"><input type="checkbox" id="ph-whole" ${wholePhotos() ? 'checked' : ''}> Keep each picture whole (no crop): for ready-made player posters. They are only shrunk, and the player card shows the whole picture.</label>
     <div class="photo-grid">${list.map(([id, p]) => `
       <div class="photo-tile">
         <label class="photo-pick" title="Upload a photo of ${esc(p.name)}">
@@ -1132,11 +1139,13 @@ function wirePhotos(el) {
   $$('[data-photo]', el).forEach((inp) => (inp.onchange = run(async (e) => {
     e.stopPropagation();
     const f = inp.files[0]; inp.value = '';
-    if (f) { await setPlayerPhoto(aid, inp.dataset.photo, await resizeImage(f, PHOTO)); toast(`Photo saved for ${A.players[inp.dataset.photo]?.name}`, 'ok'); }
+    if (f) { await setPlayerPhoto(aid, inp.dataset.photo, await resizeImage(f, photoSize())); toast(`Photo saved for ${A.players[inp.dataset.photo]?.name}`, 'ok'); }
   })));
   $$('[data-photo-del]', el).forEach((b) => (b.onclick = run(async () => {
     if (confirm(`Remove the photo of ${A.players[b.dataset.photoDel]?.name}?`)) await setPlayerPhoto(aid, b.dataset.photoDel, null);
   })));
+  const whole = $('#ph-whole', el);
+  if (whole) whole.onchange = () => { try { localStorage.setItem(wholeKey(), whole.checked ? '1' : '0'); } catch { /* private mode */ } };
   const bulk = $('#ph-bulk', el);
   if (bulk) {
     bulk.onchange = run(async (e) => {
@@ -1144,7 +1153,7 @@ function wirePhotos(el) {
       const { matched, unmatched } = matchPhotoFiles(A.players, [...bulk.files]);
       bulk.value = '';
       if (matched.length > 3) toast(`Saving ${matched.length} photos…`);
-      for (const { file, pid } of matched) await setPlayerPhoto(aid, pid, await resizeImage(file, PHOTO));
+      for (const { file, pid } of matched) await setPlayerPhoto(aid, pid, await resizeImage(file, photoSize()));
       toast(`${matched.length} photo${matched.length === 1 ? '' : 's'} saved`, 'ok');
       if (unmatched.length) alert(`No player matched these file names (use the player ID or the exact name):\n\n${unmatched.join('\n')}`);
     });
