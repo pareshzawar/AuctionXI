@@ -25,7 +25,7 @@ import { downloadTracker, preloadExcel } from './tracker.js';
 import { aiReady, aiSettingsCard, aiCommentLine, askAI, parseJSON, playerFacts } from './ai.js';
 import { downloadDeck } from './deck.js';
 import { withLeaders } from './plan.js';
-import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, PHOTO_WHOLE, LOGO, BANNER } from './media.js';
+import { watchMedia, applyMedia, setPlayerPhoto, setBrand, setTeamBanner, resizeImage, matchPhotoFiles, PHOTO, PHOTO_WHOLE, LOGO, BANNER, PHOTO_ACCESS } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
 const P = `auctions/${aid}`;
@@ -254,6 +254,7 @@ function setup(el) {
         ${field('Who bids for the team', `<select id="r-bidders">${Object.entries(BIDDERS).map(([k, v]) => `<option value="${k}" ${k === rules.bidders ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Vice-captains get their own code under Access and sharing.')}
         ${field('Who sees each team\'s remaining budget', `<select id="r-visibility">${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.purseVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
         ${field('Who sees each team\'s max bid', `<select id="r-maxvis"><option value="" ${!rules.maxBidVisibility ? 'selected' : ''}>Same as the budget</option>${Object.entries(PURSE_VISIBILITY).map(([k, v]) => `<option value="${k}" ${k === rules.maxBidVisibility ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'A captain always sees their own team\'s max bid on their phone.')}
+        ${field('Who sees player photos', `<select id="r-photos">${Object.entries(PHOTO_ACCESS).map(([k, v]) => `<option value="${k}" ${k === (rules.photoAccess || 'everyone') ? 'selected' : ''}>${v}</option>`).join('')}</select>`, 'Watermarked photos can\'t be long-pressed or saved. With "only captains…", everyone else sees initials: the database does not send them the photos. The stage shows photos when opened from the organiser\'s laptop.')}
         <label class="check" style="margin-top:var(--space-2)"><input type="checkbox" id="r-showbid" ${rules.showCurrentBid === false ? '' : 'checked'}> Show the current bid on the stage and audience phones</label>
         <span class="hint">Off: the room hears the bids, the screens show who is up and then SOLD with the price. Admins and bidding captains always see the bid.</span>
         <p class="notice notice-info" style="margin:var(--space-4) 0 0">${esc(maxBidExplainer(rules).rule)}<br>${esc(maxBidExplainer(rules).example)}</p>
@@ -389,6 +390,7 @@ async function saveSetup({ quiet = false } = {}) {
     purseVisibility: $('#r-visibility').value,
     maxBidVisibility: $('#r-maxvis').value,
     showCurrentBid: $('#r-showbid').checked,
+    photoAccess: $('#r-photos').value,
     playersPerSide: n('#r-side') || null,
     overs: n('#r-overs') || null,
     bidTimer: n('#r-timer'),
@@ -1144,7 +1146,8 @@ function photosCard(list) {
   const have = list.filter(([, p]) => p.photoData || p.photoUrl).length;
   return `<div class="card" style="margin-top:var(--space-4)">
     <div class="section-title"><h2>Player photos</h2><small>${have} of ${list.length} have a photo</small><span class="spacer"></span>
-      ${fileButton('Upload many photos', 'id="ph-bulk"', true)}</div>
+      ${fileButton('Upload many photos', 'id="ph-bulk"', true)}${have ? '<button class="btn-sm btn-ghost" id="ph-clear" title="For after the auction: removes every uploaded player photo from the database">Delete all photos</button>' : ''}</div>
+    <p class="muted" style="margin-top:0">Who sees them: <b>${esc(PHOTO_ACCESS[A.rules.photoAccess || 'everyone'])}</b> (Setup → Captain and vice-captain).</p>
     <p class="muted">Tap a player to upload their photo from this phone or laptop, or choose many at once named by player ID or name
       (<code>P001.jpg</code>, <code>Rohan Patil.jpg</code>). Photos are cropped to a 3 : 4 portrait and shrunk, and can be changed even after the list is locked.
       A <code>photo_url</code> in the CSV still works; an uploaded photo replaces it.</p>
@@ -1170,6 +1173,11 @@ function wirePhotos(el) {
   $$('[data-photo-del]', el).forEach((b) => (b.onclick = run(async () => {
     if (confirm(`Remove the photo of ${A.players[b.dataset.photoDel]?.name}?`)) await setPlayerPhoto(aid, b.dataset.photoDel, null);
   })));
+  if ($('#ph-clear', el)) $('#ph-clear', el).onclick = run(async () => {
+    if (!confirm('Delete every uploaded player photo from this auction? Phones and the stage show initials instead. This cannot be undone (keep your own copies).')) return;
+    await db.set(`media/${aid}/players`, null);
+    toast('All player photos deleted', 'ok');
+  });
   const whole = $('#ph-whole', el);
   if (whole) whole.onchange = () => { try { localStorage.setItem(wholeKey(), whole.checked ? '1' : '0'); } catch { /* private mode */ } };
   const bulk = $('#ph-bulk', el);

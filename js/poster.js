@@ -4,6 +4,7 @@
 import { db } from './db.js';
 import { $, esc, param, shareUrl } from './ui.js';
 import { qrSvg } from './qr.js';
+import { getMedia } from './media.js';
 
 const aid = (param('a') || '').toUpperCase();
 const state = { size: param('size') === 'a3' ? 'a3' : 'a4', theme: param('theme') === 'light' ? 'light' : 'dark' };
@@ -18,7 +19,7 @@ async function load() {
   const [meta, teams, media] = await Promise.all([
     db.get(`auctions/${aid}/meta`).catch(() => null),
     db.get(`auctions/${aid}/teams`).catch(() => null),
-    db.get(`media/${aid}`).catch(() => null),
+    getMedia(aid),
   ]);
   return { meta, teams: teams || {}, media: media || {} };
 }

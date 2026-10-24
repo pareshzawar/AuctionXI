@@ -13,13 +13,43 @@ export const PHOTO_WHOLE = { max: 960, type: 'image/jpeg', quality: 0.82 }; // a
 export const LOGO = { max: 320, type: 'image/png' }; // keeps a transparent background
 export const BANNER = { max: 2400, type: 'image/jpeg', quality: 0.85 }; // keeps its shape: a wide banner (2400 x 600 fills the live page's bar) or a poster
 
+// Media are read part by part: the league logo, banner and team banners follow the auction's
+// visibility, while player photos can be limited to captains, vice-captains and organisers
+// (rules.photoAccess = 'bidders'); then the database sends them to nobody else.
+const PARTS = ['logo', 'banner', 'teams', 'players'];
 export function watchMedia(aid, cb) {
-  db.on(`media/${aid}`, (v) => cb(v || {}));
+  const m = {};
+  for (const k of PARTS) db.on(`media/${aid}/${k}`, (v) => { m[k] = v || null; cb({ ...m }); });
+}
+export async function getMedia(aid) {
+  const vals = await Promise.all(PARTS.map((k) => db.get(`media/${aid}/${k}`).catch(() => null)));
+  return Object.fromEntries(PARTS.map((k, i) => [k, vals[i]]));
+}
+
+// Who sees player photos (rules.photoAccess): everyone; everyone but watermarked and not
+// saveable; or only captains, vice-captains and organisers (also watermarked).
+export const PHOTO_ACCESS = {
+  everyone: 'Everyone who can watch',
+  protected: 'Everyone, watermarked and not saveable',
+  bidders: 'Only captains, vice-captains and organisers (watermarked)',
+};
+export function protectPhotos(a) {
+  if (typeof document === 'undefined' || !a) return;
+  const on = !!a.rules.photoAccess && a.rules.photoAccess !== 'everyone';
+  document.body.classList.toggle('photos-protected', on);
+  document.body.style.setProperty('--wm', JSON.stringify(`${a.meta.tournament || a.meta.name} · do not share`));
+}
+if (typeof document !== 'undefined') {
+  // No long-press menu, "save image" or dragging of protected photos.
+  document.addEventListener('contextmenu', (e) => {
+    if (document.body.classList.contains('photos-protected') && e.target.closest?.('.ax-photo, .ax-avatar, .stage-tile-photo, .photo-pick')) e.preventDefault();
+  });
 }
 
 // Put uploaded photos and the branding on a normalised auction (call after every update).
 export function applyMedia(a, m) {
   if (!a) return a;
+  protectPhotos(a);
   a.media = m || {};
   for (const [pid, p] of Object.entries(a.players)) p.photoData = a.media.players?.[pid] || null;
   for (const [tid, t] of Object.entries(a.teams || {})) t.bannerData = a.media.teams?.[tid] || null;

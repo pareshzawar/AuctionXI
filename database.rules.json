@@ -42,8 +42,19 @@
     },
     "media": {
       "$aid": {
-        ".read": "root.child('auctions/' + $aid + '/meta/visibility').val() !== 'private' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))",
-        ".write": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())"
+        ".write": "auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())",
+        "logo": {
+          ".read": "root.child('auctions/' + $aid + '/meta/visibility').val() !== 'private' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))"
+        },
+        "banner": {
+          ".read": "root.child('auctions/' + $aid + '/meta/visibility').val() !== 'private' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))"
+        },
+        "teams": {
+          ".read": "root.child('auctions/' + $aid + '/meta/visibility').val() !== 'private' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))"
+        },
+        "players": {
+          ".read": "(root.child('auctions/' + $aid + '/meta/visibility').val() !== 'private' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists()))) && (root.child('auctions/' + $aid + '/rules/photoAccess').val() !== 'bidders' || (auth != null && (root.child('auctions/' + $aid + '/meta/ownerUid').val() === auth.uid || root.child('coadmins/' + $aid + '/' + auth.uid).exists())) || (auth != null && root.child('captains/' + $aid + '/' + auth.uid).exists()))"
+        }
       }
     },
     "notes": {
