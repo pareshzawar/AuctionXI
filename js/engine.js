@@ -210,6 +210,20 @@ export const isAllotted = (p) => !!(p && p.allottedTeam);
 export const isWaiting = (p) => p?.list === 'waiting';
 // Registration cancelled: kept on record, but out of the auction, the lists and the downloads.
 export const isCancelled = (p) => p?.list === 'cancelled';
+
+// Where an auction is in its life: draft (details still changing), ready (details saved and
+// locked), live, completed. Each auction has its own, so several can be set up side by side.
+export const STAGES = {
+  draft: { text: 'Draft', badge: 'upcoming' },
+  ready: { text: 'Ready', badge: 'retained' },
+  live: { text: 'Live', badge: 'live' },
+  completed: { text: 'Completed', badge: 'sold' },
+};
+export function stageOf(meta) {
+  if (meta?.status === 'live') return 'live';
+  if (meta?.status === 'completed') return 'completed';
+  return meta?.detailsLocked ? 'ready' : 'draft';
+}
 // Players who are auctioned: not a captain / vice-captain / kept player, not on the waiting list, not cancelled.
 export const inAuction = (p) => !!p && !isAllotted(p) && !isWaiting(p) && !isCancelled(p);
 // allottedAs: 'C' captain, 'VC' vice-captain, 'R' kept from last season (mini auction).

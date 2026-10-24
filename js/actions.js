@@ -491,9 +491,27 @@ export async function startAuction(aid, a) {
     ...capsUpdate(normalize({ ...a, sales })),
     'meta/status': 'live',
     'meta/locked': true,
+    'meta/detailsLocked': true,
     'meta/startedAt': db.now(),
   });
   await log(aid, { type: 'start' });
+}
+
+// Save and lock the details: setup, teams and the player list stop changing, so everyone can be told
+// "this is final". Small fixes (a player's name, photo, list) still work, as after the start.
+export async function lockDetails(aid, a) {
+  if (a.meta.status !== 'setup') return;
+  if (Object.keys(a.teams || {}).length < 2) throw new Error('Add at least 2 teams before locking the details');
+  if (!Object.keys(a.players || {}).length) throw new Error('Add the players before locking the details');
+  await db.update(`auctions/${aid}/meta`, { detailsLocked: true, locked: true, detailsLockedAt: db.now() });
+  await log(aid, { type: 'ready' });
+}
+
+// Back to draft: everything can be changed again. Only before the auction starts.
+export async function unlockDetails(aid, a) {
+  if (a.meta.status !== 'setup') throw new Error('The auction has started: its details stay locked');
+  await db.update(`auctions/${aid}/meta`, { detailsLocked: false, locked: false, detailsLockedAt: null });
+  await log(aid, { type: 'draft' });
 }
 
 export async function nextRound(aid, a) {

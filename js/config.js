@@ -22,3 +22,12 @@ export const firebaseConfig = {
   messagingSenderId: "508983348632",
   appId: "1:508983348632:web:0399e99b81a9d37af76fed",
 };
+
+// Your own web address (optional). Leave '' and every link, QR code and poster uses the address the
+// page was opened from, so AuctionXI works as it is on GitHub Pages, a custom domain, Netlify, a
+// school server or a laptop. Set it (e.g. 'https://auction.myclub.in/') only if organisers open the
+// console from one address but players should be sent to another.
+export const siteUrl = '';
+
+// Where the "open source" / guide links point. '' hides them. Self-hosting? Point it at your copy.
+export const projectUrl = 'https://github.com/pareshzawar/AuctionXI';

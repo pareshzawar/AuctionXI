@@ -6,17 +6,18 @@ import {
   ROLES, roleId, PICK_ORDERS, BID_MODES, LEADERS, BIDDERS, PURSE_VISIBILITY, randomCode, slug, category,
   leadersOf, hasVC, vcCanBid, isAllotted, leaderLabel, allottedPrice, miniBudget, minBase, linkLeaders, leaderNamesUpdate,
   BOWLING_TYPES, battingHandOf, bowlingArmOf, bowlingTypeOf, VISIBILITY, visibilityOf, isWaiting, isCancelled, inAuction,
+  STAGES, stageOf,
 } from './engine.js';
 import {
   isAdmin, claimCoadmin, placeBid, undoLastBid, recordRoomSale, startPlayer, sell, markUnsold, undoLastSale,
   startAuction, nextRound, finishAuction, exportSnapshot, createMiniAuction, createMockAuction, resetAuction, deleteAuction,
-  setVisibility, syncDirectory, directoryEntry, rememberOnAccount, undoSale, editSale, setTimer,
+  setVisibility, syncDirectory, directoryEntry, rememberOnAccount, undoSale, editSale, setTimer, lockDetails, unlockDetails,
 } from './actions.js';
 import {
   parseCSV, importPlayers, importTeams, playerTemplate, teamTemplate, playersToCSV, toCSV, setupToCSV, importSetup,
   HOUSE_RULE_QUESTIONS, TEAM_COLORS, num,
 } from './csv.js';
-import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, watchConnection, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
+import { $, $$, esc, toast, param, download, readFile, mountHeader, pageUrl, shareUrl, watchConnection, setSession, rememberAuction, deviceCommLang, setDeviceCommLang } from './ui.js';
 import { teamBadge, badge, price, startCountdowns } from './ds.js';
 import { cardFor, livePanel, purses, feed, maxBidExplainer, profileGroups } from './views.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
@@ -96,7 +97,8 @@ let commentator = makeCommentator();
 const miniPreset = param('mini') ? { name: param('mname') || '', season: param('season') || '' } : null;
 if (miniPreset) tab = 'results'; // mini auction builder: { teamId: Set(playerId) } the admin is ticking
 
-mountHeader(`<button class="btn-sm" id="h-pack" title="Excel tracker filled in with everything so far, plus a backup file: to carry on by hand if anything goes wrong">Download offline pack</button>
+mountHeader(`<a class="btn btn-sm" href="index.html#create" title="Set up another auction. Each has its own code, so several can run side by side">New auction</a>
+  <button class="btn-sm" id="h-pack" title="Excel tracker filled in with everything so far, plus a backup file: to carry on by hand if anything goes wrong">Download offline pack</button>
   <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid })}">Open live view</a>
   <a class="btn btn-sm" target="_blank" href="${pageUrl('live.html', { a: aid, screen: 1 })}">Open stage screen</a>`);
 $('#h-pack').onclick = () => downloadPack();
@@ -162,8 +164,8 @@ async function boot() {
     if (A.meta.status === 'live') preloadExcel().catch(() => {});
     commentator.update(A);
     $('#title').textContent = A.meta.name;
-    const st = A.meta.status;
-    $('#status').innerHTML = badge(st === 'live' ? 'live' : st === 'completed' ? 'sold' : 'upcoming', { text: st === 'live' ? 'Live' : st === 'completed' ? 'Completed' : 'Setup' })
+    const st = STAGES[stageOf(A.meta)];
+    $('#status').innerHTML = badge(st.badge, { text: st.text })
       + ` ${badge(A.meta.kind === 'mini' ? 'retained' : 'upcoming', { text: A.meta.kind === 'mini' ? 'Mini auction' : 'Major auction' })}`
       + (A.meta.mock ? ` ${badge('unsold', { text: 'Mock' })}` : '')
       + (visibilityOf(A.meta) === 'private' ? ` ${badge('unsold', { text: 'Private' })}` : '')
@@ -202,7 +204,8 @@ const numIn = (id, v) => `<input id="${id}" inputmode="numeric" value="${esc(v ?
 function setup(el) {
   const { meta, rules } = A;
   const house = Object.fromEntries(rules.houseRules.map((h) => [h.key, h.a]));
-  el.innerHTML = `${brandingCard()}${pastSeasonsCard()}<div class="card" id="ai-card" style="margin-bottom:var(--space-4)"></div>
+  const ready = stageOf(meta) === 'ready';
+  el.innerHTML = `${detailsCard()}${brandingCard()}${pastSeasonsCard()}<div class="card" id="ai-card" style="margin-bottom:var(--space-4)"></div>
     <div class="card" style="margin-bottom:var(--space-4)">
       <div class="section-title"><h2>Fill the setup from a questionnaire</h2></div>
       <p>Every tournament is different. Download the questionnaire (it already has this auction's current answers), fill in the
@@ -210,10 +213,11 @@ function setup(el) {
         squad size, captain and vice-captain prices, who bids, who sees purses, base price, bid increments, bidding mode and house rules.</p>
       <div class="row">
         <button class="btn-primary" id="q-download">Download setup questionnaire</button>
-        <label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)">Upload filled questionnaire<input type="file" accept=".csv,text/csv" id="q-upload" hidden></label>
+        ${ready ? '' : '<label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink)">Upload filled questionnaire<input type="file" accept=".csv,text/csv" id="q-upload" hidden></label>'}
         <a class="btn btn-ghost" href="templates/sample_tournament_setup.csv" download>Example: filled sample</a>
       </div>
     </div>
+    <fieldset class="lockset" ${ready ? 'disabled' : ''}>
     <div class="grid grid-2">
       <div class="card">
         <h2>Tournament</h2>
@@ -292,16 +296,20 @@ function setup(el) {
       </div>
     </div>
     ${A.meta.status !== 'setup' ? '<p class="notice notice-warn" style="margin-top:var(--space-4)">The auction has started. Changing purse or squad rules now affects every team immediately.</p>' : ''}
-    <p class="row" style="margin-top:var(--space-4)"><button class="btn-primary btn-lg" id="save-setup">Save setup</button></p>`;
+    ${ready ? '' : `<p class="row" style="margin-top:var(--space-4)"><button class="btn-lg" id="save-setup">${A.meta.status === 'setup' ? 'Save as draft' : 'Save setup'}</button>${A.meta.status === 'setup' ? '<button class="btn-primary btn-lg" id="save-lock">Save and lock details</button><small class="muted">Draft: save as often as you like. Lock when the setup, teams and players are final.</small>' : ''}</p>`}
+    </fieldset>`;
 
   wireBranding(el);
   wirePastSeasons(el);
   aiSettingsCard($('#ai-card', el));
+  wireDetailsCard(el);
+  $('#q-download').onclick = () => download(`${slug(meta.name) || aid}_setup.csv`, setupToCSV(meta, rules));
+  if (ready) return;
   $('#add-cat').onclick = () => $('#cats').insertAdjacentHTML('beforeend', catRow({ id: '', label: '', base: '', min: '', max: '' }));
   $('#add-inc').onclick = () => $('#incs').insertAdjacentHTML('beforeend', incRow({ upto: '', step: '' }));
   el.onclick = (e) => { if (e.target.matches('[data-del-row]')) e.target.closest('tr').remove(); };
   $('#save-setup').onclick = run(saveSetup);
-  $('#q-download').onclick = () => download(`${slug(meta.name) || aid}_setup.csv`, setupToCSV(meta, rules));
+  if ($('#save-lock')) $('#save-lock').onclick = run(async () => { await saveSetup({ quiet: true }); await lockAll(); });
   $('#q-upload').onchange = run(async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -322,7 +330,41 @@ const incRow = (s) => `<tr><td><input class="i-upto" inputmode="numeric" value="
 
 const n = (sel) => num($(sel).value) ?? 0;
 
-async function saveSetup() {
+// Draft or Ready, on top of the Setup tab. Ready = the setup, teams and players are saved and locked:
+// nothing that changes who is in the auction or the money can be edited by accident. Photos,
+// banners, past seasons, the AI key and small player fixes still work.
+function detailsCard() {
+  const s = stageOf(A.meta);
+  if (s === 'live' || s === 'completed') return '';
+  const teamN = Object.keys(A.teams).length;
+  const playerN = Object.keys(A.players).length;
+  return s === 'ready'
+    ? `<div class="notice notice-ok" style="margin-bottom:var(--space-4)">${badge('retained', { text: 'Ready' })} <b>Details saved and locked.</b> The setup, teams (${teamN}) and players (${playerN}) are final${A.meta.detailsLockedAt ? ` since ${esc(new Date(A.meta.detailsLockedAt).toLocaleString())}` : ''}. Photos, banners, past seasons and small player fixes (<b>Edit</b> in Players) still work.
+        <button class="btn-sm" id="d-unlock">Unlock (back to draft)</button></div>`
+    : `<div class="notice notice-info" style="margin-bottom:var(--space-4)">${badge('upcoming', { text: 'Draft' })} <b>This auction is a draft.</b> Fill in the setup, teams (${teamN}) and players (${playerN}) at your own pace: every save is kept. When it is all final, <b>Save and lock details</b> to mark it Ready.
+        <button class="btn-sm btn-primary" id="d-lock">Save and lock details</button></div>`;
+}
+function wireDetailsCard(el) {
+  if ($('#d-unlock', el)) $('#d-unlock', el).onclick = run(async () => {
+    if (!confirm('Unlock the details? The setup, teams and players can be changed again until you lock them or start the auction.')) return;
+    await unlockDetails(aid, A);
+    toast('Back to draft: details can be changed', 'ok');
+  });
+  if ($('#d-lock', el)) $('#d-lock', el).onclick = run(async () => {
+    if (tab === 'setup' && $('#save-setup')) await saveSetup({ quiet: true });
+    await lockAll();
+  });
+}
+async function lockAll() {
+  if (Object.keys(A.teams).length < 2) throw new Error('Add at least 2 teams before locking the details');
+  if (!Object.keys(A.players).length) throw new Error('Add the players before locking the details');
+  if (!confirm('Save and lock the details? The setup, teams and player list become final (Ready). You can unlock them again before the auction starts.')) { toast('Draft saved', 'ok'); render(true); return; }
+  await lockDetails(aid, A);
+  toast('Details saved and locked: Ready', 'ok');
+  render(true);
+}
+
+async function saveSetup({ quiet = false } = {}) {
   const categories = $$('#cats tr').map((tr) => ({
     id: $('.c-id', tr).value.trim().replace(/[.#$/[\]\s]/g, ''), label: $('.c-label', tr).value.trim(),
     base: num($('.c-base', tr).value) || 0, min: num($('.c-min', tr).value) || 0, max: num($('.c-max', tr).value) || 0,
@@ -374,8 +416,7 @@ async function saveSetup() {
     time: $('#s-time').value.trim() || null,
     organiser: $('#s-organiser').value.trim() || null,
   }, rules);
-  toast('Setup saved', 'ok');
-  render(true);
+  if (!quiet) { toast(A.meta.status === 'setup' ? 'Draft saved' : 'Setup saved', 'ok'); render(true); }
 }
 
 async function saveRules(meta, rules) {
@@ -397,14 +438,17 @@ async function saveRules(meta, rules) {
 
 function teams(el) {
   const entries = Object.entries(A.teams);
+  const ready = stageOf(A.meta) === 'ready';
   el.innerHTML = `
+    ${ready ? `<div class="notice notice-ok" style="margin-bottom:var(--space-4)">${badge('retained', { text: 'Ready' })} Teams are locked with the other details. Banners can still be changed below. <button class="btn-sm" id="d-unlock">Unlock (back to draft)</button></div>` : ''}
     <div class="card">
       <div class="section-title">
         <h2>Teams (${entries.length})</h2><span class="spacer"></span>
         <button class="btn-sm" id="t-template">Download teams template</button>
-        <label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Upload teams CSV<input type="file" accept=".csv,text/csv" id="t-upload" hidden></label>
-        <button class="btn-sm btn-primary" id="t-add">Add team</button>
+        ${ready ? '' : `<label class="btn btn-sm" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink)">Upload teams CSV<input type="file" accept=".csv,text/csv" id="t-upload" hidden></label>
+        <button class="btn-sm btn-primary" id="t-add">Add team</button>`}
       </div>
+      <fieldset class="lockset" ${ready ? 'disabled' : ''}>
       <div class="table-wrap">
         <table class="grid-table"><thead><tr><th>ID</th><th>Name</th><th>Code</th><th>Colour</th><th>Captain</th>${hasVC(A.rules) ? '<th>Vice-captain</th>' : ''}<th>Owner</th><th>Budget</th><th>Players</th><th></th></tr></thead>
         <tbody>${entries.map(([id, t]) => `
@@ -421,14 +465,17 @@ function teams(el) {
             <td><button class="btn-sm btn-ghost" data-del>Remove</button></td>
           </tr>`).join('') || '<tr><td colspan="9" class="muted">No teams yet. Add teams or upload the CSV.</td></tr>'}</tbody></table>
       </div>
+      </fieldset>
       <datalist id="player-names">${Object.values(A.players).map((p) => `<option value="${esc(p.name)}">`).join('')}</datalist>
       <span class="hint">Only the name is required. Three-letter codes appear on the stage and phones. Type the captain${hasVC(A.rules) ? ' and vice-captain' : ''} here or in the teams CSV:
         they are matched to the player list, and anyone not in it yet is added, allotted to the team and never auctioned. Each team gets secret codes under Access and sharing.</span>
     </div>
     ${entries.length ? teamBannersCard(entries) : ''}`;
   wireTeamBanners(el);
+  wireDetailsCard(el);
 
   $('#t-template').onclick = () => download('teams_template.csv', teamTemplate());
+  if (ready) return;
   $('#t-add').onclick = run(async () => {
     let i = entries.length + 1;
     while (A.teams['T' + i]) i++;
@@ -709,7 +756,7 @@ function players(el) {
 
   el.innerHTML = `
     ${locked
-      ? `<div class="notice notice-ok"><b>Player list locked</b>: who is in the auction, pools, base prices and captains are fixed${A.meta.status === 'setup' ? '' : ' now that the auction has started'}. Small fixes still work: <b>Edit</b> a player's name, role, stats or notes, change their list (auction / waiting / cancelled) or photo. ${A.meta.status === 'setup' ? '<button class="btn-sm" id="p-unlock">Unlock to edit everything</button>' : ''}</div>`
+      ? `<div class="notice notice-ok"><b>Player list locked</b>: who is in the auction, pools, base prices and captains are fixed${A.meta.status === 'setup' ? '' : ' now that the auction has started'}. Small fixes still work: <b>Edit</b> a player's name, role, stats or notes, change their list (auction / waiting / cancelled) or photo. ${stageOf(A.meta) === 'ready' ? '<button class="btn-sm" id="d-unlock">Unlock all details (back to draft)</button>' : A.meta.status === 'setup' ? '<button class="btn-sm" id="p-unlock">Unlock to edit everything</button>' : ''}</div>`
       : '<div class="notice notice-info">Upload players, check and fix anything below, then lock the list. A new auction starts with a fresh upload.</div>'}
     <div class="card">
       <div class="section-title">
@@ -767,6 +814,7 @@ function players(el) {
   $('#p-ai').onclick = run(aiScouting);
   $$('[data-edit]', el).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); editPlayer(b.dataset.edit); }));
   if (locked) {
+    wireDetailsCard(el);
     $('#p-unlock') && ($('#p-unlock').onclick = run(() => db.set(`${P}/meta/locked`, false)));
     return;
   }
@@ -1081,9 +1129,9 @@ async function importPlayerRows(rows, replaceAll = false) {
 /* ---------------- 4. Access & sharing ---------------- */
 
 function access(el) {
-  const joinUrl = pageUrl('index.html', { a: aid });
-  const liveUrl = pageUrl('live.html', { a: aid });
-  const screenUrl = pageUrl('live.html', { a: aid, screen: 1 });
+  const joinUrl = shareUrl('index.html', { a: aid });
+  const liveUrl = shareUrl('live.html', { a: aid });
+  const screenUrl = shareUrl('live.html', { a: aid, screen: 1 });
   const caps = Object.entries(captains);
   el.innerHTML = `
     <div class="grid grid-2">
@@ -1395,7 +1443,7 @@ function controlStart(el) {
         ${check(!missing.length && teamN > 0, missing.length ? `${hasVC(rules) ? 'Captain and vice-captain' : 'Captain'} missing for ${missing.map((id) => esc(A.teams[id].name)).join(', ')} (set them in Players)` : `Every team has its ${hasVC(rules) ? 'captain and vice-captain' : 'captain'}`)}
         ${check(toAuction >= needed, `Enough players to auction for every team to reach ${rules.squadSize} (teams need ${needed}; you have ${toAuction})`)}
         ${check(!short.length, short.length ? `Budget too small to fill the squad at base price: ${short.map((id) => esc(A.teams[id].name)).join(', ')}` : 'Every budget covers the players still to buy at base price')}
-        ${check(meta.locked, 'Player list locked')}
+        ${check(meta.detailsLocked, meta.detailsLocked ? 'Details saved and locked (Ready)' : `Details still a draft${meta.locked ? ' (player list locked)' : ''}: Setup → <b>Save and lock details</b> when they are final`)}
         ${check(visibilityOf(meta) !== 'private', visibilityOf(meta) === 'private' ? 'Open the auction to viewers (Access and sharing). It is private now' : 'Open to viewers')}
         ${check(Object.keys(captains).length > 0 || rules.bidMode === 'room', `Bidders signed in (${Object.keys(captains).length}). Optional: you can record bids for them`)}
       </ul>

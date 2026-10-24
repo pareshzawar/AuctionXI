@@ -2,7 +2,7 @@
 // that opens the auction on any phone. poster.html?a=AUCTION[&size=a3][&theme=light]
 
 import { db } from './db.js';
-import { $, esc, param, pageUrl } from './ui.js';
+import { $, esc, param, shareUrl } from './ui.js';
 import { qrSvg } from './qr.js';
 
 const aid = (param('a') || '').toUpperCase();
@@ -31,7 +31,7 @@ function draw({ meta, teams, media }) {
   page.textContent = `@page { size: ${state.size === 'a3' ? 'A3' : 'A4'} portrait; margin: 0; }`;
   el.className = `poster poster-${state.theme}${state.tall ? ' poster-tall' : ''}`;
   if (!meta) { el.innerHTML = '<div class="poster-body"><h1>Auction not found</h1><p>Open this page from Access and sharing in the admin console.</p></div>'; return; }
-  const join = pageUrl('index.html', { a: aid });
+  const join = shareUrl('index.html', { a: aid });
   const when = [niceDate(meta.date), meta.time].filter(Boolean).join(' · ');
   const list = Object.values(teams);
   el.innerHTML = `

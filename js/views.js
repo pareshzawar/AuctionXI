@@ -95,6 +95,8 @@ export function feed(a, limit = 30) {
       case 'edit': return `${badge('paused', { text: 'Corrected' })} ${name(e.playerId)} ${teamBadge(a.teams[e.team])} ${price(e.amount, a.rules, { size: 'sm', tone: 'sold' })} <span class="muted">was ${esc(a.teams[e.fromTeam]?.short || e.fromTeam || '')} ${esc(money(e.fromAmount, a.rules))}</span>`;
       case 'round': return `${badge('upcoming', { text: 'Round' })} Round ${esc(e.round)}: unsold players return`;
       case 'start': return `${badge('live')} Auction started`;
+      case 'ready': return `${badge('retained', { text: 'Ready' })} Details saved and locked`;
+      case 'draft': return `${badge('upcoming', { text: 'Draft' })} Details unlocked for changes`;
       case 'end': return `${badge('paused', { text: 'Closed' })} Auction completed`;
       default: return esc(e.type);
     }

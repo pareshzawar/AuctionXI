@@ -8,7 +8,7 @@
 
 import { firebaseConfig } from './config.js';
 
-const FIREBASE_VERSION = '10.14.1';
+// Firebase JS SDK 10.14.1, in vendor/firebase (update all three files together).
 
 const split = (p) => String(p).split('/').filter(Boolean);
 const clone = (v) => (v == null ? null : JSON.parse(JSON.stringify(v)));
@@ -111,7 +111,9 @@ function localBackend() {
 }
 
 async function firebaseBackend(cfg) {
-  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+  // The Firebase SDK is kept in vendor/firebase (same version), so the site loads nothing from
+  // another host: it works the same on GitHub Pages, a custom domain or any static server.
+  const base = new URL('../vendor/firebase', import.meta.url).href;
   const [{ initializeApp }, D, Au] = await Promise.all([
     import(`${base}/firebase-app.js`),
     import(`${base}/firebase-database.js`),

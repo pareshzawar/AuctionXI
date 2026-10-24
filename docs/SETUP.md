@@ -12,6 +12,21 @@ The site is plain files, so GitHub Pages serves it directly. No build is needed.
 
 The repo must be **public** for free GitHub Pages (private repos need a paid plan).
 
+### Your own domain (optional)
+
+AuctionXI has no address built in: every link, QR code, poster and captain message is made from the address the page is open on, the QR codes are drawn in the browser, and the Firebase SDK is kept in `vendor/firebase`. So any address works, with nothing to change in the code: GitHub Pages with a custom domain, Netlify, Cloudflare Pages, Firebase Hosting, a school or office web server, or `python3 -m http.server` on a laptop.
+
+For **GitHub Pages with your own domain** (e.g. `auction.myclub.in`):
+
+1. At your domain registrar, add a DNS record: for a sub-domain a **CNAME** `auction` → `<github-user>.github.io`; for the bare domain four **A** records to `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
+2. Repo **Settings → Pages → Custom domain**: type `auction.myclub.in` → **Save** (GitHub adds a `CNAME` file to the repo). When the check passes, tick **Enforce HTTPS**.
+3. Firebase console → **Authentication → Settings → Authorized domains → Add domain**: `auction.myclub.in`, so *Sign in with Google* works there (step 4 below).
+
+Optional settings in [`js/config.js`](../js/config.js):
+
+- `siteUrl`: leave `''` (recommended). Set it, e.g. `'https://auction.myclub.in/'`, only if organisers open the console from one address (a laptop, a preview link) but join links and QR codes must always send people to another.
+- `projectUrl`: where the *guide* and *source code* links on the home page go. Point it at your fork, or set `''` to hide them.
+
 ## 2. Create the Firebase project
 
 1. Go to <https://console.firebase.google.com> → **Add project** (Google Analytics not needed).
@@ -26,7 +41,7 @@ The repo must be **public** for free GitHub Pages (private repos need a paid pla
 
 1. **Build → Authentication → Get started**.
 2. **Sign-in method:** enable **Anonymous** (captains, audience) and **Google** (admins, optional but recommended).
-3. **Settings → Authorized domains → Add domain:** `<github-user>.github.io`.
+3. **Settings → Authorized domains → Add domain:** `<github-user>.github.io` (and your own domain, if you use one).
 
 ## 5. Connect the app (the "Firebase config")
 
@@ -63,6 +78,19 @@ Each person who forks AuctionXI puts their **own** Firebase config in their fork
 | Simultaneous connections | 100 | Admin + captains + ~80 phones. For a bigger crowd, put the **Big screen** view on a projector or screen-share it on YouTube/Meet |
 | Storage | 1 GB | Thousands of auctions |
 | Download | 10 GB / month | Plenty for a few auctions per month |
+
+## Several auctions at once: Draft and Ready
+
+An organiser can create as many auctions as they like (home page → *Create a new auction*, or **New auction** at the top of any admin console). Each has its own code, admin console, captains' codes and status, so a men's, ladies' and juniors' auction can be set up side by side, or run on the same evening on different screens.
+
+Each auction moves through four stages, shown on the home page and in the admin console:
+
+| Stage | Meaning |
+|---|---|
+| **Draft** | Every new auction. Change the setup, teams and players freely; *Save as draft* keeps each change. |
+| **Ready** | *Save and lock details* (Setup tab): the setup, teams and player list are final and can't be changed by accident. Photos, banners, past seasons and small player fixes (*Edit* in Players) still work. **Unlock (back to draft)** reopens everything until the auction starts. |
+| **Live** | After *Start auction*. |
+| **Completed** | After *End auction*. |
 
 ## 6. Who can create auctions (approved organisers)
 

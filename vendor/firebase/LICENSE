@@ -1,0 +1,6 @@
+Firebase JavaScript SDK 10.14.1 (firebase-app.js, firebase-auth.js, firebase-database.js),
+copied unchanged from the npm package "firebase" except that the import of firebase-app.js points
+at the local copy instead of www.gstatic.com and the source-map comments are removed.
+
+Copyright Google LLC. Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
