@@ -233,6 +233,7 @@ function setup(el) {
           ${field('Overs', numIn('r-overs', rules.overs))}
         </div>
         ${field('Organiser', `<input id="s-organiser" value="${esc(meta.organiser || '')}">`)}
+        ${field('Live video (YouTube link)', `<input id="s-video" value="${esc(meta.videoUrl || '')}" placeholder="https://youtu.be/… or the YouTube Studio link">`, 'Audience phones get a "Watch live video" button. Any YouTube link to the stream works, even the Studio one.')}
       </div>
       <div class="card">
         <h2>Purse and squad</h2>
@@ -418,6 +419,7 @@ async function saveSetup({ quiet = false } = {}) {
     season: $('#s-season').value.trim() || null,
     time: $('#s-time').value.trim() || null,
     organiser: $('#s-organiser').value.trim() || null,
+    videoUrl: $('#s-video').value.trim() || null,
   }, rules);
   if (!quiet) { toast(A.meta.status === 'setup' ? 'Draft saved' : 'Setup saved', 'ok'); render(true); }
 }
@@ -432,6 +434,7 @@ async function saveRules(meta, rules) {
     'meta/season': meta.season || null,
     'meta/time': meta.time || null,
     'meta/organiser': meta.organiser || null,
+    'meta/videoUrl': meta.videoUrl === undefined ? A.meta.videoUrl || null : meta.videoUrl || null,
     rules,
     ...capsUpdate({ ...A, rules: withDefaults(rules) }),
   });

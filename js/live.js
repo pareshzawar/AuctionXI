@@ -2,7 +2,7 @@
 // ?screen=1 for the projector stage (fixed 1920 x 1080 canvas, always night).
 
 import { db } from './db.js';
-import { basePrice, normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category } from './engine.js';
+import { basePrice, normalize, money, teamSummary, nextBid, bidBlocker, bidLimit, phoneBidding, canSeePurse, category, youtubeId } from './engine.js';
 import { placeBid, myBidderSeat, viewGate, waitUntilOpen } from './actions.js';
 import { whatIf, buyable, withLeaders } from './plan.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
@@ -221,6 +221,7 @@ function renderPhone() {
     }, 0));
   }
   bannerBar(meta.status !== 'setup');
+  videoBar();
   $('#p-top').innerHTML = `
     <div class="page-head">
       <div class="brand-row">
@@ -287,6 +288,27 @@ function bannerBar(live) {
   const img = bar.querySelector('img');
   if (img.getAttribute('src') !== src) { img.src = src; img.alt = `${A.meta.tournament || A.meta.name} banner`; }
   bar.classList.toggle('is-live', live);
+}
+
+// The organisers' YouTube live stream, under the banner. The player only loads when tapped (it uses
+// data) and is kept outside the parts that redraw, so it never restarts on a bid.
+function videoBar() {
+  const id = youtubeId(A.meta.videoUrl);
+  let bar = $('#video-bar');
+  if (!id || A.meta.status === 'completed') { bar?.remove(); return; }
+  if (bar && bar.dataset.vid === id) return;
+  bar?.remove();
+  bar = document.createElement('div');
+  bar.id = 'video-bar';
+  bar.dataset.vid = id;
+  bar.innerHTML = `<button class="btn-sm video-open">▶ Watch live video</button><a class="btn btn-sm btn-ghost" href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">Open in YouTube</a>`;
+  ($('#banner-bar') || $('header.top')).after(bar);
+  bar.querySelector('.video-open').onclick = () => {
+    bar.innerHTML = `<div class="video-frame"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1&playsinline=1" title="Live video" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
+      <p class="row" style="justify-content:center;margin:var(--space-2) 0 0"><button class="btn-sm btn-ghost video-close">Close video</button><a class="btn btn-sm btn-ghost" href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener">Open in YouTube</a></p>`;
+    bar.classList.add('is-open');
+    bar.querySelector('.video-close').onclick = () => { delete bar.dataset.vid; videoBar(); };
+  };
 }
 
 function captainButton() {

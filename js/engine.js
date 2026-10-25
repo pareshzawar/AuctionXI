@@ -216,6 +216,13 @@ export function ladderError(amount, base, rules) {
   return `${money(amount, rules)} is not a bid step. Bids go up by ${money(increment(below ?? base, rules), rules)} here: ${[below, above].filter((x) => x != null && x >= base).map((x) => money(x, rules)).join(' or ')}`;
 }
 
+// A YouTube video id from any of its links: watch?v=, youtu.be/, /live/, /embed/, /shorts/, or
+// the Studio page (studio.youtube.com/video/ID/livestreaming). Null if it isn't one.
+export function youtubeId(url) {
+  const m = String(url || '').match(/(?:youtu\.be\/|[?&]v=|\/(?:live|embed|shorts|video)\/)([\w-]{11})(?![\w-])/);
+  return m ? m[1] : null;
+}
+
 export function category(rules, id) {
   return (rules.categories || []).find((c) => c.id === id) || null;
 }
