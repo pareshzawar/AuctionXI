@@ -1225,7 +1225,8 @@ function access(el) {
           <div style="flex:1;min-width:200px">
             ${field('Join link (captains, team members, audience)', `<input readonly value="${esc(joinUrl)}" onclick="this.select()">`)}
             ${field('Watch-only link', `<input readonly value="${esc(liveUrl)}" onclick="this.select()">`)}
-            ${field('Stage screen (projector)', `<input readonly value="${esc(screenUrl)}" onclick="this.select()">`)}
+            ${field('Stage screen (projector)', `<input readonly value="${esc(screenUrl)}" onclick="this.select()">`, 'Dark by default. For a light stage use the link below, or press T on the stage.')}
+            ${field('Stage screen, light colours', `<input readonly value="${esc(shareUrl('live.html', { a: aid, screen: 1, theme: 'day' }))}" onclick="this.select()">`)}
           </div>
         </div>
         <p class="row" style="margin-bottom:0"><a class="btn btn-sm" href="${esc(pageUrl('poster.html', { a: aid }))}" target="_blank" rel="noopener">Print QR poster</a><small class="muted">A4 or A3 for the club house: banner, date, venue and a big QR code to join.</small></p>

@@ -119,13 +119,37 @@ export function modeBadge() {
   return el;
 }
 
+// Colour scheme, per device: 'auto' follows the phone or laptop, 'day' is light, 'night' dark.
+// The stage keeps its own choice (dark unless set to light), so the projector never flips by itself.
+const THEMES = { auto: 'Auto', day: 'Light', night: 'Dark' };
+const themeKey = (stage) => (stage ? 'auctionxi:stagetheme' : 'auctionxi:theme');
+export function getTheme(stage = false) {
+  const url = new URLSearchParams(location.search).get('theme');
+  if (url === 'day' || url === 'night') return url;
+  try { return localStorage.getItem(themeKey(stage)) || (stage ? 'night' : 'auto'); } catch { return stage ? 'night' : 'auto'; }
+}
+export function applyTheme(stage = false, t = getTheme(stage)) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+}
+export function setTheme(t, stage = false) {
+  try { localStorage.setItem(themeKey(stage), t); } catch { /* private mode */ }
+  applyTheme(stage, t);
+}
+applyTheme();
+
 export function mountHeader(extra = '') {
   const header = $('header.top');
   if (!header) return;
   header.innerHTML = `
     <a class="brand" href="index.html">AuctionXI</a>
     <div class="top-extra">${extra}</div>`;
-  header.append(modeBadge());
+  const btn = document.createElement('button');
+  btn.className = 'btn-sm btn-ghost theme-btn';
+  const label = () => { const t = getTheme(); btn.textContent = THEMES[t]; btn.title = `Colours: ${THEMES[t]} (tap to change)`; };
+  btn.onclick = () => { const order = Object.keys(THEMES); setTheme(order[(order.indexOf(getTheme()) + 1) % order.length]); label(); };
+  label();
+  header.append(btn, modeBadge());
 }
 
 // Commentary language chosen on this device ('' = the tournament's default).

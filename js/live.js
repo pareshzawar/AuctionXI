@@ -8,7 +8,7 @@ import { whatIf, buyable, withLeaders } from './plan.js';
 import { createCommentator, createVoice, LANGUAGES } from './commentary.js';
 import { openWorkbook, renderWorkbook } from './workbook.js';
 import { watchMedia, applyMedia, logoImg, bannerImg } from './media.js';
-import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, watchConnection, deviceCommLang, setDeviceCommLang } from './ui.js';
+import { $, $$, esc, toast, param, getSession, setSession, mountHeader, pageUrl, watchConnection, deviceCommLang, setDeviceCommLang, applyTheme, setTheme, getTheme } from './ui.js';
 import { badge, teamPurse, bidButton, soldStamp, startCountdowns, price } from './ds.js';
 import { cardFor, livePanel, purses, otherTeams, comingLists, tieView, finalBoard, TIE_SHOW, ticker, feed, squads, rulesSummary, lotInfo, maxBidExplainer, profilesView, profileLists, stageBoard, playerStatus, historyView, stageHistory, teamProfile } from './views.js';
 import { seasonsOf } from './history.js';
@@ -42,7 +42,7 @@ function switchLang(l) {
 }
 
 if (stage) {
-  document.documentElement.setAttribute('data-theme', 'night');
+  applyTheme(true);
   document.body.classList.add('stage-mode');
 } else {
   mountHeader(`<a class="btn btn-sm" href="${pageUrl('results.html', { a: aid })}">Results</a>
@@ -98,6 +98,8 @@ async function boot() {
     addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if (k === 'v' && voice.supported) { voice.toggle(commLang()); renderStage(); }
+      // T switches the stage between dark and light (remembered on this laptop).
+      if (k === 't') setTheme(getTheme(true) === 'day' ? 'night' : 'day', true);
       // G changes the voice: Indian female, Indian male, then each voice installed for the language.
       if (k === 'g' && voice.supported) { const o = voice.options(commLang()).map((x) => x.value); voice.choose(o[(o.indexOf(voice.choice) + 1) % o.length], commLang()); renderStage(); }
       if (k === 'l' && A) { const ls = Object.keys(LANGUAGES); switchLang(ls[(ls.indexOf(commLang()) + 1) % ls.length]); renderStage(); }
