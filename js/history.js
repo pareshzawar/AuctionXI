@@ -17,7 +17,7 @@
 
 const TOP = 5;
 
-// Team names change spelling from season to season (Lakeview / Lakevew, Hilltopwalla / Hilltop):
+// Team names change spelling from season to season (Lakeview / Lakevew, Hilltopwala / Hilltop):
 // compare the first word without vowels, and let one be the start of the other.
 export function teamKey(name) {
   const first = String(name || '').toLowerCase().normalize('NFKD').replace(/[^a-z\s]/g, '').trim().split(/\s+/)[0] || '';

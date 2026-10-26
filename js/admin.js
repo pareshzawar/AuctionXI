@@ -1095,7 +1095,7 @@ function teamBannersCard(entries) {
         <span style="flex:1;min-width:0"><b>${esc(t.name)}</b><br><small class="muted">${esc(t.short || id)}</small></span>
         ${fileButton(t.bannerData ? 'Change' : 'Upload', `data-tbanner="${esc(id)}"`)}${t.bannerData ? `<button class="btn-sm btn-ghost" data-tbanner-del="${esc(id)}">Remove</button>` : ''}
       </div>`).join('')}</div>
-    <span class="hint">Upload many at once: name each file by the team's code (TIG.jpg), ID (T5.jpg) or name (Rockport Rangers.jpg).</span>
+    <span class="hint">Upload many at once: name each file by the team's code (TIG.jpg), ID (T5.jpg) or name (Wing A Tigers.jpg).</span>
   </div>`;
 }
 
